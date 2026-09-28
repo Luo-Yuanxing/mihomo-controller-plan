@@ -1,0 +1,19 @@
+{
+  "subscription": {
+    "url": "",
+    "interval": 86400,
+    "useProxy": false,
+    "userAgent": "clash-verge/v3"
+  },
+  "core": {
+    "binaryPath": "resources/bin/mihomo.exe",
+    "mixedPort": 7890,
+    "controllerPort": 9090,
+    "secret": ""
+  },
+  "proxy": {
+    "enabled": false,
+    "server": "127.0.0.1:7890",
+    "override": "localhost;127.*;10.*;172.16.*;192.168.*"
+  }
+}
