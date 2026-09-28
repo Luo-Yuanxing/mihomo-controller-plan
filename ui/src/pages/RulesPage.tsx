@@ -39,7 +39,7 @@ function emptyRule(): EditableRule {
     type: 'DOMAIN-SUFFIX',
     value: '',
     policy: 'PROXY',
-    noResolve: false,
+    noResolve: true,
   };
 }
 

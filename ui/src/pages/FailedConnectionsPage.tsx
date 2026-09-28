@@ -55,7 +55,7 @@ export default function FailedConnectionsPage() {
         type: ruleType,
         value: connection.host,
         policy,
-        noResolve: false,
+        noResolve: true,
       }));
       const created = await api.createRules(rules);
       try {

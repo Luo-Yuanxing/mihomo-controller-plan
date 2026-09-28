@@ -21,7 +21,7 @@ const ruleInputSchema = z.object({
   type: z.enum(RULE_TYPES),
   value: z.string().default(''),
   policy: z.string().min(1),
-  noResolve: z.boolean().default(false),
+  noResolve: z.boolean().default(true),
 });
 
 const rulePatchSchema = ruleInputSchema.partial();
