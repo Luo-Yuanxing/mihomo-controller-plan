@@ -4,13 +4,17 @@
  */
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-/** 开发期由 dev server 提供界面，打包后加载 ui/dist/index.html。 */
+/** 开发期由 Vite dev server 提供界面，打包后加载内置后端（同一进程）。 */
 const devServerUrl = process.env['MCP_DEV_SERVER_URL'] ?? '';
-const allowedOrigin = devServerUrl === '' ? 'file://' : new URL(devServerUrl).origin;
+const port = Number(process.env['MCP_PORT'] ?? 8787);
 
 /** @type {BrowserWindow | null} */
 let win = null;
+/** @type {{ close(): Promise<void>, url: string } | null} */
+let runningServer = null;
+let appUrl = devServerUrl;
 
 function createWindow() {
   win = new BrowserWindow({
@@ -30,11 +34,7 @@ function createWindow() {
     win?.hide();
   });
 
-  if (devServerUrl === '') {
-    void win.loadFile(path.join(app.getAppPath(), 'ui/dist/index.html'));
-  } else {
-    void win.loadURL(devServerUrl);
-  }
+  void win.loadURL(appUrl);
 
   return win;
 }
@@ -43,20 +43,48 @@ function createWindow() {
 app.on('web-contents-created', (_event, contents) => {
   contents.setWindowOpenHandler(() => ({ action: 'deny' }));
   contents.on('will-navigate', (event, url) => {
-    if (!url.startsWith(allowedOrigin)) {
+    if (new URL(url).origin !== new URL(appUrl).origin) {
       event.preventDefault();
     }
   });
 });
 
-function bootstrap() {
-  // TODO: data/run/app.lock + app.requestSingleInstanceLock()，重复启动唤起已有窗口
-  // TODO: 定位数据目录 → 打开 rules.db → 下载订阅 → mihomo -t 预检 → 启动内核 → 启动 ProxyGuard
+/** 主进程即后端：直接跑 dist/server.js，REST 与静态资源都在本进程内。 */
+async function bootstrap() {
+  if (devServerUrl !== '') return;
+
+  const entry = pathToFileURL(path.join(app.getAppPath(), 'dist', 'server.js')).href;
+  const { startServer } = await import(entry);
+  runningServer = await startServer({ appDir: app.getAppPath(), port });
+  appUrl = runningServer.url;
 }
 
+// 单实例：重复双击时唤起已有窗口（计划 §4.4）
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+}
+
+app.on('second-instance', () => {
+  if (win === null) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+});
+
 app.whenReady().then(() => {
-  createWindow();
-  bootstrap();
+  void bootstrap()
+    .then(() => {
+      createWindow();
+    })
+    .catch((error) => {
+      process.stderr.write(`启动失败：${String(error)}\n`);
+      app.quit();
+    });
+});
+
+// 托盘菜单"退出"才会走到这里：停后端、停内核（计划 §4.1 存活关系）
+app.on('before-quit', () => {
+  void runningServer?.close();
 });
 
 // 窗口全关也不退出：代理与内核继续工作（S9）
