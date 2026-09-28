@@ -12,12 +12,57 @@ export interface SubscriptionOptions {
 export interface DownloadResult {
   bytes: number;
   path: string;
+  proxies: number;
 }
 
-/** 失败时保留旧文件并抛出错误；首次启动失败由调用方停止工作。 */
+import path from 'node:path';
+import { fetch as undiciFetch, ProxyAgent } from 'undici';
+import { parse as parseYaml } from 'yaml';
+import { writeFileAtomic } from '../util/atomic.js';
+
+const TIMEOUT_MS = 20_000;
+
+/**
+ * 下载订阅并做最小校验（YAML 可解析且含 proxies / proxy-providers）。
+ * 失败时保留旧文件并抛出错误，由调用方决定是否停止（计划 §5.1）。
+ */
 export async function downloadSubscription(
-  _options: SubscriptionOptions,
-  _dataDir: string,
+  options: SubscriptionOptions,
+  dataDir: string,
+  mixedPort: number,
 ): Promise<DownloadResult> {
-  throw new Error('未实现：订阅下载与校验');
+  if (options.url.trim() === '') {
+    throw new Error('订阅 URL 未配置');
+  }
+
+  const dispatcher = options.useProxy ? new ProxyAgent(`http://127.0.0.1:${mixedPort}`) : undefined;
+  const response = await undiciFetch(options.url, {
+    headers: { 'user-agent': options.userAgent },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    ...(dispatcher === undefined ? {} : { dispatcher }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`订阅下载失败：HTTP ${response.status}`);
+  }
+
+  const text = (await response.text()).replace(/^\uFEFF/, '');
+  let payload: unknown;
+  try {
+    payload = parseYaml(text);
+  } catch (error) {
+    throw new Error(`订阅不是合法 YAML：${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const document = payload as Record<string, unknown> | null;
+  const proxies = Array.isArray(document?.['proxies']) ? document['proxies'].length : 0;
+  const hasProviders =
+    typeof document?.['proxy-providers'] === 'object' && document['proxy-providers'] !== null;
+  if (proxies === 0 && !hasProviders) {
+    throw new Error('订阅内容缺少 proxies / proxy-providers 字段');
+  }
+
+  const target = path.join(dataDir, 'subscription.yaml');
+  await writeFileAtomic(target, text);
+  return { bytes: Buffer.byteLength(text), path: target, proxies };
 }
