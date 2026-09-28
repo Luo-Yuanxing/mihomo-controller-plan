@@ -18,7 +18,14 @@ function normalizeHost(value: string): string {
 }
 
 function normalizeError(value: string): string {
-  return value.replace(/\\n/g, ' | ').replace(/\s+/g, ' ').trim();
+  const normalized = value.replace(/\\n/g, ' | ').replace(/\s+/g, ' ').trim();
+  const detail = /(?:^|\|\s*)(?:connect failed:\s*)?dial\s+(tcp|udp)\s+(\[[^\]]+\]|[^:\s]+):(\d+):\s*([^|]+)/i.exec(
+    normalized,
+  );
+  if (detail === null) return normalized;
+
+  const [, protocol, host, port, reason] = detail;
+  return `${(protocol ?? '').toUpperCase()} ${host ?? ''}:${port ?? ''} ${(reason ?? '').replace(/^i\/o\s+/i, '').trim()}`;
 }
 
 export function parseFailedConnections(lines: string[]): FailedConnection[] {

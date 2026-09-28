@@ -21,7 +21,7 @@ describe('parseFailedConnections', () => {
       count: 2,
       lastSeen: '2026-09-29T06:10:51.067484900+08:00',
     });
-    expect(result[0]?.error).toContain(' | connect failed');
+    expect(result[0]?.error).toBe('TCP 69.63.184.142:443 timeout');
     expect(result[1]).toMatchObject({
       host: 'chat.openai.com',
       count: 1,
