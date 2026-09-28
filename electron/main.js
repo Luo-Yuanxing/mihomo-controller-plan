@@ -101,6 +101,11 @@ function confirmQuit() {
   app.quit();
 }
 
+function quitFromTray() {
+  quitting = true;
+  app.quit();
+}
+
 function createTray(iconPath) {
   const image = nativeImage.createFromPath(iconPath);
   if (image.isEmpty()) {
@@ -114,7 +119,7 @@ function createTray(iconPath) {
       { label: '显示窗口', click: showWindow },
       { label: '立即写入系统代理', click: () => void applySystemProxyFromTray() },
       { type: 'separator' },
-      { label: '退出', click: confirmQuit },
+      { label: '退出', click: quitFromTray },
     ]),
   );
   tray.on('click', showWindow);
