@@ -85,4 +85,6 @@ export const api = {
   applyProxy: () => post<ProxyState>('/api/proxy/apply'),
 
   restartKernel: () => post<CoreStatus>('/api/kernel/restart'),
+  startKernel: () => post<CoreStatus>('/api/kernel/start'),
+  stopKernel: () => post<CoreStatus>('/api/kernel/stop'),
 };

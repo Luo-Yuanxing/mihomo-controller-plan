@@ -59,6 +59,10 @@ export default function StatusPage() {
     api.restartKernel,
     (status) => `内核状态：${status.state}`,
   );
+  const startKernel = useAction(queryClient, setNotice, api.startKernel, (status) =>
+    status.state === 'failed' ? `启动失败：${status.error ?? '未知原因'}` : '内核已启动',
+  );
+  const stopKernel = useAction(queryClient, setNotice, api.stopKernel, () => '内核已停止');
   const refresh = useAction(
     queryClient,
     setNotice,
@@ -73,7 +77,14 @@ export default function StatusPage() {
 
   const data = statusQuery.data;
   const busy =
-    restart.isPending || refresh.isPending || enableProxy.isPending || disableProxy.isPending;
+    restart.isPending ||
+    startKernel.isPending ||
+    stopKernel.isPending ||
+    refresh.isPending ||
+    enableProxy.isPending ||
+    disableProxy.isPending;
+  const kernelState = data?.kernel.state ?? 'stopped';
+  const kernelUp = kernelState === 'running' || kernelState === 'adopted';
 
   return (
     <div className="flex flex-col gap-3">
@@ -86,14 +97,32 @@ export default function StatusPage() {
           <span className="text-xs text-slate-500">
             {data === undefined ? '读取中…' : (STATE_TEXT[data.kernel.state] ?? data.kernel.state)}
           </span>
-          <button
-            type="button"
-            className="ml-auto rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50"
-            disabled={busy}
-            onClick={() => restart.mutate()}
-          >
-            重启内核
-          </button>
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+              disabled={busy || kernelUp}
+              onClick={() => startKernel.mutate()}
+            >
+              启动内核
+            </button>
+            <button
+              type="button"
+              className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+              disabled={busy || !kernelUp}
+              onClick={() => stopKernel.mutate()}
+            >
+              停止内核
+            </button>
+            <button
+              type="button"
+              className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+              disabled={busy}
+              onClick={() => restart.mutate()}
+            >
+              重启内核
+            </button>
+          </div>
         </div>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
           <div className="flex gap-2">

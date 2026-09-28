@@ -215,6 +215,18 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     return ctx.restartKernel();
   });
 
+  app.post('/api/kernel/start', async () => {
+    const status = await ctx.kernel.start();
+    ctx.log.info({ state: status.state }, '内核启动完成');
+    return status;
+  });
+
+  app.post('/api/kernel/stop', async () => {
+    await ctx.kernel.stop();
+    ctx.log.info('内核已停止');
+    return ctx.kernel.status();
+  });
+
   app.get('/api/logs', (request) => {
     const lines = Number((request.query as { lines?: string }).lines ?? 200);
     const max = Number.isInteger(lines) && lines > 0 && lines <= 2000 ? lines : 200;
