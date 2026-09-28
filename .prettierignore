@@ -1,0 +1,10 @@
+node_modules/
+dist/
+out/
+release/
+ui/dist/
+data/
+resources/bin/
+*.log
+# 文档手工维护，不做自动换行重排
+*.md

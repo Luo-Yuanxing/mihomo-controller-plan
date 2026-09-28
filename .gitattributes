@@ -1,0 +1,8 @@
+# 统一按 LF 入库，避免 Windows 上的 CRLF 转换与 prettier endOfLine: lf 冲突
+* text=auto eol=lf
+
+# 二进制文件不做换行转换
+*.exe binary
+*.ico binary
+*.png binary
+*.zip binary
