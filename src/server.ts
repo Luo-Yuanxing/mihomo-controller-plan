@@ -288,7 +288,11 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
 
   const close = async (): Promise<void> => {
     if (subscriptionTimer !== null) clearInterval(subscriptionTimer);
-    guard.stop();
+    try {
+      await guard.shutdown();
+    } catch (error) {
+      log.error({ err: String(error) }, '退出前关闭系统代理失败');
+    }
     await core.stop();
     await app.close();
     db.close();

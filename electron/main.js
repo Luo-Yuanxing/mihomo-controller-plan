@@ -89,7 +89,7 @@ function confirmQuit() {
     noLink: true,
     title: '退出代理控制面板',
     message: '退出后代理将停止',
-    detail: '内核会一并停止；系统代理设置保持当前值，不做还原。',
+    detail: '退出前会关闭系统代理，内核一并停止。',
   };
   const choice =
     win !== null && !win.isDestroyed() && win.isVisible()
@@ -187,7 +187,7 @@ app.whenReady().then(() => {
     });
 });
 
-// 托盘"退出"才会走到这里：停后端、停内核，系统代理保持不动（计划 §4.1）
+// 托盘"退出"才会走到这里：关闭系统代理、停后端与内核
 app.on('before-quit', (event) => {
   if (!quitting && win !== null) {
     event.preventDefault();

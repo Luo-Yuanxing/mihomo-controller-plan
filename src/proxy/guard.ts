@@ -39,6 +39,7 @@ export interface ProxyGuard {
   enable(): Promise<ProxyState>;
   disable(): Promise<ProxyState>;
   apply(): Promise<ProxyState>;
+  shutdown(): Promise<void>;
   start(): void;
   stop(): void;
 }
@@ -149,6 +150,19 @@ export function createProxyGuard(options: ProxyGuardOptions): ProxyGuard {
     }
   }
 
+  async function shutdown(): Promise<void> {
+    stop();
+    if (!supported) return;
+
+    await writeValue('ProxyEnable', 'REG_DWORD', '0');
+    try {
+      await notifyWinInet();
+    } catch (error) {
+      lastError = `系统代理已关闭，但通知系统刷新失败：${String(error)}`;
+      options.log.warn({ err: lastError }, '退出时刷新系统代理失败');
+    }
+  }
+
   return {
     state,
     async enable() {
@@ -171,6 +185,7 @@ export function createProxyGuard(options: ProxyGuardOptions): ProxyGuard {
       await writeDesired();
       return state();
     },
+    shutdown,
     start,
     stop,
   };
