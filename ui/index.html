@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- script-src 的 'unsafe-inline' 仅用于 Vite 开发期注入的 HMR 预热脚本 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:5173 http://127.0.0.1:8787; object-src 'none'; base-uri 'none'"
+    />
     <title>代理控制面板</title>
   </head>
   <body>
