@@ -1,0 +1,239 @@
+/**
+ * REST 接口清单。
+ * 计划 §6 接口清单；仅监听 127.0.0.1，由 server 侧校验 X-Api-Token。
+ */
+import fs from 'node:fs';
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import { z } from 'zod';
+import { renderConfig } from './config/template.js';
+import type { AppContext } from './context.js';
+import { RULE_TYPES, RuleValidationError, renderRuleProvider } from './rules/render.js';
+import { syncRules } from './rules/sync.js';
+import { settingsSchema } from './settings.js';
+import { readFileIfExists } from './util/atomic.js';
+import { logPaths, tailLines } from './util/logger.js';
+import type { RuleInput } from './rules/repo.js';
+
+const ruleInputSchema = z.object({
+  enabled: z.boolean().default(true),
+  // 类型白名单在入口就拦下，避免脏数据进库（计划 §5.4 第 2 步）
+  type: z.enum(RULE_TYPES),
+  value: z.string().default(''),
+  policy: z.string().min(1),
+  noResolve: z.boolean().default(false),
+});
+
+const rulePatchSchema = ruleInputSchema.partial();
+
+const createRulesSchema = z.union([
+  ruleInputSchema,
+  z.array(ruleInputSchema),
+  z.object({ rules: z.array(ruleInputSchema) }),
+]);
+
+function invalid(reply: FastifyReply, error: z.ZodError): FastifyReply {
+  const detail = error.issues
+    .map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`)
+    .join('; ');
+  return reply.status(400).send({ error: `请求参数不合法：${detail}` });
+}
+
+export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
+  app.get('/api/status', async () => ({
+    app: {
+      version: ctx.appVersion,
+      dataDir: ctx.dataDir,
+      dataFallback: ctx.dataFallback,
+      ruleProvider: ctx.ruleProvider,
+      subscriptionProvider: ctx.subscriptionProvider,
+    },
+    kernel: ctx.kernel.status(),
+    subscription: { ...ctx.subscription },
+    proxy: await ctx.guard.state(),
+  }));
+
+  app.get('/api/settings', async () => ctx.settings);
+
+  app.put('/api/settings', async (request, reply) => {
+    const parsed = settingsSchema.safeParse(request.body);
+    if (!parsed.success) return invalid(reply, parsed.error);
+
+    const previous = ctx.settings;
+    const settings = await ctx.saveSettings(parsed.data);
+    await ctx.writeConfig();
+
+    const needsRestart =
+      previous.core.mixedPort !== settings.core.mixedPort ||
+      previous.core.controllerPort !== settings.core.controllerPort ||
+      previous.core.secret !== settings.core.secret;
+    return { settings, needsRestart };
+  });
+
+  app.get('/api/subscription', () => ({
+    config: {
+      url: ctx.settings.subscription.url,
+      interval: ctx.settings.subscription.interval,
+      useProxy: ctx.settings.subscription.useProxy,
+      userAgent: ctx.settings.subscription.userAgent,
+    },
+    state: ctx.subscription,
+    file: ctx.paths.subscription,
+    fileExists: fs.existsSync(ctx.paths.subscription),
+  }));
+
+  app.put('/api/subscription', async (request, reply) => {
+    const schema = z.object({
+      url: z.string().optional(),
+      interval: z.number().int().positive().optional(),
+      useProxy: z.boolean().optional(),
+      userAgent: z.string().min(1).optional(),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) return invalid(reply, parsed.error);
+
+    const current = ctx.settings.subscription;
+    const next = {
+      url: parsed.data.url ?? current.url,
+      interval: parsed.data.interval ?? current.interval,
+      useProxy: parsed.data.useProxy ?? current.useProxy,
+      userAgent: parsed.data.userAgent ?? current.userAgent,
+    };
+    await ctx.saveSettings({ ...ctx.settings, subscription: next });
+    ctx.subscription.url = next.url;
+    ctx.subscription.interval = next.interval;
+    ctx.subscription.useProxy = next.useProxy;
+    ctx.subscription.userAgent = next.userAgent;
+    await ctx.writeConfig();
+    return { config: next };
+  });
+
+  app.post('/api/subscription/refresh', async (request, reply) => {
+    try {
+      return await ctx.refreshSubscription();
+    } catch (error) {
+      return reply.status(502).send({
+        error: error instanceof Error ? error.message : String(error),
+        state: ctx.subscription,
+      });
+    }
+  });
+
+  app.get('/api/rules', () => ({ rules: ctx.repo.list(), provider: ctx.ruleProvider }));
+
+  app.get('/api/rules/provider', async () => {
+    const file = `${ctx.paths.rulesDir}/${ctx.ruleProvider}.yaml`;
+    const yaml = await readFileIfExists(file);
+    return {
+      file,
+      exists: yaml !== null,
+      yaml: yaml ?? renderRuleProvider(ctx.repo.list()),
+    };
+  });
+
+  app.post('/api/rules', async (request, reply) => {
+    const parsed = createRulesSchema.safeParse(request.body);
+    if (!parsed.success) return invalid(reply, parsed.error);
+
+    const inputs = Array.isArray(parsed.data)
+      ? parsed.data
+      : 'rules' in parsed.data
+        ? parsed.data.rules
+        : [parsed.data];
+    const created = ctx.repo.create(inputs);
+    ctx.log.info({ count: created.length }, '新增规则');
+    return reply.status(201).send({ created });
+  });
+
+  app.put('/api/rules/order', async (request, reply) => {
+    const parsed = z.object({ ids: z.array(z.number().int().positive()) }).safeParse(request.body);
+    if (!parsed.success) return invalid(reply, parsed.error);
+    ctx.repo.reorder(parsed.data.ids);
+    return { rules: ctx.repo.list() };
+  });
+
+  app.put('/api/rules/:id', async (request, reply) => {
+    const id = Number((request.params as { id: string }).id);
+    if (!Number.isInteger(id) || id <= 0) return reply.status(400).send({ error: 'id 不合法' });
+    const parsed = rulePatchSchema.safeParse(request.body);
+    if (!parsed.success) return invalid(reply, parsed.error);
+    const patch: Partial<RuleInput> = {};
+    if (parsed.data.enabled !== undefined) patch.enabled = parsed.data.enabled;
+    if (parsed.data.type !== undefined) patch.type = parsed.data.type;
+    if (parsed.data.value !== undefined) patch.value = parsed.data.value;
+    if (parsed.data.policy !== undefined) patch.policy = parsed.data.policy;
+    if (parsed.data.noResolve !== undefined) patch.noResolve = parsed.data.noResolve;
+    return { rule: ctx.repo.update(id, patch) };
+  });
+
+  app.delete('/api/rules/:id', async (request, reply) => {
+    const id = Number((request.params as { id: string }).id);
+    if (!Number.isInteger(id) || id <= 0) return reply.status(400).send({ error: 'id 不合法' });
+    ctx.repo.remove(id);
+    return { rules: ctx.repo.list() };
+  });
+
+  app.post('/api/rules/sync', async (request, reply) => {
+    const parsed = z.object({ force: z.boolean().optional() }).safeParse(request.body ?? {});
+    if (!parsed.success) return invalid(reply, parsed.error);
+    try {
+      const result = await syncRules({
+        repo: ctx.repo,
+        api: ctx.api,
+        dataDir: ctx.dataDir,
+        providerName: ctx.ruleProvider,
+        ...(parsed.data.force === undefined ? {} : { force: parsed.data.force }),
+      });
+      ctx.log.info(result, '规则热更新完成');
+      return { ...result, provider: ctx.ruleProvider };
+    } catch (error) {
+      // 规则本身不合法属于输入类错误，交给统一错误处理返回 400
+      if (error instanceof RuleValidationError) throw error;
+      return reply.status(502).send({
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.get('/api/proxy', () => ctx.guard.state());
+
+  app.post('/api/proxy/enable', async () => {
+    const state = await ctx.guard.enable();
+    ctx.log.info('系统代理已开启并纳入守护');
+    return state;
+  });
+
+  app.post('/api/proxy/disable', async () => {
+    const state = await ctx.guard.disable();
+    ctx.log.info('系统代理已关闭并交还控制权');
+    return state;
+  });
+
+  app.post('/api/proxy/apply', async () => ctx.guard.apply());
+
+  app.post('/api/kernel/restart', async () => {
+    await ctx.writeConfig();
+    return ctx.restartKernel();
+  });
+
+  app.get('/api/logs', (request) => {
+    const lines = Number((request.query as { lines?: string }).lines ?? 200);
+    const max = Number.isInteger(lines) && lines > 0 && lines <= 2000 ? lines : 200;
+    const paths = logPaths(ctx.dataDir);
+    return { app: tailLines(paths.app, max), core: tailLines(paths.core, max) };
+  });
+
+  app.get('/api/config', async () => {
+    const yaml = await readFileIfExists(ctx.paths.config);
+    return {
+      file: ctx.paths.config,
+      yaml:
+        yaml ??
+        renderConfig({
+          settings: ctx.settings,
+          secret: ctx.settings.core.secret,
+          subscriptionProvider: ctx.subscriptionProvider,
+          ruleProvider: ctx.ruleProvider,
+        }),
+    };
+  });
+}
