@@ -65,3 +65,19 @@ export function dataPaths(dataDir: string) {
     coreLock: path.join(dataDir, 'run', 'core.lock'),
   };
 }
+
+/**
+ * 解析随包分发的资源路径：
+ * 开发期是 <repo>/resources/...，打包后是 <install>/resources/...（appDir 变成 app.asar）。
+ */
+export function resolveResourcePath(appDir: string, configured: string): string {
+  if (path.isAbsolute(configured)) return configured;
+
+  // process.resourcesPath 只在 Electron 里存在
+  const packedResources = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const candidates = [path.join(appDir, configured)];
+  if (packedResources !== undefined) {
+    candidates.push(path.join(packedResources, configured.replace(/^resources[\\/]/, '')));
+  }
+  return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0] ?? configured;
+}

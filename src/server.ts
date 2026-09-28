@@ -10,6 +10,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { renderConfig } from './config/template.js';
 import type { AppContext, SubscriptionState } from './context.js';
 import { createCoreApi } from './core/api.js';
+import { ensureGeodata } from './core/geodata.js';
 import { createCoreManager, type CoreStatus } from './core/manager.js';
 import { createProxyGuard } from './proxy/guard.js';
 import { registerRoutes } from './routes.js';
@@ -21,7 +22,7 @@ import { downloadSubscription } from './sub/download.js';
 import { writeFileAtomic } from './util/atomic.js';
 import { acquireLock } from './util/lock.js';
 import { createLogger, logPaths } from './util/logger.js';
-import { dataPaths, resolveDataDir } from './util/paths.js';
+import { dataPaths, resolveDataDir, resolveResourcePath } from './util/paths.js';
 
 export interface ServerOptions {
   /** 应用根目录：开发期是仓库根，打包后是 app.asar 根。 */
@@ -79,6 +80,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const { dataDir, fallback } = resolveDataDir(appDir);
   const paths = dataPaths(dataDir);
   const log = createLogger(dataDir);
+  ensureGeodata(dataDir, appDir, log);
 
   let settings: Settings = loadSettings(dataDir);
   if (settings.core.secret === '') {
@@ -122,9 +124,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
 
   const core = createCoreManager({
     dataDir,
-    binaryPath: path.isAbsolute(settings.core.binaryPath)
-      ? settings.core.binaryPath
-      : path.join(appDir, settings.core.binaryPath),
+    binaryPath: resolveResourcePath(appDir, settings.core.binaryPath),
     configFile: paths.config,
     mixedPort: settings.core.mixedPort,
     controllerPort: settings.core.controllerPort,

@@ -16,11 +16,14 @@ export interface ValidateResult {
 export async function validateConfig(
   binaryPath: string,
   configFile: string,
+  dataDir: string,
 ): Promise<ValidateResult> {
   try {
-    const { stdout, stderr } = await execFileAsync(binaryPath, ['-t', '-f', configFile], {
-      windowsHide: true,
-    });
+    const { stdout, stderr } = await execFileAsync(
+      binaryPath,
+      ['-t', '-d', dataDir, '-f', configFile],
+      { windowsHide: true },
+    );
     return { ok: true, output: `${stdout}${stderr}`.trim() };
   } catch (error) {
     const failure = error as { stdout?: string; stderr?: string; message: string };

@@ -7,6 +7,8 @@ import fs from 'node:fs';
 import { promisify } from 'node:util';
 import type { Logger } from 'pino';
 import { createCoreApi } from './api.js';
+import { validateConfig } from './validate.js';
+import { tailLines } from '../util/logger.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -49,7 +51,7 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
     controller: `127.0.0.1:${options.controllerPort}`,
     secret: options.secret,
   });
-  const readyTimeoutMs = options.readyTimeoutMs ?? 15_000;
+  const readyTimeoutMs = options.readyTimeoutMs ?? 30_000;
   const probeIntervalMs = options.probeIntervalMs ?? 10_000;
 
   let child: ChildProcess | null = null;
@@ -114,6 +116,12 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
       return fail(`未找到内核文件：${options.binaryPath}`);
     }
 
+    // 应用前必须过 mihomo -t，配置错误直接报原始错误（计划 FR-05 / S4）
+    const check = await validateConfig(options.binaryPath, options.configFile, options.dataDir);
+    if (!check.ok) {
+      return fail(`配置预检未通过：\n${check.output}`);
+    }
+
     const args = [
       '-d',
       options.dataDir,
@@ -157,7 +165,10 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
       }
       await new Promise((resolve) => setTimeout(resolve, 300));
     }
-    return fail(`内核 ${readyTimeoutMs} ms 内未就绪`);
+    const tail = tailLines(options.coreLogFile, 20).join('\n');
+    return fail(
+      `内核 ${readyTimeoutMs} ms 内未就绪。内核日志尾部：\n${tail === '' ? '（无输出）' : tail}`,
+    );
   }
 
   async function stop(): Promise<void> {

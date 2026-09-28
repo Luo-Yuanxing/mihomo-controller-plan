@@ -21,6 +21,9 @@ export function renderConfig(options: TemplateOptions): string {
     `mixed-port: ${settings.core.mixedPort}`,
     'mode: rule',
     'log-level: info',
+    // 用本地 geoip.dat/geosite.dat，避免内核去 GitHub 下载 MMDB 而卡在启动阶段
+    'geodata-mode: true',
+    'geo-auto-update: false',
     `external-controller: 127.0.0.1:${settings.core.controllerPort}`,
     `secret: "${secret}"`,
     '',
