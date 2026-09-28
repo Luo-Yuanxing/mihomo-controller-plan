@@ -281,6 +281,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
         log.error({ err: String(error) }, '内核退出后关闭系统代理失败');
       });
     });
+    await guard.apply();
     guard.start();
   }
 
