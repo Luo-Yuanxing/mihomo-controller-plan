@@ -29,6 +29,10 @@ function createWindow() {
   });
 
   // TODO: 关闭窗口只隐藏到托盘；托盘菜单为 显示窗口 / 立即写入系统代理 / 退出
+  win.once('ready-to-show', () => {
+    win?.show();
+  });
+
   win.on('close', (event) => {
     event.preventDefault();
     win?.hide();
