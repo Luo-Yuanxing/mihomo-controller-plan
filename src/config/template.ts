@@ -7,7 +7,8 @@ import type { Settings } from '../settings.js';
 export interface TemplateOptions {
   settings: Settings;
   secret: string;
-  subscriptionProvider: string;
+  /** 为 null 时不引用订阅文件，代理组仅保留直连，保证无订阅时网络可用。 */
+  subscriptionProvider: string | null;
   ruleProvider: string;
 }
 
@@ -16,7 +17,7 @@ export interface TemplateOptions {
  */
 export function renderConfig(options: TemplateOptions): string {
   const { settings, secret } = options;
-  return [
+  const lines = [
     '# 由 mihomo-controller-plan 生成，请勿手工修改',
     `mixed-port: ${settings.core.mixedPort}`,
     'mode: rule',
@@ -33,15 +34,23 @@ export function renderConfig(options: TemplateOptions): string {
     '  nameserver:',
     '    - https://doh.pub/dns-query',
     '',
-    'proxy-providers:',
-    `  ${options.subscriptionProvider}:`,
-    '    type: file',
-    '    path: ./subscription.yaml',
-    '    health-check:',
-    '      enable: true',
-    '      url: https://www.gstatic.com/generate_204',
-    '      interval: 300',
-    '',
+  ];
+
+  if (options.subscriptionProvider !== null) {
+    lines.push(
+      'proxy-providers:',
+      `  ${options.subscriptionProvider}:`,
+      '    type: file',
+      '    path: ./subscription.yaml',
+      '    health-check:',
+      '      enable: true',
+      '      url: https://www.gstatic.com/generate_204',
+      '      interval: 300',
+      '',
+    );
+  }
+
+  lines.push(
     'rule-providers:',
     `  ${options.ruleProvider}:`,
     '    type: file',
@@ -51,13 +60,22 @@ export function renderConfig(options: TemplateOptions): string {
     'proxy-groups:',
     '  - name: PROXY',
     '    type: select',
-    '    use:',
-    `      - ${options.subscriptionProvider}`,
+  );
+
+  if (options.subscriptionProvider === null) {
+    lines.push('    proxies:', '      - DIRECT');
+  } else {
+    lines.push('    use:', `      - ${options.subscriptionProvider}`);
+  }
+
+  lines.push(
     '',
     'rules:',
     `  - RULE-SET,${options.ruleProvider},PROXY`,
     '  - GEOIP,CN,DIRECT',
     '  - MATCH,PROXY',
     '',
-  ].join('\n');
+  );
+
+  return lines.join('\n');
 }

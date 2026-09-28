@@ -48,7 +48,10 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
       subscriptionProvider: ctx.subscriptionProvider,
     },
     kernel: ctx.kernel.status(),
-    subscription: { ...ctx.subscription },
+    subscription: {
+      ...ctx.subscription,
+      fileExists: fs.existsSync(ctx.paths.subscription),
+    },
     proxy: await ctx.guard.state(),
   }));
 
@@ -60,6 +63,11 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
     const previous = ctx.settings;
     const settings = await ctx.saveSettings(parsed.data);
+    ctx.subscription.url = settings.subscription.url;
+    ctx.subscription.interval = settings.subscription.interval;
+    ctx.subscription.useProxy = settings.subscription.useProxy;
+    ctx.subscription.userAgent = settings.subscription.userAgent;
+    ctx.syncSubscriptionTimer();
     await ctx.writeConfig();
 
     const needsRestart =
@@ -103,8 +111,40 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     ctx.subscription.interval = next.interval;
     ctx.subscription.useProxy = next.useProxy;
     ctx.subscription.userAgent = next.userAgent;
+    ctx.syncSubscriptionTimer();
     await ctx.writeConfig();
     return { config: next };
+  });
+
+  app.delete('/api/subscription', async () => {
+    const previous = ctx.settings.subscription;
+    const deleted = fs.existsSync(ctx.paths.subscription);
+    const next = {
+      ...previous,
+      url: '',
+    };
+    await ctx.saveSettings({ ...ctx.settings, subscription: next });
+    ctx.subscription.url = '';
+    ctx.syncSubscriptionTimer();
+
+    try {
+      fs.rmSync(ctx.paths.subscription, { force: true });
+    } catch (error) {
+      await ctx.saveSettings({ ...ctx.settings, subscription: previous });
+      ctx.subscription.url = previous.url;
+      ctx.syncSubscriptionTimer();
+      throw error;
+    }
+
+    ctx.subscription.lastOkAt = null;
+    ctx.subscription.lastError = null;
+    ctx.subscription.bytes = null;
+    await ctx.writeConfig();
+
+    const state = ctx.kernel.status().state;
+    const kernel =
+      state === 'running' || state === 'adopted' ? await ctx.restartKernel() : ctx.kernel.status();
+    return { deleted, config: next, kernel };
   });
 
   app.post('/api/subscription/refresh', async (request, reply) => {
@@ -243,7 +283,9 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
         renderConfig({
           settings: ctx.settings,
           secret: ctx.settings.core.secret,
-          subscriptionProvider: ctx.subscriptionProvider,
+          subscriptionProvider: fs.existsSync(ctx.paths.subscription)
+            ? ctx.subscriptionProvider
+            : null,
           ruleProvider: ctx.ruleProvider,
         }),
     };

@@ -106,12 +106,26 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     bytes: null,
     refreshing: false,
   };
+  let subscriptionTimer: NodeJS.Timeout | null = null;
+
+  const syncSubscriptionTimer = (): void => {
+    if (subscriptionTimer !== null) {
+      clearInterval(subscriptionTimer);
+      subscriptionTimer = null;
+    }
+    if (settings.subscription.url === '') return;
+
+    subscriptionTimer = setInterval(() => {
+      void context.refreshSubscription().catch(() => undefined);
+    }, settings.subscription.interval * 1000);
+    subscriptionTimer.unref?.();
+  };
 
   const writeConfig = async (): Promise<void> => {
     const yaml = renderConfig({
       settings,
       secret: settings.core.secret,
-      subscriptionProvider,
+      subscriptionProvider: fs.existsSync(paths.subscription) ? subscriptionProvider : null,
       ruleProvider,
     });
     await writeFileAtomic(paths.config, yaml);
@@ -182,6 +196,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     async refreshSubscription() {
       context.subscription.refreshing = true;
       try {
+        const hadSubscription = fs.existsSync(paths.subscription);
         const result = await downloadSubscription(
           {
             url: settings.subscription.url,
@@ -192,12 +207,21 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
           dataDir,
           settings.core.mixedPort,
         );
+        await writeConfig();
         context.subscription.lastOkAt = new Date().toISOString();
         context.subscription.lastError = null;
         context.subscription.bytes = result.bytes;
         log.info({ bytes: result.bytes, proxies: result.proxies }, '订阅已更新');
-        if (core.status().state === 'running' || core.status().state === 'adopted') {
-          await api.reloadProxyProvider(subscriptionProvider);
+        const state = core.status().state;
+        if (state === 'running' || state === 'adopted') {
+          if (hadSubscription) {
+            await api.reloadProxyProvider(subscriptionProvider);
+          } else {
+            const status = await core.restart();
+            if (status.state === 'failed') {
+              throw new Error(status.error ?? '订阅已更新，但内核重启失败');
+            }
+          }
         }
         return context.subscription;
       } catch (error) {
@@ -208,6 +232,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
         context.subscription.refreshing = false;
       }
     },
+    syncSubscriptionTimer,
     async restartKernel(): Promise<CoreStatus> {
       return core.restart();
     },
@@ -259,13 +284,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     guard.start();
   }
 
-  let subscriptionTimer: NodeJS.Timeout | null = null;
-  if (settings.subscription.url !== '') {
-    subscriptionTimer = setInterval(() => {
-      void context.refreshSubscription().catch(() => undefined);
-    }, settings.subscription.interval * 1000);
-    subscriptionTimer.unref?.();
-  }
+  context.syncSubscriptionTimer();
 
   const close = async (): Promise<void> => {
     if (subscriptionTimer !== null) clearInterval(subscriptionTimer);
