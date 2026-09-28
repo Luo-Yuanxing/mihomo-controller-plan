@@ -10,6 +10,7 @@ ui/dist/
 data/config.yaml
 data/subscription.yaml
 data/rules.db
+data/settings.json
 data/rules/*.yaml
 data/logs/*
 data/run/*

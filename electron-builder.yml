@@ -1,6 +1,9 @@
 appId: com.mihomo.controller.panel
 productName: 代理控制面板
 asar: true
+# better-sqlite3 是原生模块，必须解包到 app.asar.unpacked
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
 
 directories:
   output: release
@@ -16,13 +19,16 @@ extraResources:
   - from: resources/bin
     to: bin
 
-# data/ 骨架放到 exe 同级，运行时写入都在这里
+# 只拷贝 data 骨架，避免把开发机的真实运行数据打进发布包
 extraFiles:
-  - from: data
+  - from: resources/data-skeleton
     to: data
 
 win:
   target:
     - target: dir
+      arch:
+        - x64
+    - target: zip
       arch:
         - x64
