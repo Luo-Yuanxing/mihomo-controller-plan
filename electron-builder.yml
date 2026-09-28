@@ -20,6 +20,8 @@ extraResources:
     to: bin
   - from: resources/geo
     to: geo
+  - from: resources/tray.png
+    to: tray.png
 
 # 只拷贝 data 骨架，避免把开发机的真实运行数据打进发布包
 extraFiles:

@@ -251,6 +251,10 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   } else {
     core.watch((failed) => {
       log.error({ err: failed.error }, '内核退出，停止守护类工作');
+      // 内核已死，代理指向的端口不再可达，必须关闭系统代理避免整机断网
+      void guard.disable().catch((error) => {
+        log.error({ err: String(error) }, '内核退出后关闭系统代理失败');
+      });
     });
     guard.start();
   }
