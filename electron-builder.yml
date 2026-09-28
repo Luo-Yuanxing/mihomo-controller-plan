@@ -1,0 +1,28 @@
+appId: com.mihomo.controller.panel
+productName: 代理控制面板
+asar: true
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**
+  - ui/dist/**
+  - electron/**
+  - package.json
+
+extraResources:
+  - from: resources/bin
+    to: bin
+
+# data/ 骨架放到 exe 同级，运行时写入都在这里
+extraFiles:
+  - from: data
+    to: data
+
+win:
+  target:
+    - target: dir
+      arch:
+        - x64
