@@ -6,15 +6,15 @@ release/
 ui/dist/
 *.tsbuildinfo
 
-# 运行数据：只保留 data/ 骨架，忽略运行时文件
-data/config.yaml
-data/subscription.yaml
-data/rules.db
-data/settings.json
-data/rules/*.yaml
-data/logs/*
-data/run/*
-!**/.gitkeep
+# 运行数据：只保留 data/ 目录骨架，里面的运行时文件一律不入库
+data/**
+!data/**/
+!data/**/.gitkeep
+
+# 内核二进制随包分发，但不入库（体积大）
+resources/bin/*
+!resources/bin/.gitkeep
+resources/geo/*
 
 # 本地环境与日志
 .env
