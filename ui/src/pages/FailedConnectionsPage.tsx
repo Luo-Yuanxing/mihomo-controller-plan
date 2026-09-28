@@ -24,12 +24,20 @@ export default function FailedConnectionsPage() {
   });
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [hostQuery, setHostQuery] = useState('');
   const [ruleType, setRuleType] = useState<DomainRuleType>('DOMAIN-SUFFIX');
   const [policy, setPolicy] = useState('PROXY');
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   const connections = failedQuery.data?.connections ?? [];
-  const selectedRows = connections.filter((connection) => selected.has(connection.id));
+  const normalizedQuery = hostQuery.trim().toLowerCase();
+  const visibleConnections =
+    normalizedQuery === ''
+      ? connections
+      : connections.filter((connection) => connection.host.toLowerCase().includes(normalizedQuery));
+  const selectedRows = visibleConnections.filter((connection) => selected.has(connection.id));
+  const allVisibleSelected =
+    visibleConnections.length > 0 && selectedRows.length === visibleConnections.length;
 
   function toggle(id: string): void {
     setSelected((current) => {
@@ -42,9 +50,9 @@ export default function FailedConnectionsPage() {
 
   function toggleAll(): void {
     setSelected((current) =>
-      current.size === connections.length && connections.length > 0
-        ? new Set()
-        : new Set(connections.map((connection) => connection.id)),
+      allVisibleSelected
+        ? new Set([...current].filter((id) => !visibleConnections.some((item) => item.id === id)))
+        : new Set([...current, ...visibleConnections.map((connection) => connection.id)]),
     );
   }
 
@@ -92,7 +100,20 @@ export default function FailedConnectionsPage() {
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-base font-semibold">失败连接（{connections.length} 个目标）</h2>
         <span className="text-sm text-slate-500">已选 {selectedRows.length} 个</span>
+        {normalizedQuery !== '' && (
+          <span className="text-sm text-slate-500">匹配 {visibleConnections.length} 个</span>
+        )}
         <label className="ml-auto flex items-center gap-1 text-sm text-slate-500">
+          筛选主机
+          <input
+            type="search"
+            className="w-44 rounded border border-slate-300 px-2 py-1 font-mono text-slate-900"
+            placeholder="例如 com"
+            value={hostQuery}
+            onChange={(event) => setHostQuery(event.target.value)}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-sm text-slate-500">
           规则类型
           <select
             className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
@@ -117,10 +138,10 @@ export default function FailedConnectionsPage() {
         <button
           type="button"
           className="rounded border border-slate-300 bg-white px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
-          disabled={connections.length === 0}
+          disabled={visibleConnections.length === 0}
           onClick={toggleAll}
         >
-          {selected.size === connections.length && connections.length > 0 ? '取消全选' : '全选'}
+          {allVisibleSelected ? '取消全选' : '全选'}
         </button>
         <button
           type="button"
@@ -159,7 +180,7 @@ export default function FailedConnectionsPage() {
             </tr>
           </thead>
           <tbody>
-            {connections.map((connection: FailedConnection) => (
+            {visibleConnections.map((connection: FailedConnection) => (
               <tr key={connection.id} className="border-t border-slate-200 align-top">
                 <td className="px-2 py-2">
                   <input
@@ -181,10 +202,14 @@ export default function FailedConnectionsPage() {
                 </td>
               </tr>
             ))}
-            {connections.length === 0 && (
+            {visibleConnections.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                  {failedQuery.isLoading ? '读取日志中…' : '暂无失败连接'}
+                  {failedQuery.isLoading
+                    ? '读取日志中…'
+                    : connections.length === 0
+                      ? '暂无失败连接'
+                      : '无匹配主机'}
                 </td>
               </tr>
             )}

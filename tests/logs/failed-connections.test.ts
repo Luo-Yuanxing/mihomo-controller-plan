@@ -11,7 +11,10 @@ describe('parseFailedConnections', () => {
     const second = first
       .split('\n')[0]
       ?.replace('2026-09-29T06:09:51.067484900+08:00', '2026-09-29T06:10:51.067484900+08:00');
-    const result = parseFailedConnections([...first.split('\n'), second ?? '']);
+    const result = parseFailedConnections(
+      [...first.split('\n'), second ?? ''],
+      Date.parse('2026-09-29T06:19:51.067484900+08:00'),
+    );
 
     expect(result).toHaveLength(2);
     expect(result[0]).toMatchObject({
@@ -33,7 +36,19 @@ describe('parseFailedConnections', () => {
       parseFailedConnections([
         'time="2026-09-29T06:09:51+08:00" level=info msg="Mixed proxy listening"',
         'time="2026-09-29T06:09:51+08:00" level=error msg="initial rule provider error"',
-      ]),
+      ], Date.parse('2026-09-29T06:09:51+08:00')),
     ).toEqual([]);
+  });
+
+  it('超过 10 分钟的失败记录从零重新计数', () => {
+    const result = parseFailedConnections(
+      [
+        'time="2026-09-29T06:00:00+08:00" level=warning msg="[TCP] dial PROXY (match Match/) 127.0.0.1:59269 --> example.com:443 error: dial tcp 1.1.1.1:443: i/o timeout"',
+        'time="2026-09-29T06:11:00+08:00" level=warning msg="[TCP] dial PROXY (match Match/) 127.0.0.1:59269 --> example.com:443 error: dial tcp 1.1.1.1:443: i/o timeout"',
+      ],
+      Date.parse('2026-09-29T06:11:00+08:00'),
+    );
+
+    expect(result).toMatchObject([{ host: 'example.com', count: 1 }]);
   });
 });

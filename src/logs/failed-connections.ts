@@ -11,6 +11,7 @@ export interface FailedConnection {
 
 const LOG_LINE = /^time="([^"]+)"\s+level=(?:warn(?:ing)?|error)\s+msg="(.*)"$/;
 const DIAL_ERROR = /^\[(TCP|UDP)\]\s+dial\s+.+?\s+-->\s+(.+):(\d+)\s+error:\s*(.*)$/;
+const RETAIN_MS = 10 * 60 * 1000;
 
 function normalizeHost(value: string): string {
   const host = value.trim().replace(/^\[|\]$/g, '');
@@ -28,8 +29,9 @@ function normalizeError(value: string): string {
   return `${(protocol ?? '').toUpperCase()} ${host ?? ''}:${port ?? ''} ${(reason ?? '').replace(/^i\/o\s+/i, '').trim()}`;
 }
 
-export function parseFailedConnections(lines: string[]): FailedConnection[] {
+export function parseFailedConnections(lines: string[], now = Date.now()): FailedConnection[] {
   const grouped = new Map<string, FailedConnection>();
+  const cutoff = now - RETAIN_MS;
 
   for (const line of lines) {
     const log = LOG_LINE.exec(line);
@@ -37,6 +39,8 @@ export function parseFailedConnections(lines: string[]): FailedConnection[] {
 
     const [, timestamp, message] = log;
     if (timestamp === undefined || message === undefined) continue;
+    const occurredAt = Date.parse(timestamp);
+    if (Number.isNaN(occurredAt) || occurredAt < cutoff) continue;
 
     const dial = DIAL_ERROR.exec(message);
     if (dial === null) continue;
