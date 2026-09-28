@@ -1,0 +1,66 @@
+/** 从 mihomo core.log 中提取失败连接，并按协议、主机、端口去重汇总。 */
+export interface FailedConnection {
+  id: string;
+  network: string;
+  host: string;
+  port: number;
+  count: number;
+  lastSeen: string;
+  error: string;
+}
+
+const LOG_LINE = /^time="([^"]+)"\s+level=(?:warn(?:ing)?|error)\s+msg="(.*)"$/;
+const DIAL_ERROR = /^\[(TCP|UDP)\]\s+dial\s+.+?\s+-->\s+(.+):(\d+)\s+error:\s*(.*)$/;
+
+function normalizeHost(value: string): string {
+  const host = value.trim().replace(/^\[|\]$/g, '');
+  return host.toLowerCase();
+}
+
+function normalizeError(value: string): string {
+  return value.replace(/\\n/g, ' | ').replace(/\s+/g, ' ').trim();
+}
+
+export function parseFailedConnections(lines: string[]): FailedConnection[] {
+  const grouped = new Map<string, FailedConnection>();
+
+  for (const line of lines) {
+    const log = LOG_LINE.exec(line);
+    if (log === null) continue;
+
+    const [, timestamp, message] = log;
+    if (timestamp === undefined || message === undefined) continue;
+
+    const dial = DIAL_ERROR.exec(message);
+    if (dial === null) continue;
+
+    const [, network, rawHost, rawPort, rawError] = dial;
+    if (network === undefined || rawHost === undefined || rawPort === undefined) continue;
+
+    const host = normalizeHost(rawHost);
+    const port = Number(rawPort);
+    if (host === '' || !Number.isInteger(port)) continue;
+
+    const id = `${network.toLowerCase()}:${host}:${String(port)}`;
+    const existing = grouped.get(id);
+    if (existing === undefined) {
+      grouped.set(id, {
+        id,
+        network,
+        host,
+        port,
+        count: 1,
+        lastSeen: timestamp,
+        error: normalizeError(rawError ?? ''),
+      });
+      continue;
+    }
+
+    existing.count += 1;
+    existing.lastSeen = timestamp;
+  }
+
+  return [...grouped.values()].sort(
+    (left, right) => Date.parse(right.lastSeen) - Date.parse(left.lastSeen),
+  );
+}

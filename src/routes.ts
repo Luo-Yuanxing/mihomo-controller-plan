@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { renderConfig } from './config/template.js';
 import type { AppContext } from './context.js';
+import { parseFailedConnections } from './logs/failed-connections.js';
 import { RULE_TYPES, RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
@@ -156,6 +157,18 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
         state: ctx.subscription,
       });
     }
+  });
+
+  app.get('/api/failed-connections', (request) => {
+    const lines = Number((request.query as { lines?: string }).lines ?? 5000);
+    const maxLines = Number.isInteger(lines) && lines > 0 && lines <= 20_000 ? lines : 5000;
+    const file = logPaths(ctx.dataDir).core;
+    const scanned = tailLines(file, maxLines);
+    return {
+      file,
+      scannedLines: scanned.length,
+      connections: parseFailedConnections(scanned),
+    };
   });
 
   app.get('/api/rules', () => ({ rules: ctx.repo.list(), provider: ctx.ruleProvider }));
