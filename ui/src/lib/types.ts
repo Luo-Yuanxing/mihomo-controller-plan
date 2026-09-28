@@ -99,7 +99,7 @@ export interface StatusResponse {
     subscriptionProvider: string;
   };
   kernel: CoreStatus;
-  subscription: SubscriptionState;
+  subscription: SubscriptionState & { fileExists: boolean };
   proxy: ProxyState;
 }
 

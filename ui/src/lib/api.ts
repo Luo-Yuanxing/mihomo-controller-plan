@@ -77,6 +77,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(patch),
     }),
+  deleteSubscription: () =>
+    request<{ deleted: boolean; config: SubscriptionConfig; kernel: CoreStatus }>(
+      '/api/subscription',
+      { method: 'DELETE' },
+    ),
   refreshSubscription: () => post<SubscriptionState>('/api/subscription/refresh'),
 
   proxy: () => request<ProxyState>('/api/proxy'),

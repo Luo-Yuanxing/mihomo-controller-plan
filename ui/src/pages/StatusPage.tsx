@@ -69,6 +69,24 @@ export default function StatusPage() {
     api.refreshSubscription,
     () => '订阅已更新并通知内核重载',
   );
+  const removeSubscription = useMutation({
+    mutationFn: api.deleteSubscription,
+    onSuccess: async (result) => {
+      setNotice({
+        kind: result.kernel.state === 'failed' ? 'error' : 'ok',
+        text:
+          result.kernel.state === 'failed'
+            ? `订阅已删除，但内核重启失败：${result.kernel.error ?? '未知原因'}`
+            : '订阅已删除，网络已切换为直连',
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['status'] }),
+        queryClient.invalidateQueries({ queryKey: ['settings'] }),
+        queryClient.invalidateQueries({ queryKey: ['logs'] }),
+      ]);
+    },
+    onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
+  });
   const enableProxy = useAction(queryClient, setNotice, api.enableProxy, () => '系统代理已开启');
   const disableProxy = useAction(queryClient, setNotice, api.disableProxy, () => '系统代理已关闭');
   const applyProxy = useAction(queryClient, setNotice, api.applyProxy, (state) =>
@@ -81,6 +99,7 @@ export default function StatusPage() {
     startKernel.isPending ||
     stopKernel.isPending ||
     refresh.isPending ||
+    removeSubscription.isPending ||
     enableProxy.isPending ||
     disableProxy.isPending;
   const kernelState = data?.kernel.state ?? 'stopped';
@@ -165,6 +184,19 @@ export default function StatusPage() {
           >
             刷新订阅
           </button>
+          <button
+            type="button"
+            className="rounded border border-rose-300 px-2 py-1 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+            disabled={
+              busy || (data?.subscription.fileExists !== true && data?.subscription.url === '')
+            }
+            onClick={() => {
+              if (!window.confirm('删除订阅文件并将网络切换为直连？')) return;
+              removeSubscription.mutate();
+            }}
+          >
+            删除订阅
+          </button>
         </div>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
           <div className="col-span-2 flex gap-2">
@@ -174,6 +206,10 @@ export default function StatusPage() {
           <div className="flex gap-2">
             <dt className="text-slate-500">刷新间隔</dt>
             <dd>{data === undefined ? '—' : `${String(data.subscription.interval)} s`}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="text-slate-500">订阅文件</dt>
+            <dd>{data?.subscription.fileExists === true ? '已存在' : '未配置'}</dd>
           </div>
           <div className="flex gap-2">
             <dt className="text-slate-500">下载走代理</dt>
