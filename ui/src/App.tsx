@@ -5,12 +5,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from './lib/api';
+import FailedConnectionsPage from './pages/FailedConnectionsPage';
 import RulesPage from './pages/RulesPage';
 import SettingsPage from './pages/SettingsPage';
 import StatusPage from './pages/StatusPage';
 
 const TABS = [
   { key: 'rules', label: '规则', render: () => <RulesPage /> },
+  { key: 'failed', label: '失败连接', render: () => <FailedConnectionsPage /> },
   { key: 'status', label: '状态', render: () => <StatusPage /> },
   { key: 'settings', label: '设置', render: () => <SettingsPage /> },
 ] as const;

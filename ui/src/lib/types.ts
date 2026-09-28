@@ -109,6 +109,16 @@ export interface SyncResult {
   provider: string;
 }
 
+export interface FailedConnection {
+  id: string;
+  network: string;
+  host: string;
+  port: number;
+  count: number;
+  lastSeen: string;
+  error: string;
+}
+
 export interface LogsResponse {
   app: string[];
   core: string[];

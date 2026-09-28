@@ -1,6 +1,7 @@
 /** 后端 REST 客户端；Electron 内置服务与 Vite dev 代理都是同源，无需带完整地址。 */
 import type {
   CoreStatus,
+  FailedConnection,
   LogsResponse,
   ProxyState,
   Rule,
@@ -39,6 +40,10 @@ const post = <T>(path: string, body: unknown = {}): Promise<T> =>
 export const api = {
   status: () => request<StatusResponse>('/api/status'),
   logs: (lines = 200) => request<LogsResponse>(`/api/logs?lines=${String(lines)}`),
+  failedConnections: (lines = 5000) =>
+    request<{ file: string; scannedLines: number; connections: FailedConnection[] }>(
+      `/api/failed-connections?lines=${String(lines)}`,
+    ),
 
   rules: () => request<{ rules: Rule[]; provider: string }>('/api/rules'),
   ruleProvider: () =>
