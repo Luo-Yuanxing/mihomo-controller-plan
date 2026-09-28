@@ -2,9 +2,10 @@
  * SQLite 连接与建表，唯一使用数据库的地方。
  * 计划 §5.3 规则存储。
  */
-import type BetterSqlite3 from 'better-sqlite3';
+import path from 'node:path';
+import Database from 'better-sqlite3';
 
-export type RulesDatabase = BetterSqlite3.Database;
+export type RulesDatabase = Database.Database;
 
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS rules (
@@ -19,6 +20,9 @@ CREATE TABLE IF NOT EXISTS rules (
 CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 `;
 
-export function openRulesDatabase(_dataDir: string): RulesDatabase {
-  throw new Error('未实现：打开 data/rules.db');
+export function openRulesDatabase(dataDir: string): RulesDatabase {
+  const db = new Database(path.join(dataDir, 'rules.db'));
+  db.pragma('journal_mode = WAL');
+  db.exec(SCHEMA);
+  return db;
 }

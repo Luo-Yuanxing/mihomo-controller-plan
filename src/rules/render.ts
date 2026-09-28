@@ -18,6 +18,48 @@ export const RULE_TYPES = [
 
 export type RuleType = (typeof RULE_TYPES)[number];
 
-export function renderRuleProvider(_rules: Rule[]): string {
-  throw new Error('未实现：渲染 rule-provider yaml');
+export class RuleValidationError extends Error {
+  constructor(
+    message: string,
+    readonly ruleId: number,
+  ) {
+    super(`规则 id=${ruleId} 不合法：${message}`);
+    this.name = 'RuleValidationError';
+  }
+}
+
+const SAFE_SCALAR = /^[A-Za-z0-9._/:,*+-]+$/;
+
+function emitScalar(value: string): string {
+  if (SAFE_SCALAR.test(value) && !value.startsWith('-') && !value.endsWith(':')) return value;
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+/** 单条规则的 mihomo rule 文本；MATCH 不带匹配值。 */
+export function renderRuleLine(rule: Rule): string {
+  if (!(RULE_TYPES as readonly string[]).includes(rule.type)) {
+    throw new RuleValidationError(`未知类型 ${rule.type}`, rule.id);
+  }
+  if (rule.policy.trim() === '') {
+    throw new RuleValidationError('目标策略为空', rule.id);
+  }
+  if (rule.type !== 'MATCH' && rule.value.trim() === '') {
+    throw new RuleValidationError('匹配值为空', rule.id);
+  }
+
+  const parts = [rule.type];
+  if (rule.type !== 'MATCH') parts.push(rule.value);
+  parts.push(rule.policy);
+  if (rule.noResolve) parts.push('no-resolve');
+  return parts.map(emitScalar).join(',');
+}
+
+/** 渲染 rule-provider 内容（behavior: classical），计划 §7.2。 */
+export function renderRuleProvider(rules: Rule[]): string {
+  const header = ['# 由 mihomo-controller-plan 生成，请勿手工修改'];
+  const enabled = rules.filter((rule) => rule.enabled);
+  if (enabled.length === 0) return `${[...header, 'payload: []'].join('\n')}\n`;
+
+  const lines = enabled.map((rule) => `  - ${renderRuleLine(rule)}`);
+  return `${[...header, 'payload:', ...lines].join('\n')}\n`;
 }
