@@ -17,6 +17,7 @@ import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
 import { UiConfigValidationError } from './ui-config.js';
 import { readFileIfExists } from './util/atomic.js';
+import { resolveBinaryPath } from './util/paths.js';
 import { logPaths, tailLines } from './util/logger.js';
 import type { RuleInput } from './rules/repo.js';
 
@@ -78,8 +79,20 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     const parsed = settingsSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply, parsed.error);
 
+    // 内核路径和界面常量配置文件一样：解析成绝对路径并落盘，路径不存在直接拒绝
+    let binaryPath: string;
+    try {
+      binaryPath = resolveBinaryPath(ctx.appDir, parsed.data.core.binaryPath);
+    } catch (error) {
+      return reply.status(400).send({ error: errorText(error) });
+    }
+
     const previous = ctx.settings;
-    const settings = await ctx.saveSettings(parsed.data);
+    const settings = await ctx.saveSettings({
+      ...parsed.data,
+      core: { ...parsed.data.core, binaryPath },
+    });
+    ctx.kernel.setBinary(binaryPath);
     ctx.subscription.url = settings.subscription.url;
     ctx.subscription.useProxy = settings.subscription.useProxy;
     ctx.subscription.userAgent = settings.subscription.userAgent;

@@ -29,6 +29,8 @@ export interface CoreManager {
   restart(): Promise<CoreStatus>;
   stop(): Promise<void>;
   status(): CoreStatus;
+  /** 换内核可执行文件；下次 start/restart 用新路径。 */
+  setBinary(path: string): void;
   /** 每 10 s 探活，内核中途退出时回调（计划 §5.2 运行期）。 */
   watch(onExit: (status: CoreStatus) => void): void;
 }
@@ -59,6 +61,7 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
   let version: string | null = null;
   let error: string | null = null;
   let timer: NodeJS.Timeout | null = null;
+  let binaryPath = options.binaryPath;
 
   function status(): CoreStatus {
     return {
@@ -68,7 +71,7 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
       error,
       controller: `127.0.0.1:${options.controllerPort}`,
       mixedPort: options.mixedPort,
-      binaryPath: options.binaryPath,
+      binaryPath,
     };
   }
 
@@ -112,12 +115,12 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
     if (state === 'running' && child?.exitCode === null) return status();
     if (await adopt()) return status();
 
-    if (!fs.existsSync(options.binaryPath)) {
-      return fail(`未找到内核文件：${options.binaryPath}`);
+    if (!fs.existsSync(binaryPath)) {
+      return fail(`未找到内核文件：${binaryPath}`);
     }
 
     // 应用前必须过 mihomo -t，配置错误直接报原始错误（计划 FR-05 / S4）
-    const check = await validateConfig(options.binaryPath, options.configFile, options.dataDir);
+    const check = await validateConfig(binaryPath, options.configFile, options.dataDir);
     if (!check.ok) {
       return fail(`配置预检未通过：\n${check.output}`);
     }
@@ -133,7 +136,7 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
       options.secret,
     ];
 
-    const spawned = spawn(options.binaryPath, args, {
+    const spawned = spawn(binaryPath, args, {
       cwd: options.dataDir,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -213,6 +216,9 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
     },
     stop,
     status,
+    setBinary(next: string) {
+      binaryPath = next;
+    },
     watch,
   };
 }

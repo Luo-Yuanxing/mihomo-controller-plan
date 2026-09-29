@@ -150,13 +150,16 @@ export default function SettingsPage() {
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
         <h2 className="text-base font-semibold">内核</h2>
-        <Field label="内核路径" hint="相对路径按应用目录解析">
+        <Field label="内核路径" hint="保存后落成绝对路径">
           <input
             className={inputClass}
             value={draft.core.binaryPath}
             onChange={(event) => patch({ core: { ...draft.core, binaryPath: event.target.value } })}
           />
         </Field>
+        {draft.core.binaryPath.trim() === '' && (
+          <p className="text-xs text-rose-600">内核路径不能为空</p>
+        )}
         <Field label="混合端口">
           <input
             type="number"

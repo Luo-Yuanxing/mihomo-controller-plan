@@ -198,7 +198,11 @@ describe.skipIf(!canLoadFastify)('PUT /api/settings', () => {
   });
 
   function withProxyGroup(proxyGroup: string) {
-    return { ...DEFAULT_SETTINGS, subscription: { ...DEFAULT_SETTINGS.subscription, proxyGroup } };
+    return {
+      ...DEFAULT_SETTINGS,
+      core: { ...DEFAULT_SETTINGS.core, binaryPath: process.execPath },
+      subscription: { ...DEFAULT_SETTINGS.subscription, proxyGroup },
+    };
   }
 
   const extra = () => {
@@ -223,6 +227,7 @@ describe.skipIf(!canLoadFastify)('PUT /api/settings', () => {
             restarts.push('restart');
             return { state: 'running' };
           },
+          setBinary: () => undefined,
         },
       },
     };
@@ -256,6 +261,24 @@ describe.skipIf(!canLoadFastify)('PUT /api/settings', () => {
     const body = response.json<{ groupsRebuilt: boolean; needsRestart: boolean }>();
     expect(body.groupsRebuilt).toBe(false);
     expect(body.needsRestart).toBe(true);
+    expect(restarts).toHaveLength(0);
+    await app.close();
+  });
+
+  it('内核路径不存在直接 400，不落库也不重启', async () => {
+    const { restarts, context } = extra();
+    const app = buildApp(fakeApi(), { ...context, settings: withProxyGroup('Proxy') });
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: {
+        ...withProxyGroup('Proxy'),
+        core: { ...DEFAULT_SETTINGS.core, binaryPath: 'resources/bin/没有这个.exe' },
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json<{ error: string }>().error).toContain('不存在或不可读');
     expect(restarts).toHaveLength(0);
     await app.close();
   });

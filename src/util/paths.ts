@@ -81,3 +81,23 @@ export function resolveResourcePath(appDir: string, configured: string): string 
   }
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? candidates[0] ?? configured;
 }
+
+/**
+ * 内核可执行文件路径：非空 + 解析成绝对路径 + 必须存在且是文件。
+ * 相对路径按"应用目录 → 打包后的 resources 目录"解析，和随包资源同一套规则；
+ * 成功后返回绝对路径，由调用方落盘（和界面常量配置文件路径一样存绝对路径）。
+ */
+export function resolveBinaryPath(appDir: string, configured: string): string {
+  const raw = configured.trim();
+  if (raw === '') throw new Error('内核路径不能为空');
+
+  const resolved = path.isAbsolute(raw) ? raw : resolveResourcePath(appDir, raw);
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(resolved);
+  } catch {
+    throw new Error(`内核文件不存在或不可读：${resolved}`);
+  }
+  if (!stat.isFile()) throw new Error(`内核路径不是文件：${resolved}`);
+  return path.resolve(resolved);
+}

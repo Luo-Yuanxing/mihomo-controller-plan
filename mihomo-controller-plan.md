@@ -265,6 +265,7 @@ proxy-providers:
 | 能力 | 设计 |
 | --- | --- |
 | 启动 | `spawn(bin, ['-d', dir, '-f', config, '-ext-ctl', '127.0.0.1:9090', '-secret', S], { windowsHide: true })`，stdout/stderr 收进日志 |
+| 内核路径 | `settings.json` 里存绝对路径：保存时按"绝对路径 → 应用目录 → 打包后的 resources 目录"解析并校验存在，失败直接 400；运行时换路径下次 start/restart 生效 |
 | 就绪探测 | 轮询 `GET /version`，超时 15 s 视为失败并附日志尾部，随后停止 |
 | 运行期 | 每 10 s 探活；发现内核退出则记录退出码与日志尾部后停止工作 |
 | 存活关系 | 内核不随窗口关闭结束；只有托盘菜单"退出"才结束它 |
@@ -434,6 +435,7 @@ payload:
 - TypeScript strict；ESLint + Prettier。
 - 测试：Vitest 覆盖规则渲染、SQLite 读写、原子写、配置预检；注册表操作抽成接口后可 mock。
 - 打包：electron-builder 产出免安装文件夹（exe + resources + data 骨架），压缩成 zip 分发；不做单文件打包、安装包、签名与自动更新。
+- 内核二进制：`resources/bin/mihomo.exe` 作为预设版本随包分发（`extraResources` → `resources/bin`），不入库；`npm run dist` 前先跑 `scripts/check-mihomo-binary.mjs`，缺文件直接失败，避免发出没有内核的包。
 
 ---
 
