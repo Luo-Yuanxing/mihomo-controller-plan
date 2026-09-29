@@ -1,9 +1,9 @@
 /** 状态页：内核状态、端口、订阅信息、系统代理三项状态、重启内核。计划 §8。 */
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import Notice from '../components/Notice';
+import NoticeStack from '../components/NoticeStack';
 import { api } from '../lib/api';
 import type { ProxyValues } from '../lib/types';
+import { useNotices, type NoticeKind } from '../lib/useNotices';
 
 const STATE_TEXT: Record<string, string> = {
   running: '运行中',
@@ -12,21 +12,19 @@ const STATE_TEXT: Record<string, string> = {
   failed: '异常',
 };
 
-type NoticeState = { kind: 'ok' | 'error'; text: string } | null;
-
 function useAction<T>(
   queryClient: QueryClient,
-  setNotice: (notice: NoticeState) => void,
+  push: (kind: NoticeKind, text: string) => void,
   action: () => Promise<T>,
   okText: (result: T) => string,
 ) {
   return useMutation({
     mutationFn: action,
     onSuccess: async (result) => {
-      setNotice({ kind: 'ok', text: okText(result) });
+      push('ok', okText(result));
       await queryClient.invalidateQueries({ queryKey: ['status'] });
     },
-    onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
+    onError: (error: Error) => push('error', error.message),
   });
 }
 
@@ -46,7 +44,7 @@ function proxyRow(label: string, desired: ProxyValues, actual: ProxyValues | nul
 
 export default function StatusPage() {
   const queryClient = useQueryClient();
-  const [notice, setNotice] = useState<NoticeState>(null);
+  const notices = useNotices();
   const statusQuery = useQuery({
     queryKey: ['status'],
     queryFn: api.status,
@@ -55,41 +53,45 @@ export default function StatusPage() {
 
   const restart = useAction(
     queryClient,
-    setNotice,
+    notices.push,
     api.restartKernel,
     (status) => `内核状态：${status.state}`,
   );
-  const startKernel = useAction(queryClient, setNotice, api.startKernel, (status) =>
+  const startKernel = useAction(queryClient, notices.push, api.startKernel, (status) =>
     status.state === 'failed' ? `启动失败：${status.error ?? '未知原因'}` : '内核已启动',
   );
-  const stopKernel = useAction(queryClient, setNotice, api.stopKernel, () => '内核已停止');
+  const stopKernel = useAction(queryClient, notices.push, api.stopKernel, () => '内核已停止');
   const refresh = useAction(
     queryClient,
-    setNotice,
+    notices.push,
     api.refreshSubscription,
     () => '订阅已更新并通知内核重载',
   );
   const removeSubscription = useMutation({
     mutationFn: api.deleteSubscription,
     onSuccess: async (result) => {
-      setNotice({
-        kind: result.kernel.state === 'failed' ? 'error' : 'ok',
-        text:
-          result.kernel.state === 'failed'
-            ? `订阅已删除，但内核重启失败：${result.kernel.error ?? '未知原因'}`
-            : '订阅已删除，网络已切换为直连',
-      });
+      notices.push(
+        result.kernel.state === 'failed' ? 'error' : 'ok',
+        result.kernel.state === 'failed'
+          ? `订阅已删除，但内核重启失败：${result.kernel.error ?? '未知原因'}`
+          : '订阅已删除，网络已切换为直连',
+      );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['status'] }),
         queryClient.invalidateQueries({ queryKey: ['settings'] }),
         queryClient.invalidateQueries({ queryKey: ['logs'] }),
       ]);
     },
-    onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
+    onError: (error: Error) => notices.push('error', error.message),
   });
-  const enableProxy = useAction(queryClient, setNotice, api.enableProxy, () => '系统代理已开启');
-  const disableProxy = useAction(queryClient, setNotice, api.disableProxy, () => '系统代理已关闭');
-  const applyProxy = useAction(queryClient, setNotice, api.applyProxy, (state) =>
+  const enableProxy = useAction(queryClient, notices.push, api.enableProxy, () => '系统代理已开启');
+  const disableProxy = useAction(
+    queryClient,
+    notices.push,
+    api.disableProxy,
+    () => '系统代理已关闭',
+  );
+  const applyProxy = useAction(queryClient, notices.push, api.applyProxy, (state) =>
     state.match ? '三项与期望值一致' : '已回写期望值',
   );
 
@@ -107,8 +109,15 @@ export default function StatusPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      {notice !== null && <Notice kind={notice.kind} text={notice.text} />}
-      {statusQuery.isError && <Notice kind="error" text={String(statusQuery.error)} />}
+      <NoticeStack
+        notices={[
+          ...notices.items,
+          ...(statusQuery.isError
+            ? [{ id: -1, kind: 'error' as const, text: String(statusQuery.error) }]
+            : []),
+        ]}
+        onDismiss={notices.dismiss}
+      />
 
       <section className="rounded border border-slate-300 bg-white p-3">
         <div className="mb-2 flex items-center gap-2">

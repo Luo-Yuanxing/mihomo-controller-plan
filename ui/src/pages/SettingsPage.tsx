@@ -1,9 +1,10 @@
 /** 设置页：内核路径、端口、订阅 URL 与刷新间隔、系统代理开关、日志查看。计划 §8。 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
-import Notice from '../components/Notice';
+import NoticeStack from '../components/NoticeStack';
 import { api } from '../lib/api';
 import type { Settings, UiConfigPreview } from '../lib/types';
+import { useNotices } from '../lib/useNotices';
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
@@ -30,7 +31,7 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState<Settings | null>(null);
   const [configFile, setConfigFile] = useState('');
   const [preview, setPreview] = useState<UiConfigPreview | null>(null);
-  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const notices = useNotices();
 
   useEffect(() => {
     if (settingsQuery.data !== undefined) setDraft(settingsQuery.data);
@@ -43,41 +44,40 @@ export default function SettingsPage() {
   const saveMutation = useMutation({
     mutationFn: (settings: Settings) => api.saveSettings(settings),
     onSuccess: async (result) => {
-      setNotice({
-        kind: 'ok',
-        text: result.needsRestart
-          ? '设置已保存；端口或 secret 变了，需要重启内核才生效'
-          : '设置已保存',
-      });
+      notices.push(
+        'ok',
+        result.needsRestart ? '设置已保存；端口或 secret 变了，需要重启内核才生效' : '设置已保存',
+      );
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       await queryClient.invalidateQueries({ queryKey: ['status'] });
     },
-    onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
+    onError: (error: Error) => notices.push('error', error.message),
   });
 
   const forceLoad = useMutation({
     mutationFn: () => api.forceLoadUiConfig(configFile.trim()),
     onSuccess: async (result) => {
       setPreview(null);
-      setNotice({ kind: 'ok', text: `已按配置文件强制覆盖系统值：${result.file}` });
+      notices.push('ok', `已按配置文件强制覆盖系统值：${result.file}`);
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
-    onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
+    onError: (error: Error) => notices.push('error', error.message),
   });
 
   const previewLoad = useMutation({
     mutationFn: () => api.previewUiConfig(configFile.trim()),
     onSuccess: (result) => {
       setPreview(result);
-      setNotice(
+      notices.push(
+        'ok',
         result.same
-          ? { kind: 'ok', text: '配置文件与系统值一致，无需保存' }
-          : { kind: 'ok', text: '配置文件与系统值不一致（红色项），确认后可一键保存到系统' },
+          ? '配置文件与系统值一致，无需保存'
+          : '配置文件与系统值不一致（红色项），确认后可一键保存到系统',
       );
     },
     onError: (error: Error) => {
       setPreview(null);
-      setNotice({ kind: 'error', text: error.message });
+      notices.push('error', error.message);
     },
   });
 
@@ -88,10 +88,10 @@ export default function SettingsPage() {
     },
     onSuccess: async (result) => {
       setPreview(null);
-      setNotice({ kind: 'ok', text: `已从界面保存到系统：${result.file}` });
+      notices.push('ok', `已从界面保存到系统：${result.file}`);
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
-    onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
+    onError: (error: Error) => notices.push('error', error.message),
   });
 
   if (draft === null) {
@@ -104,7 +104,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-3">
-      {notice !== null && <Notice kind={notice.kind} text={notice.text} />}
+      <NoticeStack notices={notices.items} onDismiss={notices.dismiss} />
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
         <h2 className="text-base font-semibold">内核</h2>
@@ -232,7 +232,7 @@ export default function SettingsPage() {
             className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
             disabled={previewLoad.isPending || configFile.trim() === ''}
             onClick={() => {
-              setNotice(null);
+              notices.clear();
               previewLoad.mutate();
             }}
           >
@@ -243,7 +243,7 @@ export default function SettingsPage() {
             className="rounded bg-slate-900 px-3 py-1 text-sm text-white disabled:opacity-50"
             disabled={forceLoad.isPending || configFile.trim() === ''}
             onClick={() => {
-              setNotice(null);
+              notices.clear();
               forceLoad.mutate();
             }}
           >
@@ -255,7 +255,7 @@ export default function SettingsPage() {
               className="rounded bg-emerald-600 px-3 py-1 text-sm text-white disabled:opacity-50"
               disabled={applyUiConfig.isPending}
               onClick={() => {
-                setNotice(null);
+                notices.clear();
                 applyUiConfig.mutate();
               }}
             >

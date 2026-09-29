@@ -1,10 +1,11 @@
 /** 规则页：规则表格 + 原始 yaml + 保存并热更新。计划 §8。 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import Notice from '../components/Notice';
 import { api } from '../lib/api';
 import type { Rule, RuleInput, UiConfig } from '../lib/types';
 import { useUiConfig } from '../lib/uiConfig';
+import { useNotices } from '../lib/useNotices';
+import NoticeStack from '../components/NoticeStack';
 
 interface EditableRule extends RuleInput {
   id: number | null;
@@ -74,7 +75,7 @@ export default function RulesPage() {
   const [removed, setRemoved] = useState<number[]>([]);
   const [orderDirty, setOrderDirty] = useState(false);
   const [filters, setFilters] = useState<RuleFilters>(EMPTY_FILTERS);
-  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const notices = useNotices();
 
   useEffect(() => {
     if (rulesQuery.data === undefined) return;
@@ -127,18 +128,18 @@ export default function RulesPage() {
       return api.syncRules();
     },
     onSuccess: async (result) => {
-      setNotice({
-        kind: 'ok',
-        text: `已热更新 ${result.provider}：${
+      notices.push(
+        'ok',
+        `已热更新 ${result.provider}：${
           result.changed ? '文件已重写' : '内容无变化，未触发 PUT'
         }，耗时 ${result.elapsedMs} ms`,
-      });
+      );
       await queryClient.invalidateQueries({ queryKey: ['rules'] });
       await queryClient.invalidateQueries({ queryKey: ['ruleProvider'] });
       await queryClient.invalidateQueries({ queryKey: ['status'] });
     },
     onError: (error: Error) => {
-      setNotice({ kind: 'error', text: error.message });
+      notices.push('error', error.message);
     },
   });
 
@@ -185,7 +186,7 @@ export default function RulesPage() {
           type="button"
           disabled={saveMutation.isPending}
           onClick={() => {
-            setNotice(null);
+            notices.clear();
             saveMutation.mutate();
           }}
           className="rounded bg-slate-900 px-3 py-1 text-sm text-white disabled:opacity-50"
@@ -195,8 +196,15 @@ export default function RulesPage() {
         <span className="text-xs text-slate-500">provider：{providerName}</span>
       </div>
 
-      {notice !== null && <Notice kind={notice.kind} text={notice.text} />}
-      {rulesQuery.isError && <Notice kind="error" text={String(rulesQuery.error)} />}
+      <NoticeStack
+        notices={[
+          ...notices.items,
+          ...(rulesQuery.isError
+            ? [{ id: -1, kind: 'error' as const, text: String(rulesQuery.error) }]
+            : []),
+        ]}
+        onDismiss={notices.dismiss}
+      />
 
       <div className="overflow-auto rounded border border-slate-300 bg-white">
         <table className="w-full text-sm">

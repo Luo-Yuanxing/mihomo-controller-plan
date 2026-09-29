@@ -1,10 +1,11 @@
 /** 失败连接页：从内核日志提取失败目标，多选后批量生成规则。 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import Notice from '../components/Notice';
+import NoticeStack from '../components/NoticeStack';
 import { api } from '../lib/api';
 import type { FailedConnection, RuleInput } from '../lib/types';
 import { useUiConfig } from '../lib/uiConfig';
+import { useNotices } from '../lib/useNotices';
 
 function displayTime(value: string): string {
   const timestamp = Date.parse(value);
@@ -26,7 +27,7 @@ export default function FailedConnectionsPage() {
   const [hostQuery, setHostQuery] = useState('');
   const [ruleType, setRuleType] = useState(uiConfig.defaults.ruleType);
   const [policy, setPolicy] = useState(uiConfig.defaults.policy);
-  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const notices = useNotices();
 
   const connections = failedQuery.data?.connections ?? [];
   const normalizedQuery = hostQuery.trim().toLowerCase();
@@ -77,13 +78,12 @@ export default function FailedConnectionsPage() {
       }
     },
     onSuccess: async (result) => {
-      setNotice({
-        kind: result.syncError === null ? 'ok' : 'error',
-        text:
-          result.syncError === null
-            ? `已新增 ${String(result.count)} 条规则，热更新耗时 ${String(result.sync?.elapsedMs ?? 0)} ms`
-            : `已新增 ${String(result.count)} 条规则，但热更新失败：${result.syncError}`,
-      });
+      notices.push(
+        result.syncError === null ? 'ok' : 'error',
+        result.syncError === null
+          ? `已新增 ${String(result.count)} 条规则，热更新耗时 ${String(result.sync?.elapsedMs ?? 0)} ms`
+          : `已新增 ${String(result.count)} 条规则，但热更新失败：${result.syncError}`,
+      );
       setSelected(new Set());
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['rules'] }),
@@ -91,7 +91,7 @@ export default function FailedConnectionsPage() {
         queryClient.invalidateQueries({ queryKey: ['status'] }),
       ]);
     },
-    onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
+    onError: (error: Error) => notices.push('error', error.message),
   });
 
   return (
@@ -153,7 +153,7 @@ export default function FailedConnectionsPage() {
           className="rounded bg-slate-900 px-3 py-1 text-sm text-white disabled:opacity-50"
           disabled={selectedRows.length === 0 || policy.trim() === '' || addRules.isPending}
           onClick={() => {
-            setNotice(null);
+            notices.clear();
             addRules.mutate();
           }}
         >
@@ -161,8 +161,15 @@ export default function FailedConnectionsPage() {
         </button>
       </div>
 
-      {notice !== null && <Notice kind={notice.kind} text={notice.text} />}
-      {failedQuery.isError && <Notice kind="error" text={String(failedQuery.error)} />}
+      <NoticeStack
+        notices={[
+          ...notices.items,
+          ...(failedQuery.isError
+            ? [{ id: -1, kind: 'error' as const, text: String(failedQuery.error) }]
+            : []),
+        ]}
+        onDismiss={notices.dismiss}
+      />
 
       <div className="overflow-auto rounded border border-slate-300 bg-white">
         <table className="w-full text-sm">
