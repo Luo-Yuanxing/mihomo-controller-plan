@@ -152,8 +152,6 @@ export default function RulesPage() {
     },
   });
 
-  // const providerName = rulesQuery.data?.provider ?? 'custom';
-
   const valueQuery = filters.value.trim().toLowerCase();
   const visibleRows = rows
     .map((row, index) => ({ row, index }))
@@ -202,7 +200,6 @@ export default function RulesPage() {
         >
           {saveMutation.isPending ? '保存中…' : '保存并热更新'}
         </button>
-        {/* <span className="text-xs text-slate-500">provider：{providerName}</span> */}
       </div>
 
       <NoticeStack

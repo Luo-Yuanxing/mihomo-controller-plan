@@ -2,11 +2,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import NoticeStack from '../components/NoticeStack';
-import Notice from '../components/Notice';
-import { api, ApiError } from '../lib/api';
+import { api } from '../lib/api';
 import type { Settings, UiConfigPreview } from '../lib/types';
 import { useNotices } from '../lib/useNotices';
-import { uiConfigIssues, type UiConfigIssue } from '../lib/validateUiConfig';
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
@@ -50,8 +48,6 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState<Settings | null>(null);
   const [configFile, setConfigFile] = useState('');
   const [preview, setPreview] = useState<UiConfigPreview | null>(null);
-  const [valueIssues, setValueIssues] = useState<UiConfigIssue[]>([]);
-  const [issuesFrom, setIssuesFrom] = useState<'backend' | 'backup' | null>(null);
   const notices = useNotices();
 
   // 路径格式即时提示（后端仍是最终判定：非空 + .json + 存在且是文件）
@@ -62,21 +58,6 @@ export default function SettingsPage() {
       : trimmedConfigFile.toLowerCase().endsWith('.json')
         ? null
         : '配置文件必须以 .json 结尾';
-
-  /**
-   * 后端是最终标准：优先用后端返回的 issues；
-   * 只有后端没给明细（网络异常等）时，才拿前端备份规则兜底提示。
-   */
-  function collectIssues(error: Error, config: UiConfigPreview['config'] | null): void {
-    if (error instanceof ApiError && error.issues.length > 0) {
-      setValueIssues(error.issues);
-      setIssuesFrom('backend');
-      return;
-    }
-    const backup = config === null ? [] : uiConfigIssues(config);
-    setValueIssues(backup);
-    setIssuesFrom(backup.length > 0 ? 'backup' : null);
-  }
 
   useEffect(() => {
     if (settingsQuery.data !== undefined) setDraft(settingsQuery.data);
@@ -103,24 +84,16 @@ export default function SettingsPage() {
     mutationFn: () => api.forceLoadUiConfig(configFile.trim()),
     onSuccess: async (result) => {
       setPreview(null);
-      setValueIssues([]);
-      setIssuesFrom(null);
       notices.push('ok', `已按配置文件强制覆盖系统值：${result.file}`);
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
-    onError: (error: Error) => {
-      collectIssues(error, null);
-      notices.push('error', error.message);
-    },
+    onError: (error: Error) => notices.push('error', error.message),
   });
 
   const previewLoad = useMutation({
     mutationFn: () => api.previewUiConfig(configFile.trim()),
     onSuccess: (result) => {
       setPreview(result);
-      // 后端已经校验通过才返回 200，这里直接清零
-      setValueIssues([]);
-      setIssuesFrom(null);
       notices.push(
         'ok',
         result.same
@@ -130,7 +103,6 @@ export default function SettingsPage() {
     },
     onError: (error: Error) => {
       setPreview(null);
-      collectIssues(error, null);
       notices.push('error', error.message);
     },
   });
@@ -143,15 +115,10 @@ export default function SettingsPage() {
     },
     onSuccess: async (result) => {
       setPreview(null);
-      setValueIssues([]);
-      setIssuesFrom(null);
       notices.push('ok', `已从界面保存到系统：${result.file}`);
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
-    onError: (error: Error) => {
-      collectIssues(error, preview?.config ?? null);
-      notices.push('error', error.message);
-    },
+    onError: (error: Error) => notices.push('error', error.message),
   });
 
   /**
@@ -305,7 +272,7 @@ export default function SettingsPage() {
           >
             {forceLoad.isPending ? '覆盖中…' : '强制按配置文件加载（覆盖系统值）'}
           </button>
-          {preview !== null && !preview.same && issuesFrom !== 'backend' && (
+          {preview !== null && !preview.same && (
             <button
               type="button"
               className="rounded bg-emerald-600 px-3 py-1 text-sm text-white disabled:opacity-50"
@@ -319,35 +286,6 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
-
-        {valueIssues.length > 0 && (
-          <Notice
-            kind={issuesFrom === 'backend' ? 'error' : 'warn'}
-            text={
-              <>
-                <p className="mb-1 font-semibold">
-                  {issuesFrom === 'backend'
-                    ? `后端取值检测未通过（${String(valueIssues.length)} 项），已阻止保存`
-                    : `前端备份检测（${String(valueIssues.length)} 项，后端未返回明细，仅供参考）`}
-                </p>
-                <ul className="list-disc pl-4">
-                  {valueIssues.map((issue) => (
-                    <li key={`${issue.path}-${issue.message}`}>
-                      <span className="font-mono">
-                        {issue.path === ''
-                          ? '配置'
-                          : issue.path === 'file'
-                            ? '配置文件路径'
-                            : issue.path}
-                      </span>
-                      ：{issue.message}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            }
-          />
-        )}
 
         {preview !== null && (
           <table className="w-full text-xs">

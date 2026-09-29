@@ -59,7 +59,6 @@ async function createBuilder(): Promise<BuildApp> {
     const context = {
       appVersion: 'test',
       appDir: dataDir,
-      uiDir: dataDir,
       dataDir,
       dataFallback: false,
       paths: dataPaths(dataDir),

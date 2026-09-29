@@ -76,7 +76,6 @@
 | 前端 | React + Vite + TypeScript | — |
 | UI | Tailwind CSS + shadcn/ui | 只做 3 个页面：规则页、状态页、设置页 |
 | 数据请求 | TanStack Query | 缓存与刷新策略 |
-| 表格 | TanStack Table | 规则列表 |
 | 桌面壳 | Electron | 主进程即 Node |
 | 日志 | pino | 结构化 + 轮转 |
 | 测试 | Vitest | 单元与接口测试 |
@@ -157,6 +156,7 @@ mihomo-controller-plan/
 │  │  ├─ api.ts            内核 REST 客户端
 │  │  └─ validate.ts       mihomo -t 预检
 │  ├─ sub/download.ts      订阅下载与校验
+│  ├─ sub/subscription.ts  订阅文件解析：节点数 / 代理组 / dns
 │  ├─ rules/
 │  │  ├─ db.ts             SQLite 连接与建表
 │  │  ├─ repo.ts           规则增删改查
@@ -191,7 +191,7 @@ mihomo-controller-plan/
 │  ├─ config.yaml               生成的 mihomo 配置
 │  ├─ rules/custom.yaml         生成的 rule-provider
 │  ├─ logs/                     app.log / core.log
-│  └─ run/                      app.lock / core.lock
+│  └─ run/                      app.lock
 ├─ README.txt                   一页说明：怎么启动、数据在哪、怎么备份
 └─ 卸载.txt                     绿色版：删掉整个文件夹即可
 ```
@@ -216,7 +216,7 @@ mihomo-controller-plan/
 | --- | --- | --- |
 | 应用 | `data/run/app.lock` 文件锁 | 提示已在运行并退出 |
 | 界面 | `app.requestSingleInstanceLock()` | 重复双击时唤起已有窗口 |
-| 内核 | `data/run/core.lock` + 固定端口绑定 | 报错退出，不换端口 |
+| 内核 | 固定端口绑定（探测到已有内核在跑就接管） | 报错退出，不换端口 |
 
 端口固定：mixed `7890`（可改）、controller `9090`（不给改）。被占用时报错写明端口与 PID，不做迁移。
 
@@ -269,7 +269,7 @@ proxy-providers:
 | 就绪探测 | 轮询 `GET /version`，超时 15 s 视为失败并附日志尾部，随后停止 |
 | 运行期 | 每 10 s 探活；发现内核退出则记录退出码与日志尾部后停止工作 |
 | 存活关系 | 内核不随窗口关闭结束；只有托盘菜单"退出"才结束它 |
-| 重复双击 | 启动时检测 `core.lock` 与端口：已有内核在跑则直接接管，不重复启动 |
+| 重复双击 | 启动时探测控制端口：已有内核在跑则直接接管，不重复启动 |
 | 退出 | 走托盘菜单退出时触发 `-post-down` 清理；超时后强杀进程树 |
 | 版本 | 解析 `-v` 记录版本与构建 tag |
 
@@ -336,12 +336,10 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/status` | 内核状态、版本、端口、订阅状态、系统代理状态 |
-| GET | `/api/subscription` | 当前订阅配置与最近一次下载结果 |
-| PUT | `/api/subscription` | 修改订阅 URL / 是否走代理下载 |
 | POST | `/api/subscription/refresh` | 立即下载并生效 |
 | GET | `/api/subscription/groups` | 订阅文件里的代理组，用于选 `PROXY` 指代哪个组 |
 | GET | `/api/rules` | 规则列表 |
-| POST | `/api/rules` | 新增（支持数组批量） |
+| POST | `/api/rules` | 新增（批量，请求体 `{ rules: [...] }`） |
 | PUT | `/api/rules/{id}` | 修改 |
 | DELETE | `/api/rules/{id}` | 删除 |
 | POST | `/api/rules/sync` | 落盘 + 热更新 |
@@ -358,6 +356,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | PUT | `/api/proxies/{group}` | 切换该组的出口节点 |
 | GET | `/api/proxies/{group}/delay` | 并发测组内各节点时延（毫秒） |
 | GET | `/api/logs` | 最近 N 行日志 |
+| GET | `/api/failed-connections` | 从内核日志里汇总失败连接（界面用，多选后可加成规则） |
 | GET | `/api/ping` | 最轻的问候请求，界面离线时每秒探一次 |
 | POST | `/api/offline/shutdown` | 离线兜底：关系统代理 + 停内核 |
 | POST | `/api/offline/restart` | 离线兜底：无条件写系统代理期望值 + 重写配置 + 重启内核 |
@@ -428,6 +427,7 @@ payload:
 | 页面 | 内容 |
 | --- | --- |
 | 规则 | 代理出口（PROXY 指代哪个订阅组 + 出口节点按钮块，可一键测各节点时延）+ 规则表格（增删改、启停、拖拽排序）+ 原始 yaml 文本框 + 保存并热更新 |
+| 失败连接 | 内核日志里的失败目标（按协议/主机/端口汇总，只统计最近 10 分钟）多选后批量加成规则 |
 | 状态 | 内核状态与版本、端口、订阅信息与刷新订阅、系统代理三项状态、重启内核按钮 |
 | 设置 | 内核路径、端口、订阅 URL、系统代理开关、日志查看 |
 

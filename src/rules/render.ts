@@ -23,7 +23,7 @@ function emitScalar(value: string): string {
 }
 
 /** 单条规则的 mihomo rule 文本；类型白名单来自 data/ui-config.json。 */
-export function renderRuleLine(rule: Rule): string {
+function renderRuleLine(rule: Rule): string {
   if (!getRuleTypes().includes(rule.type)) {
     throw new RuleValidationError(`未知类型 ${rule.type}`, rule.id);
   }

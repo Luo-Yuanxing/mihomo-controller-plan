@@ -25,7 +25,6 @@ export interface SubscriptionState {
 export interface AppContext {
   appVersion: string;
   appDir: string;
-  uiDir: string;
   dataDir: string;
   dataFallback: boolean;
   paths: ReturnType<typeof dataPaths>;

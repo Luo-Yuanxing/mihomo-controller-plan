@@ -25,9 +25,13 @@ import {
 } from './settings.js';
 import { ensureUiConfigFile, getUiConfig } from './ui-config.js';
 import { createUiConfigService } from './ui-config-store.js';
-import { countSubscriptionProxies, downloadSubscription } from './sub/download.js';
-import { readSubscriptionDns } from './sub/dns.js';
-import { planProxyGroups, type RenderedGroup } from './sub/groups.js';
+import { downloadSubscription } from './sub/download.js';
+import {
+  planProxyGroups,
+  readSubscription,
+  type RenderedGroup,
+  type SubscriptionFile,
+} from './sub/subscription.js';
 import { writeFileAtomic } from './util/atomic.js';
 import { acquireLock } from './util/lock.js';
 import { createLogger, logPaths } from './util/logger.js';
@@ -113,7 +117,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   });
 
   /** 订阅文件存在且含节点才算可用；空订阅按无订阅处理，避免 PROXY 组静默直连。 */
-  const hasUsableSubscription = (): boolean => countSubscriptionProxies(paths.subscription) > 0;
+  const readSubscriptionFile = (): SubscriptionFile => readSubscription(paths.subscription);
+  const hasUsableSubscription = (): boolean => readSubscriptionFile().proxies > 0;
 
   const subscription: SubscriptionState = {
     url: settings.subscription.url,
@@ -129,10 +134,10 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
    * 用户选的"PROXY 指代订阅哪个组"。订阅换掉、组没了都会回退成 null（= 用订阅全部节点），
    * 保证生成出来的配置一定能起。
    */
-  const currentPlan = (): RenderedGroup[] | null => {
-    if (!hasUsableSubscription()) return null;
+  const currentPlan = (subscriptionFile: SubscriptionFile): RenderedGroup[] | null => {
+    if (subscriptionFile.proxies === 0) return null;
     const chosen = settings.subscription.proxyGroup;
-    const plan = planProxyGroups({ file: paths.subscription, chosen });
+    const plan = planProxyGroups(subscriptionFile, chosen);
     if (plan === null && chosen !== '') {
       log.warn({ group: chosen }, '订阅里没有这个代理组，PROXY 回退为订阅全部节点');
     }
@@ -140,13 +145,14 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   };
 
   const writeConfig = async (): Promise<void> => {
+    const subscriptionFile = readSubscriptionFile();
     const yaml = renderConfig({
       settings,
       secret: settings.core.secret,
-      subscriptionProvider: hasUsableSubscription() ? subscriptionProvider : null,
+      subscriptionProvider: subscriptionFile.proxies > 0 ? subscriptionProvider : null,
       ruleProvider,
-      proxyGroupPlan: currentPlan(),
-      subscriptionDns: readSubscriptionDns(paths.subscription),
+      proxyGroupPlan: currentPlan(subscriptionFile),
+      subscriptionDns: subscriptionFile.dns,
     });
     await writeFileAtomic(paths.config, yaml);
   };
@@ -192,7 +198,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const context: AppContext = {
     appVersion: process.env['npm_package_version'] ?? '0.1.0',
     appDir,
-    uiDir,
     dataDir,
     dataFallback: fallback,
     paths,
@@ -229,7 +234,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       context.subscription.refreshing = true;
       try {
         const hadUsableSubscription = hasUsableSubscription();
-        const planBefore = JSON.stringify(currentPlan());
+        const planBefore = JSON.stringify(currentPlan(readSubscriptionFile()));
         const result = await downloadSubscription(
           {
             url: settings.subscription.url,
@@ -251,7 +256,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
           if (
             hadUsableSubscription &&
             usableSubscription &&
-            planBefore === JSON.stringify(currentPlan())
+            planBefore === JSON.stringify(currentPlan(readSubscriptionFile()))
           ) {
             await api.reloadProxyProvider(subscriptionProvider);
           } else {
@@ -341,7 +346,7 @@ const invokedDirectly =
   process.argv[1] !== undefined &&
   import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 
-if (invokedDirectly || process.env['MCP_STANDALONE'] === '1') {
+if (invokedDirectly) {
   const running = await startServer({
     appDir: process.cwd(),
     port: Number(process.env['MCP_PORT'] ?? 8787),

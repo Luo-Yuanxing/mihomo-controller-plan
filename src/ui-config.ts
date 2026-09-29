@@ -80,7 +80,7 @@ export class UiConfigValidationError extends Error {
   }
 }
 
-/** 取值规则上限；前端 ui/src/lib/validateUiConfig.ts 保持同一份规则。 */
+/** 取值规则上限；前置校验与导出都用这一份。 */
 export const UI_CONFIG_LIMITS = {
   maxRuleTypes: 20,
   maxPolicies: 20,
@@ -109,10 +109,7 @@ function checkInterval(
   }
 }
 
-/**
- * 逐项检查配置文件/界面提交的值（结构 + 跨字段一致性 + 取值范围）。
- * 前后端各实现一份，规则必须一致：tests/ui/ui-config-validation.test.ts 会对拍。
- */
+/** 逐项检查配置文件/界面提交的值（结构 + 跨字段一致性 + 取值范围），错误带可读字段名。 */
 export function uiConfigIssues(raw: unknown): UiConfigIssue[] {
   const issues: UiConfigIssue[] = [];
   if (!isRecord(raw)) return [{ path: '', message: '必须是 JSON 对象' }];
@@ -251,7 +248,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
 export const DEFAULT_UI_CONFIG_FILE = { ...DEFAULT_UI_CONFIG, rules: [] };
 
 /** 文件级校验：界面常量 + 可选的 rules 段（类型要在 ruleTypes 白名单里）。 */
-export function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
+function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
   const issues = uiConfigIssues(raw);
   if (!isRecord(raw)) return issues;
 

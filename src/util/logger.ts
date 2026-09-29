@@ -30,16 +30,9 @@ function pruneOldLogs(logDir: string): void {
 
 export function logPaths(dataDir: string) {
   const logDir = path.join(dataDir, 'logs');
-  const dated = fs.existsSync(logDir)
-    ? fs
-        .readdirSync(logDir)
-        .filter((name) => name.startsWith(APP_PREFIX) && name.endsWith('.log'))
-        .sort()
-        .at(-1)
-    : undefined;
   return {
     dir: logDir,
-    app: path.join(logDir, dated ?? `${APP_PREFIX}${dayStamp()}.log`),
+    app: path.join(logDir, `${APP_PREFIX}${dayStamp()}.log`),
     core: path.join(logDir, 'core.log'),
   };
 }

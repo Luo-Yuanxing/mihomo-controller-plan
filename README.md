@@ -16,7 +16,7 @@ npm run dist       # electron-builder 产出免安装文件夹
 | 路径 | 说明 |
 | --- | --- |
 | `src/` | Node 侧：REST、内核托管、订阅、规则、配置渲染 |
-| `ui/` | React 前端（规则 / 状态 / 设置 3 页） |
+| `ui/` | React 前端（规则 / 失败连接 / 状态 / 设置） |
 | `electron/` | Electron 壳，托盘常驻 |
 | `resources/bin/` | 随包分发的 mihomo.exe（需自行放入，不入库） |
 | `data/` | 唯一可写区，运行时数据全在这里 |
