@@ -113,17 +113,13 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     } else {
       kernel = await ctx.restartKernel();
       steps.push(
-        kernel.state === 'failed'
-          ? `内核启动失败：${kernel.error ?? '未知原因'}`
-          : '内核已启动',
+        kernel.state === 'failed' ? `内核启动失败：${kernel.error ?? '未知原因'}` : '内核已启动',
       );
     }
 
     const kernelUp = kernel.state === 'running' || kernel.state === 'adopted';
     const proxy = kernelUp ? await ctx.guard.apply() : await ctx.guard.disable();
-    steps.push(
-      kernelUp ? '系统代理已写回期望值' : '内核不可用，已关闭系统代理以免整机断网',
-    );
+    steps.push(kernelUp ? '系统代理已写回期望值' : '内核不可用，已关闭系统代理以免整机断网');
     ctx.log.warn({ steps }, '一键修复完成');
     return { steps, kernel, proxy };
   });
