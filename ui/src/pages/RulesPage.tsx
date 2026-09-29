@@ -110,6 +110,14 @@ export default function RulesPage() {
     setOrderDirty(true);
   }
 
+  const allEnabled = rows.length > 0 && rows.every((row) => row.enabled);
+
+  /** 一键全启用/全禁用；和单元格里的勾选一样，改动要靠"保存并热更新"落库。 */
+  function toggleAll(): void {
+    const next = !allEnabled;
+    setRows((current) => current.map((row) => ({ ...row, enabled: next, dirty: true })));
+  }
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const created = rows.filter((row) => row.id === null);
@@ -213,7 +221,19 @@ export default function RulesPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-2 py-2">启用</th>
+              <th className="px-2 py-2">
+                <div className="flex flex-col items-start gap-0.5">
+                  <span>启用</span>
+                  <button
+                    type="button"
+                    disabled={rows.length === 0}
+                    className="text-xs normal-case text-slate-500 hover:text-slate-900 disabled:opacity-50"
+                    onClick={toggleAll}
+                  >
+                    {allEnabled ? '全禁用' : '全启用'}
+                  </button>
+                </div>
+              </th>
               <th className="px-2 py-2">顺序</th>
               <th className="px-2 py-2">类型</th>
               <th className="px-2 py-2">匹配值</th>
