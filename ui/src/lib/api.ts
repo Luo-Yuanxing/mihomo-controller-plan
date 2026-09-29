@@ -14,7 +14,7 @@ import type {
   SubscriptionState,
   SyncResult,
   UiConfig,
-  UiConfigPreview,
+  UiConfigImportResult,
   UiConfigState,
 } from './types';
 import { setOffline } from './offline';
@@ -87,17 +87,11 @@ export const api = {
   settings: () => request<Settings>('/api/settings'),
 
   uiConfig: () => request<UiConfigState>('/api/ui-config'),
-  forceLoadUiConfig: (file?: string) =>
-    post<UiConfigState>('/api/ui-config/load-force', file === undefined ? {} : { file }),
-  previewUiConfig: (file?: string) =>
-    post<UiConfigPreview>('/api/ui-config/preview', file === undefined ? {} : { file }),
-  applyUiConfig: (input: { file?: string; config: UiConfig }) =>
-    post<UiConfigState>('/api/ui-config/apply', input),
-  exportUiConfig: (file?: string) =>
-    post<{ file: string; rules: number; bytes: number }>(
-      '/api/ui-config/export',
-      file === undefined ? {} : { file },
-    ),
+  applyUiConfig: (config: UiConfig) => post<UiConfigState>('/api/ui-config/apply', { config }),
+  initializeUiConfig: () => post<UiConfigState>('/api/ui-config/initialize'),
+  shareUiConfig: () => request<{ payload: string; bytes: number }>('/api/ui-config/share'),
+  importUiConfig: (payload: string) =>
+    post<UiConfigImportResult>('/api/ui-config/import', { payload }),
 
   saveSettings: (settings: Settings) =>
     request<{ settings: Settings; needsRestart: boolean; groupsRebuilt: boolean }>(

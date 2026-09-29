@@ -25,26 +25,18 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   settings: { logsRefetchIntervalMs: 5000 },
 };
 
-/** 生效值快照（GET /api/ui-config）：来源文件 + 当前值 + 文件修改时间。 */
+/** 生效值快照（GET /api/ui-config）：当前值 + 是否还是初始化文件 + 文件修改时间。 */
 export interface UiConfigState {
-  file: string;
   config: UiConfig;
+  /** true = 还是初始化文件，界面要引导用户导入一份配置。 */
+  initialized: boolean;
   updatedAt: string | null;
 }
 
-/** 预览对比的逐项差异。 */
-export interface UiConfigDiffItem {
-  label: string;
-  current: string;
-  incoming: string;
-  same: boolean;
-}
-
-export interface UiConfigPreview {
-  file: string;
-  config: UiConfig;
-  diff: UiConfigDiffItem[];
-  same: boolean;
+/** 字符串导入的结果。 */
+export interface UiConfigImportResult extends UiConfigState {
+  rules: { count: number; changed: boolean } | null;
+  warnings: string[];
 }
 
 export interface Rule {

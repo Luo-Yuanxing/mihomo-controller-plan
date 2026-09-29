@@ -1,9 +1,9 @@
-/** 设置页：内核路径、端口、订阅 URL 与刷新间隔、系统代理开关、日志查看。计划 §8。 */
+/** 设置页：内核路径、端口、订阅 URL、导入设置、日志查看。计划 §8。 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import NoticeStack from '../components/NoticeStack';
 import { api } from '../lib/api';
-import type { Settings, UiConfigPreview } from '../lib/types';
+import type { Settings } from '../lib/types';
 import { useNotices } from '../lib/useNotices';
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -18,23 +18,6 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const inputClass = 'w-full rounded border border-slate-300 px-2 py-1 font-mono text-sm';
 
-/**
- * 选导出目标路径：Electron 里弹 Windows 保存对话框，默认文件名与目录沿用当前配置文件；
- * 拿不到对话框（浏览器里打开、或主进程还是改动前启动的）时退回输入框里填的路径。
- */
-function dialogApi(): { saveJson(path: string): Promise<string | null> } | undefined {
-  return (window as unknown as { mcpDialog?: { saveJson(path: string): Promise<string | null> } })
-    .mcpDialog;
-}
-
-async function pickExportPath(configFile: string): Promise<string | null> {
-  const api = dialogApi();
-  if (api === undefined) return configFile;
-
-  const dir = configFile.replace(/[\\/][^\\/]*$/, '');
-  return api.saveJson(dir === '' ? 'config.json' : `${dir}\\config.json`);
-}
-
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: api.settings });
@@ -46,26 +29,12 @@ export default function SettingsPage() {
   });
 
   const [draft, setDraft] = useState<Settings | null>(null);
-  const [configFile, setConfigFile] = useState('');
-  const [preview, setPreview] = useState<UiConfigPreview | null>(null);
+  const [shareText, setShareText] = useState('');
   const notices = useNotices();
-
-  // 路径格式即时提示（后端仍是最终判定：非空 + .json + 存在且是文件）
-  const trimmedConfigFile = configFile.trim();
-  const pathIssue =
-    trimmedConfigFile === ''
-      ? '配置文件路径不能为空'
-      : trimmedConfigFile.toLowerCase().endsWith('.json')
-        ? null
-        : '配置文件必须以 .json 结尾';
 
   useEffect(() => {
     if (settingsQuery.data !== undefined) setDraft(settingsQuery.data);
   }, [settingsQuery.data]);
-
-  useEffect(() => {
-    if (uiConfigQuery.data !== undefined) setConfigFile(uiConfigQuery.data.file);
-  }, [uiConfigQuery.data]);
 
   const saveMutation = useMutation({
     mutationFn: (settings: Settings) => api.saveSettings(settings),
@@ -80,64 +49,49 @@ export default function SettingsPage() {
     onError: (error: Error) => notices.push('error', error.message),
   });
 
-  const forceLoad = useMutation({
-    mutationFn: () => api.forceLoadUiConfig(configFile.trim()),
-    onSuccess: async (result) => {
-      setPreview(null);
-      notices.push('ok', `已按配置文件强制覆盖生效值：${result.file}`);
-      await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
+  /** 生成分享串：填进文本框，用户自己复制走。 */
+  const shareConfig = useMutation({
+    mutationFn: () => api.shareUiConfig(),
+    onSuccess: (result) => {
+      setShareText(result.payload);
+      notices.push('ok', `已生成配置字符串（${String(result.bytes)} 字节），复制即可传给别的面板`);
     },
     onError: (error: Error) => notices.push('error', error.message),
   });
 
-  const previewLoad = useMutation({
-    mutationFn: () => api.previewUiConfig(configFile.trim()),
-    onSuccess: (result) => {
-      setPreview(result);
+  /** 字符串导入：解析与套用都在后端，字段不合法时什么都不会变。 */
+  const importConfig = useMutation({
+    mutationFn: (payload: string) => api.importUiConfig(payload),
+    onSuccess: async (result) => {
+      const rules = result.rules === null ? '规则未变' : `规则 ${String(result.rules.count)} 条`;
       notices.push(
         'ok',
-        result.same
-          ? '配置文件与生效值一致，无需保存'
-          : '配置文件与生效值不一致（红色项），确认后可一键保存到 config.json',
+        `已导入配置（${rules}）${result.warnings.length === 0 ? '' : `；${result.warnings.join('；')}`}`,
       );
+      await queryClient.invalidateQueries();
     },
-    onError: (error: Error) => {
-      setPreview(null);
-      notices.push('error', error.message);
+    onError: (error: Error) => notices.push('error', error.message),
+  });
+
+  /** 立即初始化：把初始化标记改成 false，内容不动。 */
+  const initializeConfig = useMutation({
+    mutationFn: () => api.initializeUiConfig(),
+    onSuccess: async () => {
+      notices.push('ok', '已初始化：之后启动直接按 config.json 生效');
+      await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
+    onError: (error: Error) => notices.push('error', error.message),
   });
 
   const applyUiConfig = useMutation({
     mutationFn: () => {
-      if (preview === null) throw new Error('先执行预览');
-      // 不在前端阻断：合法与否由后端判定
-      return api.applyUiConfig({ file: preview.file, config: preview.config });
+      const config = uiConfigQuery.data?.config;
+      if (config === undefined) throw new Error('界面常量还没读出来');
+      return api.applyUiConfig(config);
     },
-    onSuccess: async (result) => {
-      setPreview(null);
-      notices.push('ok', `已保存到 ${result.file}`);
+    onSuccess: async () => {
+      notices.push('ok', '界面常量已保存到 config.json');
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
-    },
-    onError: (error: Error) => notices.push('error', error.message),
-  });
-
-  /**
-   * 导出：先弹 Windows 保存对话框（默认落在配置文件所在文件夹），
-   * 再把界面常量 + 自定义规则写成一份 config.json。取消对话框就什么都不做。
-   */
-  const exportConfig = useMutation({
-    mutationFn: async () => {
-      const target = await pickExportPath(configFile.trim());
-      return target === null ? null : api.exportUiConfig(target);
-    },
-    onSuccess: (result) => {
-      if (result === null) return;
-      notices.push(
-        'ok',
-        dialogApi() === undefined
-          ? `已导出到 ${result.file}（含 ${String(result.rules)} 条规则）；当前窗口没有系统保存对话框，路径取自输入框`
-          : `已导出到 ${result.file}（含 ${String(result.rules)} 条规则）`,
-      );
     },
     onError: (error: Error) => notices.push('error', error.message),
   });
@@ -149,6 +103,9 @@ export default function SettingsPage() {
   function patch(next: Partial<Settings>): void {
     setDraft((current) => (current === null ? current : { ...current, ...next }));
   }
+
+  /** 初始化文件（还没配置过）：这一区高亮，引导用户先导入一份配置。 */
+  const needsSetup = uiConfigQuery.data?.initialized === true;
 
   // 浏览器碰不到文件系统，前端只能查格式；能不能读到文件由后端保存时判定
   const binaryPath = draft.core.binaryPath.trim();
@@ -229,97 +186,81 @@ export default function SettingsPage() {
         </Field>
       </section>
 
-      <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
-        <h2 className="text-base font-semibold">界面常量（config.json）</h2>
+      <section
+        className={`flex flex-col gap-2 rounded border bg-white p-3 ${
+          needsSetup ? 'border-2 border-amber-400 ring-2 ring-amber-200' : 'border border-slate-300'
+        }`}
+      >
+        <h2 className="text-base font-semibold">导入设置</h2>
         <p className="text-xs text-slate-500">
-          生效值（config.json）：规则类型 {uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—'}
+          当前生效值：规则类型 {uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—'}
           ；目标策略{' '}
           {uiConfigQuery.data?.config.policies.map((option) => option.label).join(' / ') ?? '—'}；
           失败连接 {uiConfigQuery.data?.config.failedConnections.refetchIntervalMs ?? '—'}ms /{' '}
           {uiConfigQuery.data?.config.failedConnections.lines ?? '—'} 行
         </p>
-        <Field label="配置文件路径" hint="可放到任意位置">
-          <input
-            className={inputClass}
-            value={configFile}
-            onChange={(event) => {
-              setConfigFile(event.target.value);
-              setPreview(null);
-            }}
-          />
-        </Field>
-        {pathIssue !== null && <p className="text-xs text-rose-700">{pathIssue}</p>}
+        {needsSetup && (
+          <p className="text-xs font-medium text-amber-700">
+            这还是初始化配置：请从别处导入一份配置字符串，或直接点"立即初始化"沿用当前内容。
+          </p>
+        )}
+        <textarea
+          className="h-24 w-full resize-y rounded border border-slate-300 px-2 py-1 font-mono text-xs"
+          placeholder="把别处生成的配置字符串粘到这里，再点“导入字符串”"
+          value={shareText}
+          onChange={(event) => setShareText(event.target.value)}
+        />
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
-            disabled={previewLoad.isPending || pathIssue !== null}
+            className="rounded bg-slate-900 px-3 py-1 text-sm text-white disabled:opacity-50"
+            disabled={importConfig.isPending || shareText.trim() === ''}
             onClick={() => {
               notices.clear();
-              previewLoad.mutate();
+              importConfig.mutate(shareText.trim());
             }}
           >
-            {previewLoad.isPending ? '读取中…' : '预览加载（只对比）'}
+            {importConfig.isPending ? '导入中…' : '导入字符串'}
           </button>
           <button
             type="button"
-            className="rounded bg-slate-900 px-3 py-1 text-sm text-white disabled:opacity-50"
-            disabled={forceLoad.isPending || pathIssue !== null}
+            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+            disabled={shareConfig.isPending}
             onClick={() => {
               notices.clear();
-              forceLoad.mutate();
+              shareConfig.mutate();
             }}
           >
-            {forceLoad.isPending ? '覆盖中…' : '强制按配置文件加载（覆盖生效值）'}
+            {shareConfig.isPending ? '生成中…' : '生成字符串'}
           </button>
-          {preview !== null && !preview.same && (
-            <button
-              type="button"
-              className="rounded bg-emerald-600 px-3 py-1 text-sm text-white disabled:opacity-50"
-              disabled={applyUiConfig.isPending}
-              onClick={() => {
-                notices.clear();
-                applyUiConfig.mutate();
-              }}
-            >
-              {applyUiConfig.isPending ? '保存中…' : '确认保存'}
-            </button>
-          )}
+          <button
+            type="button"
+            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+            disabled={initializeConfig.isPending || !needsSetup}
+            title="只把初始化标记改成 false，内容不动"
+            onClick={() => {
+              notices.clear();
+              initializeConfig.mutate();
+            }}
+          >
+            {initializeConfig.isPending ? '初始化中…' : '立即初始化'}
+          </button>
+          <button
+            type="button"
+            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+            disabled={applyUiConfig.isPending || uiConfigQuery.data === undefined}
+            title="把上面显示的界面常量写回 config.json"
+            onClick={() => {
+              notices.clear();
+              applyUiConfig.mutate();
+            }}
+          >
+            {applyUiConfig.isPending ? '保存中…' : '保存界面常量'}
+          </button>
         </div>
-
-        {preview !== null && (
-          <table className="w-full text-xs">
-            <thead className="bg-slate-50 text-left uppercase text-slate-500">
-              <tr>
-                <th className="px-2 py-1">字段</th>
-                <th className="px-2 py-1">生效值</th>
-                <th className="px-2 py-1">配置文件</th>
-              </tr>
-            </thead>
-            <tbody>
-              {preview.diff.map((item) => (
-                <tr
-                  key={item.label}
-                  className={
-                    item.same ? 'border-t border-slate-100' : 'border-t border-rose-200 bg-rose-50'
-                  }
-                >
-                  <td className="px-2 py-1 text-slate-500">{item.label}</td>
-                  <td
-                    className={`px-2 py-1 font-mono ${item.same ? 'text-slate-500' : 'text-rose-700'}`}
-                  >
-                    {item.current}
-                  </td>
-                  <td
-                    className={`px-2 py-1 font-mono ${item.same ? 'text-slate-500' : 'text-rose-700'}`}
-                  >
-                    {item.incoming}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <p className="text-xs text-slate-400">
+          字符串里只有界面常量、自定义规则、内核路径与系统代理期望值；订阅与内核 secret 不外传。
+        </p>
       </section>
 
       <div className="flex gap-2">
@@ -330,17 +271,6 @@ export default function SettingsPage() {
           onClick={() => saveMutation.mutate(draft)}
         >
           {saveMutation.isPending ? '保存中…' : '保存设置'}
-        </button>
-        <button
-          type="button"
-          className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
-          disabled={exportConfig.isPending}
-          onClick={() => {
-            notices.clear();
-            exportConfig.mutate();
-          }}
-        >
-          {exportConfig.isPending ? '导出中…' : '导出到该路径（含规则）'}
         </button>
       </div>
 

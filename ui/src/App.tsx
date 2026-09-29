@@ -65,6 +65,16 @@ export default function App() {
   });
   const kernelState = status.data?.kernel.state ?? 'stopped';
   const stateMark = STATE_MARK[kernelState] ?? STATE_UNKNOWN;
+
+  /** 还是初始化配置：先把用户送到设置页的"导入设置"，那里有导入字符串与立即初始化。 */
+  const initialized = useQuery({
+    queryKey: ['ui-config'],
+    queryFn: api.uiConfig,
+    select: (state) => state.initialized,
+  });
+  useEffect(() => {
+    if (initialized.data === true) setActive('settings');
+  }, [initialized.data]);
   // 刷新 = 重新拉一遍所有查询 + 重建当前页面（重挂载），所以点下去一定看得出变化
   const [resetKey, setResetKey] = useState(0);
   const refresh = useMutation({
