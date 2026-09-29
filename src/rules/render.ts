@@ -22,7 +22,7 @@ function emitScalar(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-/** 单条规则的 mihomo rule 文本；类型白名单来自 data/ui-config.json。 */
+/** 单条规则的 mihomo rule 文本；类型白名单来自统一配置文件 config.json。 */
 function renderRuleLine(rule: Rule): string {
   if (!getRuleTypes().includes(rule.type)) {
     throw new RuleValidationError(`未知类型 ${rule.type}`, rule.id);

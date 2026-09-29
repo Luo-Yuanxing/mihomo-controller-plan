@@ -87,7 +87,7 @@
 | --- | --- | --- |
 | 规则 | SQLite `data/rules.db` | 唯一使用数据库的地方，高频写入不丢 |
 | 订阅内容 | 文件 `data/subscription.yaml` | 下载结果，内核以 `file` 类型 provider 读取 |
-| 设置（订阅 URL、端口、内核路径等） | 文件 `data/settings.json` | 量小，直接读写文件 |
+| 设置与界面常量（订阅 URL、端口、内核路径、界面选项等） | 文件 `config.json`（工作目录，不可写时退回 `data/`） | 一个文件装完，界面与手改都改它 |
 | 生成物 | 文件 `data/config.yaml`、`data/rules/*.yaml` | 由程序生成，可随时重建 |
 
 ## 4. 架构
@@ -166,11 +166,11 @@ mihomo-controller-plan/
 │  └─ util/                锁文件、原子写、日志
 ├─ ui/                     React 前端（3 页）
 ├─ electron/main.js        壳
+├─ config.json             统一配置：界面常量 + 内核/订阅/系统代理（工作目录，可手改）
 └─ data/                   运行时数据（开发期与打包后同名）
    ├─ config.yaml
    ├─ subscription.yaml
    ├─ rules.db
-   ├─ settings.json
    ├─ rules/
    ├─ logs/
    └─ run/                 进程锁
@@ -181,11 +181,11 @@ mihomo-controller-plan/
 ```
 mihomo-controller-plan/
 ├─ mihomo-controller-plan.exe   主程序，双击启动
+├─ config.json                  统一配置：界面常量 + 内核/订阅/系统代理期望值（可手改）
 ├─ resources/
 │  ├─ app.asar                  前后端代码（只读，不写）
 │  └─ bin/mihomo.exe            内核（随包分发，也允许在设置里换成自己的路径）
 ├─ data/                        唯一可写区，运行时文件全在这里
-│  ├─ settings.json             订阅 URL、端口、内核路径、系统代理三项期望值
 │  ├─ subscription.yaml         下载到的订阅原文
 │  ├─ rules.db                  SQLite 规则库
 │  ├─ config.yaml               生成的 mihomo 配置
@@ -239,7 +239,7 @@ mihomo-controller-plan/
 
 | 项 | 设计 |
 | --- | --- |
-| 配置 | `settings.json` 中 `subscription: { url, useProxy, userAgent, proxyGroup }` |
+| 配置 | `config.json` 的 `subscription: { url, useProxy, userAgent, proxyGroup }` |
 | 下载 | `fetch` GET，默认 20 s 超时，默认 UA `clash-verge/v3`（可覆盖），可选走本机 mixed 端口或系统代理 |
 | 校验 | 状态码 2xx；剥 BOM；YAML 可解析；含 `proxies` 或 `proxy-providers` |
 | 落盘 | 写 `subscription.yaml.tmp` → `rename` 覆盖，再 `PUT /providers/proxies/sub-main` |
@@ -265,7 +265,7 @@ proxy-providers:
 | 能力 | 设计 |
 | --- | --- |
 | 启动 | `spawn(bin, ['-d', dir, '-f', config, '-ext-ctl', '127.0.0.1:9090', '-secret', S], { windowsHide: true })`，stdout/stderr 收进日志 |
-| 内核路径 | `settings.json` 里存绝对路径：保存时按"绝对路径 → 应用目录 → 打包后的 resources 目录"解析并校验存在，失败直接 400；运行时换路径下次 start/restart 生效 |
+| 内核路径 | `config.json` 的 `core.binaryPath` 存绝对路径：保存时按"绝对路径 → 应用目录 → 打包后的 resources 目录"解析并校验存在，失败直接 400；运行时换路径下次 start/restart 生效 |
 | 就绪探测 | 轮询 `GET /version`，超时 15 s 视为失败并附日志尾部，随后停止 |
 | 运行期 | 每 10 s 探活；发现内核退出则记录退出码与日志尾部后停止工作 |
 | 存活关系 | 内核不随窗口关闭结束；只有托盘菜单"退出"才结束它 |
@@ -317,7 +317,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | 未接管 | 用户关掉系统代理后立即停止干预 |
 | 退出 | 不做还原，注册表保持当前值 |
 | 失败 | 回写失败属于环境类异常 → 记录并停止工作 |
-| 持久化 | 开关与绕过列表存在 `data/settings.json` 里；代理服务器地址每次启动按混合端口重算 |
+| 持久化 | 开关与绕过列表存在 `config.json` 的 `proxy` 段里；代理服务器地址每次启动按混合端口重算 |
 
 代价：最坏 1 分钟内系统代理处于被改状态，界面提供"立即写入"按钮兜底。
 
@@ -343,10 +343,10 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | PUT | `/api/rules/{id}` | 修改 |
 | DELETE | `/api/rules/{id}` | 删除 |
 | POST | `/api/rules/sync` | 落盘 + 热更新 |
-| GET | `/api/ui-config` | 界面常量的系统值（存库，与文件解耦） |
+| GET | `/api/ui-config` | 界面常量的生效值（来源文件 + 当前值 + 文件修改时间） |
 | POST | `/api/ui-config/preview` | 按配置文件预览对比，不生效 |
-| POST | `/api/ui-config/load-force` | 按配置文件覆盖系统值；带 `rules` 段时整表覆盖规则并热更新，带 `core`/`subscription`/`proxy` 段时一并写回设置 |
-| POST | `/api/ui-config/apply` | 把界面上的界面常量保存到系统 |
+| POST | `/api/ui-config/load-force` | 按配置文件覆盖生效值并写回 config.json；带 `rules` 段时整表覆盖规则并热更新，带 `core`/`subscription`/`proxy` 段时一并写回设置 |
+| POST | `/api/ui-config/apply` | 把界面上的界面常量写回 config.json |
 | POST | `/api/ui-config/export` | 导出为一份 config.json：界面常量 + 自定义规则 + 内核/订阅/系统代理设置 |
 | GET | `/api/proxy` | 系统代理期望值 / 实际值 / 是否一致 |
 | POST | `/api/proxy/enable` | 开启并纳入守护 |

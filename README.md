@@ -20,7 +20,7 @@ npm run dist       # 产出 release/ 下的免安装目录与 zip
 
 - 版本号只改 `package.json` 一处：zip 名按 `artifactName` 模板带版本，**exe 名的版本后缀由 `scripts/after-pack.cjs` 补**——electron-builder 的 `win.executableName` 不展开 `${version}` 宏。
 - `npm run build` 会先跑 `scripts/clean.mjs` 清空 `dist/` 与 `ui/dist/`：tsc 不删除源文件已删的历史输出，不清会被原样打进包。
-- 随包分发 `resources/bin/mihomo.exe`、`resources/geo/`；`resources/data-skeleton/` 只带空的 `config.json`、`settings.json`，不含开发机的订阅与密钥。
+- 随包分发 `resources/bin/mihomo.exe`、`resources/geo/`；界面常量与应用设置同住在应用根目录的 `config.json`（首次启动自动生成），开发机的订阅与密钥不进包。
 
 ## 目录
 
@@ -30,6 +30,7 @@ npm run dist       # 产出 release/ 下的免安装目录与 zip
 | `ui/` | React 前端（规则 / 失败连接 / 状态 / 设置） |
 | `electron/` | Electron 壳，托盘常驻 |
 | `resources/bin/` | 随包分发的 mihomo.exe（需自行放入，不入库） |
+| `config.json` | 工作目录下的唯一配置文件：界面常量 + 内核/订阅/系统代理期望值 |
 | `data/` | 唯一可写区，运行时数据全在这里 |
 
 ## 数据目录定位
@@ -37,6 +38,12 @@ npm run dist       # 产出 release/ 下的免安装目录与 zip
 1. 环境变量 `MCP_DATA_DIR`
 2. exe 同级 `data/`（可写时）
 3. 回退 `%LOCALAPPDATA%\mihomo-controller-plan\data`
+
+## 配置文件
+
+界面常量与应用设置（内核路径、混合端口、订阅、系统代理期望值）同住在工作目录的 `config.json`：
+开发期是仓库根，打包后是 exe 同级；该目录不可写时退回数据目录。首次启动自动生成，可以直接手改，
+界面上的"强制按配置文件加载"就是按它覆盖生效值。
 
 ## 安全使用
 
