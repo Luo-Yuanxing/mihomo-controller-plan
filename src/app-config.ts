@@ -30,8 +30,8 @@ export interface AppConfig {
   /** 规则段只在导入/导出时同步，null = 文件没带这一段。 */
   rules: RuleEntry[] | null;
   /**
-   * 是不是还没配置过的初始化文件：true = 模板态，界面要引导用户导入一份配置；
-   * 任何一种导入（字符串导入 / 立即初始化）都会把它改成 false，之后启动直接按文件生效。
+   * 初始化标记：默认 false = 启动就按文件生效，不加载引导；
+   * 只有 true（旧版本落下的文件）才走一次立即初始化，改完仍旧是 false。
    */
   initialized: boolean;
 }
@@ -74,7 +74,7 @@ export function readAppConfig(file: string): AppConfig {
     proxy: record['proxy'],
   });
   const rules = z.array(ruleEntrySchema).safeParse(record['rules']);
-  // 老文件没有这一项：说明它早就配置过了，按"已初始化"处理，免得老用户被拉去引导页
+  // 老文件没有这一项：按"已初始化"处理，启动不加载引导
   const initialized = typeof record['initialized'] === 'boolean' ? record['initialized'] : false;
 
   return {
@@ -123,9 +123,17 @@ export async function saveUiConfig(file: string, ui: UiConfig, initialized = fal
   await writeAppConfig(file, { ...readAppConfig(file), ui, initialized });
 }
 
-/** 只改初始化标记：立即初始化就是把它从 true 改成 false，其余内容不动。 */
+/** 只改初始化标记：立即初始化就是把它落成 false，其余内容不动。 */
 export async function markInitialized(file: string): Promise<void> {
   await writeAppConfig(file, { ...readAppConfig(file), initialized: false });
+}
+
+/**
+ * 同步版标记落盘：加载时立即完成初始化用（必须同步落盘，
+ * 否则这次写盘会和随后的保存/导入抢同一个文件，把用户改动盖回去）。
+ */
+export function markInitializedSync(file: string): void {
+  fs.writeFileSync(file, renderAppConfig({ ...readAppConfig(file), initialized: false }), 'utf8');
 }
 
 /** 统一配置文件名：工作目录下的 config.json。 */
@@ -162,7 +170,7 @@ export function ensureAppConfigFile(appDir: string, dataDir: string, log?: Logge
         fs.mkdirSync(path.dirname(candidate), { recursive: true });
         // 预生成的文件直接算已初始化（initialized: false），启动不加载引导
         fs.writeFileSync(candidate, renderAppConfig(DEFAULT_APP_CONFIG), 'utf8');
-        log?.info({ file: candidate }, '已预生成初始化配置文件 config.json');
+        log?.info({ file: candidate }, '已预生成配置文件 config.json（已初始化）');
       }
       target = candidate;
       break;

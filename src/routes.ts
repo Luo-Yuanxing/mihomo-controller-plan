@@ -344,7 +344,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     }
   });
 
-  /** 立即初始化：把 config.json 的初始化标记改成 false，内容不动。 */
+  /** 立即初始化：把 config.json 的初始化标记落成 false，内容不动。 */
   app.post('/api/ui-config/initialize', async () => ctx.initializeUiConfig());
 
   /** 保存界面常量到 config.json：存过一次就算配置好了。 */

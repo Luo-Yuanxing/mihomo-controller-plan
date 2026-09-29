@@ -39,7 +39,7 @@ export interface AppContext {
   ruleProvider: string;
   /** 当前生效的界面常量（config.json 的界面常量段）。 */
   uiConfig: UiConfig;
-  /** 生效值快照：当前值 + 是否还是初始化文件 + 文件修改时间。 */
+  /** 生效值快照：当前值 + 初始化标记（加载时即为 false）+ 文件修改时间。 */
   uiConfigState(): StoredUiConfig;
   /** 保存界面常量到 config.json（存过一次就算配置好了）。 */
   applyUiConfig(config: unknown): Promise<StoredUiConfig>;

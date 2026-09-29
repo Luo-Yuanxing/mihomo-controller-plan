@@ -1,10 +1,17 @@
 /**
  * 导入设置的编排：生效值就是工作目录里 config.json 的界面常量段。
- * 文件对用户透明——界面只有"字符串导入 / 立即初始化"两个入口，其余全自动。
+ * 文件对用户透明——界面只有"字符串导入 / 立即初始化"两个入口，其余全自动；
+ * 加载时就把初始化标记落成 false，不做任何引导流程。
  */
 import fs from 'node:fs';
 import type { Logger } from 'pino';
-import { markInitialized, readAppConfig, saveUiConfig, writeAppConfig } from './app-config.js';
+import {
+  markInitialized,
+  markInitializedSync,
+  readAppConfig,
+  saveUiConfig,
+  writeAppConfig,
+} from './app-config.js';
 import { parseUiConfig, setActiveUiConfig, type RuleEntry, type UiConfig } from './ui-config.js';
 import {
   decodeSharedConfig,
@@ -15,7 +22,7 @@ import {
 
 export interface StoredUiConfig {
   config: UiConfig;
-  /** true = 还是初始化文件，界面要引导用户导入一份配置。 */
+  /** false = 启动就是初始化完成的生效态，界面不加载引导。 */
   initialized: boolean;
   /** config.json 的最后修改时间，读不到就是 null。 */
   updatedAt: string | null;
@@ -33,7 +40,7 @@ export interface UiConfigService {
   state(): StoredUiConfig;
   /** 保存界面常量：存过一次就算配置好了（initialized → false）。 */
   apply(config: unknown): Promise<StoredUiConfig>;
-  /** 立即初始化：只把 initialized 改成 false，内容不动。 */
+  /** 立即初始化：把标记落成 false，内容不动（正常情况下加载时就已经是 false）。 */
   initialize(): Promise<StoredUiConfig>;
   /** 生成分享串（含规则与内核/代理设置，剔除订阅与 secret）。 */
   share(rules: RuleEntry[], app: ShareableApp): string;
@@ -54,15 +61,27 @@ function modifiedAt(file: string): string | null {
 export function createUiConfigService(defaultFile: string, log?: Logger): UiConfigService {
   const file = defaultFile;
   const initial = readAppConfig(file);
+  // 加载即完成初始化：标记还是 true（旧版本落下的文件）就同步落成 false，界面不加载引导
+  if (initial.initialized) {
+    try {
+      markInitializedSync(file);
+      log?.info({ file }, '加载时已把初始化标记落成 false');
+    } catch (error) {
+      log?.warn(
+        { file, err: error instanceof Error ? error.message : String(error) },
+        '加载时写初始化标记失败，本次仍按已初始化运行',
+      );
+    }
+  }
   setActiveUiConfig(initial.ui);
 
   let state: StoredUiConfig = {
     config: initial.ui,
-    initialized: initial.initialized,
+    initialized: false,
     updatedAt: modifiedAt(file),
   };
   log?.info(
-    { file, initialized: state.initialized, ruleTypes: state.config.ruleTypes },
+    { file, initialized: false, ruleTypes: state.config.ruleTypes },
     '界面常量生效值已就绪',
   );
 
@@ -82,7 +101,7 @@ export function createUiConfigService(defaultFile: string, log?: Logger): UiConf
     },
     async initialize() {
       await markInitialized(file);
-      log?.info({ file }, '已把初始化文件标记为已初始化');
+      log?.info({ file }, '已把初始化标记落成 false');
       return next(state.config, false);
     },
     share(rules, app) {
