@@ -84,13 +84,12 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { kernel: ctx.kernel.status(), proxy };
   });
 
-  /** 离线兜底二：无条件写一遍系统代理期望值，重写配置后重启内核。 */
+  /** 离线兜底二：重写配置后重启内核（重启成功会按联动把系统代理指向内核）。 */
   app.post('/api/offline/restart', async () => {
-    const proxy = await ctx.guard.apply();
     await ctx.writeConfig();
     const kernel = await ctx.restartKernel();
     ctx.log.warn({ state: kernel.state }, '离线兜底：已重启内核');
-    return { kernel, proxy };
+    return { kernel, proxy: await ctx.guard.state() };
   });
 
   /**
@@ -522,8 +521,6 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     ctx.log.info('系统代理已关闭并交还控制权');
     return state;
   });
-
-  app.post('/api/proxy/apply', async () => ctx.guard.apply());
 
   app.post('/api/kernel/restart', async () => {
     await ctx.writeConfig();

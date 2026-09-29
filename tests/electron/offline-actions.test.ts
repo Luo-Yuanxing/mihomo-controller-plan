@@ -21,10 +21,7 @@ function fakeContext(): FakeContext {
           calls.push('guard.disable');
           return { guarding: false };
         },
-        apply: async () => {
-          calls.push('guard.apply');
-          return { guarding: true };
-        },
+        state: async () => ({ guarding: true }),
       },
       writeConfig: async () => {
         calls.push('writeConfig');
@@ -47,13 +44,13 @@ describe('离线兜底动作', () => {
     expect(calls).toEqual(['kernel.stop', 'guard.disable']);
   });
 
-  it('立即重启内核：写期望值 → 重写配置 → 重启内核，走 /api/offline/restart', async () => {
+  it('立即重启内核：重写配置 → 重启内核（代理由联动接管），走 /api/offline/restart', async () => {
     const { calls, context } = fakeContext();
     const action = offlineAction('restart');
 
     expect(action.httpPath).toBe('/api/offline/restart');
     await action.run(context);
-    expect(calls).toEqual(['guard.apply', 'writeConfig', 'restartKernel']);
+    expect(calls).toEqual(['writeConfig', 'restartKernel']);
   });
 
   it('未知动作直接报错，不静默', () => {

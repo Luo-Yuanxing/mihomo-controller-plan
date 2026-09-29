@@ -92,7 +92,6 @@ export default function StatusPage() {
     api.disableProxy,
     () => '系统代理已关闭',
   );
-  const applyProxy = useAction(queryClient, notices.push, api.applyProxy, () => '系统代理写入成功');
   const recover = useAction(
     queryClient,
     notices.push,
@@ -149,7 +148,7 @@ export default function StatusPage() {
               className="rounded border border-amber-400 bg-amber-50 px-2 py-1 text-sm text-amber-900 hover:bg-amber-100 disabled:opacity-50"
               disabled={busy}
               onClick={() => recover.mutate()}
-              title="重写配置 → 内核没起来就启动 → 内核就绪才写系统代理，起不来就关掉代理保证不断网"
+              title="重写配置 → 启动内核 → 开系统代理"
             >
               一键修复
             </button>
@@ -158,7 +157,7 @@ export default function StatusPage() {
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
               disabled={busy || kernelUp}
               onClick={() => startKernel.mutate()}
-              title="启动成功后自动把系统代理指向内核（反向不成立：开关系统代理不会启停内核）"
+              title="启动后自动开启系统代理"
             >
               启动内核
             </button>
@@ -167,7 +166,7 @@ export default function StatusPage() {
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
               disabled={busy || !kernelUp}
               onClick={() => stopKernel.mutate()}
-              title="停止内核会同时关闭系统代理，免得流量指向没人监听的端口"
+              title="停止后自动关闭系统代理"
             >
               停止内核
             </button>
@@ -275,7 +274,7 @@ export default function StatusPage() {
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50"
               disabled={busy}
               onClick={() => enableProxy.mutate()}
-              title="打开系统代理并纳入守护（每 60 s 巡检回写）；守护不能单独关，关掉系统代理即停止守护"
+              title="开启并纳入守护"
             >
               开启系统代理
             </button>
@@ -283,17 +282,8 @@ export default function StatusPage() {
               type="button"
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50"
               disabled={busy}
-              onClick={() => applyProxy.mutate()}
-              title="按期望值立即重写一遍注册表，不改开关也不改守护"
-            >
-              立即写入
-            </button>
-            <button
-              type="button"
-              className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50"
-              disabled={busy}
               onClick={() => disableProxy.mutate()}
-              title="关闭系统代理并停止守护，把控制权交还给你（不涉及内核）"
+              title="关闭并停止守护"
             >
               关闭系统代理
             </button>
@@ -323,7 +313,7 @@ export default function StatusPage() {
         </table>
         {data !== undefined && !data.proxy.match && (
           <p className="mt-1 text-xs text-amber-700">
-            与实际值不一致，最坏 60 s 内会被守护回写；可点"立即写入"兜底。
+            与实际值不一致，最坏 60 s 内会被守护回写；点一下"开启系统代理"也会立刻重写一遍。
           </p>
         )}
         {data?.proxy.error != null && (

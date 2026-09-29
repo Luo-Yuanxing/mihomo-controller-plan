@@ -64,8 +64,6 @@ export interface ProxyGuard {
   enable(): Promise<ProxyState>;
   /** 关闭系统代理并停止守护，把控制权交还用户。 */
   disable(): Promise<ProxyState>;
-  /** 按期望值写一遍注册表，不改守护状态。 */
-  apply(): Promise<ProxyState>;
   /** 换期望的代理服务器地址（混合端口变了）；正在守护就顺手写一遍注册表。 */
   setServer(server: string): Promise<ProxyState>;
   shutdown(): Promise<void>;
@@ -210,10 +208,6 @@ export function createProxyGuard(options: ProxyGuardOptions): ProxyGuard {
       await writeDesired();
       guarding = false;
       stop();
-      return state();
-    },
-    async apply() {
-      await writeDesired();
       return state();
     },
     async setServer(server: string) {

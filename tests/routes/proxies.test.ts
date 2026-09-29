@@ -525,14 +525,11 @@ describe.skipIf(!canLoadFastify)('离线兜底', () => {
     await app.close();
   });
 
-  it('立即重启内核：写期望值 → 重写配置 → 重启', async () => {
+  it('立即重启内核：重写配置 → 重启（代理由联动接管）', async () => {
     const calls: string[] = [];
     const app = buildApp(fakeApi(), {
       guard: {
-        apply: async () => {
-          calls.push('guard.apply');
-          return proxyState;
-        },
+        state: async () => proxyState,
       },
       writeConfig: async () => {
         calls.push('writeConfig');
@@ -545,7 +542,7 @@ describe.skipIf(!canLoadFastify)('离线兜底', () => {
     const response = await app.inject({ method: 'POST', url: '/api/offline/restart' });
 
     expect(response.statusCode).toBe(200);
-    expect(calls).toEqual(['guard.apply', 'writeConfig', 'restartKernel']);
+    expect(calls).toEqual(['writeConfig', 'restartKernel']);
     await app.close();
   });
 });

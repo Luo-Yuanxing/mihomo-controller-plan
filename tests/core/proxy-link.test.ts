@@ -27,9 +27,7 @@ function fakeGuard(calls: string[], enableThrows = false): ProxyGuard {
       calls.push('disable');
       return proxyState(false);
     },
-    apply: async () => proxyState(false),
-    setServer: async () => proxyState(false),
-    shutdown: async () => undefined,
+    setServer: async () => proxyState(false),    shutdown: async () => undefined,
   };
 }
 

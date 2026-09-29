@@ -128,7 +128,6 @@ export const api = {
     ),
   enableProxy: () => post<ProxyState>('/api/proxy/enable'),
   disableProxy: () => post<ProxyState>('/api/proxy/disable'),
-  applyProxy: () => post<ProxyState>('/api/proxy/apply'),
   /** 一键修复：重写配置 → 必要时重启内核 → 内核就绪才写代理，没起来就关掉代理。 */
   recover: () => post<{ steps: string[]; kernel: CoreStatus; proxy: ProxyState }>('/api/recover'),
 

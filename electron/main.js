@@ -20,7 +20,7 @@ let tray = null;
  * 开发期后端跑在独立进程（此处为 null），打包后后端就在本进程内。
  * @type {{ url: string, close(): Promise<void>, context: {
  *   log: { info: Function, warn: Function },
- *   guard: { enable(): Promise<unknown>, disable(): Promise<unknown>, apply(): Promise<unknown> },
+ *   guard: { enable(): Promise<unknown>, disable(): Promise<unknown>, state(): Promise<unknown> },
  *   kernel: { stop(): Promise<unknown> },
  *   writeConfig(): Promise<void>,
  *   restartKernel(): Promise<unknown>,
@@ -126,16 +126,6 @@ async function callBackend(httpPath, action) {
   return action(runningServer.context);
 }
 
-/** 托盘菜单"立即写入系统代理"：相当于手动触发一次守护（计划 §5.5 兜底按钮）。 */
-async function applySystemProxyFromTray() {
-  try {
-    await callBackend('/api/proxy/apply', (context) => context.guard.apply());
-    runningServer?.context.log.info('托盘：已写入系统代理');
-  } catch (error) {
-    dialog.showErrorBox('写入系统代理失败', String(error));
-  }
-}
-
 /** 托盘菜单"开启/关闭系统代理"：面板白屏或断网时仍能改回来。 */
 async function setSystemProxyFromTray(enable) {
   const label = enable ? '开启' : '关闭';
@@ -237,7 +227,6 @@ function createTray(iconPath) {
       { label: '启动 / 重启内核', click: () => void restartKernelFromTray() },
       { label: '开启系统代理', click: () => void setSystemProxyFromTray(true) },
       { label: '关闭系统代理', click: () => void setSystemProxyFromTray(false) },
-      { label: '立即写入系统代理', click: () => void applySystemProxyFromTray() },
       { type: 'separator' },
       { label: '安全退出（先关闭系统代理）', click: () => void confirmQuit() },
     ]),

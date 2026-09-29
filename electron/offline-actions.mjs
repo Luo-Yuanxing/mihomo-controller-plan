@@ -12,13 +12,12 @@ export const OFFLINE_ACTIONS = {
       return { proxy: await context.guard.disable() };
     },
   },
-  /** 立即重启内核：无条件写系统代理期望值 → 重写配置 → 重启内核。 */
+  /** 立即重启内核：重写配置 → 重启内核（重启成功后按联动把系统代理指向内核）。 */
   restart: {
     httpPath: '/api/offline/restart',
     run: async (context) => {
-      const proxy = await context.guard.apply();
       await context.writeConfig();
-      return { proxy, kernel: await context.restartKernel() };
+      return { kernel: await context.restartKernel(), proxy: await context.guard.state() };
     },
   },
 };
