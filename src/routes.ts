@@ -93,6 +93,41 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { kernel, proxy };
   });
 
+  /**
+   * 一键修复：重写配置 → 内核没起来就重启 → 内核就绪才写系统代理，没起来就关掉代理。
+   * 最后一步是关键：内核不可用时宁可关代理，也不能让整机流量指向一个没人监听的端口。
+   */
+  app.post('/api/recover', async () => {
+    const steps: string[] = [];
+
+    try {
+      await ctx.writeConfig();
+      steps.push('已按当前设置重写 config.yaml');
+    } catch (error) {
+      steps.push(`重写配置失败：${errorText(error)}`);
+    }
+
+    let kernel = ctx.kernel.status();
+    if (kernel.state === 'running' || kernel.state === 'adopted') {
+      steps.push('内核已在运行');
+    } else {
+      kernel = await ctx.restartKernel();
+      steps.push(
+        kernel.state === 'failed'
+          ? `内核启动失败：${kernel.error ?? '未知原因'}`
+          : '内核已启动',
+      );
+    }
+
+    const kernelUp = kernel.state === 'running' || kernel.state === 'adopted';
+    const proxy = kernelUp ? await ctx.guard.apply() : await ctx.guard.disable();
+    steps.push(
+      kernelUp ? '系统代理已写回期望值' : '内核不可用，已关闭系统代理以免整机断网',
+    );
+    ctx.log.warn({ steps }, '一键修复完成');
+    return { steps, kernel, proxy };
+  });
+
   app.get('/api/settings', async () => ctx.settings);
 
   /** 保存设置后已经落盘、但后续动作失败：带状态码交给调用方回。 */
