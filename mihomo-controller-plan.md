@@ -370,10 +370,8 @@ profile:
   store-selected: true   # 用户选的出口跨重启保留
 
 dns:
-  enable: true
-  enhanced-mode: fake-ip
-  nameserver:
-    - https://doh.pub/dns-query
+  # 整体照搬订阅文件的 dns 段（default-nameserver / nameserver-policy / fallback 等）
+  # 订阅里没有 dns 段时才用内置最小配置：enable + fake-ip + doh.pub
 
 proxy-providers:
   sub-main:

@@ -4,6 +4,7 @@
  */
 import type { Settings } from '../settings.js';
 import type { RenderedGroup } from '../sub/groups.js';
+import { stringify } from 'yaml';
 
 /** 目标策略里的"代理"落在哪个组：规则策略值、生成配置的组名都用它。 */
 export const PROXY_GROUP_NAME = 'PROXY';
@@ -19,6 +20,24 @@ export interface TemplateOptions {
    * null / 空数组 = PROXY 直接用订阅全部节点。
    */
   proxyGroupPlan?: RenderedGroup[] | null;
+  /** 订阅文件里的 dns 段；null = 用内置的最小 DNS 配置。 */
+  subscriptionDns?: Record<string, unknown> | null;
+}
+
+/** dns 段整体照搬订阅：用 YAML 序列化后统一缩进两格。 */
+function dnsLines(dns: Record<string, unknown> | null): string[] {
+  if (dns === null) {
+    return [
+      '  enable: true',
+      '  enhanced-mode: fake-ip',
+      '  nameserver:',
+      '    - https://doh.pub/dns-query',
+    ];
+  }
+  return stringify(dns, { lineWidth: 0 })
+    .trimEnd()
+    .split('\n')
+    .map((line) => (line === '' ? '' : `  ${line}`));
 }
 
 /** 标识符与 http(s) 网址才不加引号，其余（含空格、• 等）一律双引号包住。 */
@@ -69,10 +88,7 @@ export function renderConfig(options: TemplateOptions): string {
     '  store-selected: true',
     '',
     'dns:',
-    '  enable: true',
-    '  enhanced-mode: fake-ip',
-    '  nameserver:',
-    '    - https://doh.pub/dns-query',
+    ...dnsLines(options.subscriptionDns ?? null),
     '',
   ];
 

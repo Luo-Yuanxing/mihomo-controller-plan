@@ -11,6 +11,7 @@ import { CoreApiError, DELAY_TEST_URL, proxyGroups } from './core/api.js';
 import { parseFailedConnections } from './logs/failed-connections.js';
 import { RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { countSubscriptionProxies } from './sub/download.js';
+import { readSubscriptionDns } from './sub/dns.js';
 import { planProxyGroups, readSubscriptionGroups } from './sub/groups.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
@@ -435,6 +436,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
           secret: ctx.settings.core.secret,
           subscriptionProvider,
           ruleProvider: ctx.ruleProvider,
+          subscriptionDns: readSubscriptionDns(ctx.paths.subscription),
           proxyGroupPlan:
             subscriptionProvider === null
               ? null

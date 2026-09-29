@@ -71,4 +71,25 @@ describe('renderConfig', () => {
 
     expect(yaml).toContain('    proxies:\n      - "自动 选择"');
   });
+
+  it('有订阅 dns 段时整段照搬，没有时用内置最小配置', () => {
+    const withDns = renderConfig({
+      ...base,
+      subscriptionProvider: 'sub-main',
+      subscriptionDns: {
+        enable: true,
+        'enhanced-mode': 'fake-ip',
+        'default-nameserver': ['223.5.5.5'],
+        nameserver: ['https://doh.pub/dns-query'],
+        'fallback-filter': { geoip: true, 'geoip-code': 'CN' },
+      },
+    });
+    const withoutDns = renderConfig({ ...base, subscriptionProvider: 'sub-main' });
+
+    expect(withDns).toContain('dns:\n  enable: true\n  enhanced-mode: fake-ip');
+    expect(withDns).toContain('  default-nameserver:\n    - 223.5.5.5');
+    expect(withDns).toContain('  fallback-filter:\n    geoip: true\n    geoip-code: CN');
+    expect(withoutDns).toContain('dns:\n  enable: true\n  enhanced-mode: fake-ip');
+    expect(withoutDns).not.toContain('default-nameserver');
+  });
 });

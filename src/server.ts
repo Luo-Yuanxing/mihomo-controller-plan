@@ -21,6 +21,7 @@ import { loadSettings, saveSettings as persistSettings, type Settings } from './
 import { ensureUiConfigFile, getUiConfig } from './ui-config.js';
 import { createUiConfigService } from './ui-config-store.js';
 import { countSubscriptionProxies, downloadSubscription } from './sub/download.js';
+import { readSubscriptionDns } from './sub/dns.js';
 import { planProxyGroups, type RenderedGroup } from './sub/groups.js';
 import { writeFileAtomic } from './util/atomic.js';
 import { acquireLock } from './util/lock.js';
@@ -137,6 +138,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       subscriptionProvider: hasUsableSubscription() ? subscriptionProvider : null,
       ruleProvider,
       proxyGroupPlan: currentPlan(),
+      subscriptionDns: readSubscriptionDns(paths.subscription),
     });
     await writeFileAtomic(paths.config, yaml);
   };
