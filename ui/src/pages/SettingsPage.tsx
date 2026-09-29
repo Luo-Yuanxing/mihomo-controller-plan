@@ -2,9 +2,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import NoticeStack from '../components/NoticeStack';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import type { Settings, UiConfigPreview } from '../lib/types';
 import { useNotices } from '../lib/useNotices';
+import { uiConfigIssues, type UiConfigIssue } from '../lib/validateUiConfig';
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
@@ -31,6 +32,7 @@ export default function SettingsPage() {
   const [draft, setDraft] = useState<Settings | null>(null);
   const [configFile, setConfigFile] = useState('');
   const [preview, setPreview] = useState<UiConfigPreview | null>(null);
+  const [valueIssues, setValueIssues] = useState<UiConfigIssue[]>([]);
   const notices = useNotices();
 
   useEffect(() => {
@@ -58,16 +60,21 @@ export default function SettingsPage() {
     mutationFn: () => api.forceLoadUiConfig(configFile.trim()),
     onSuccess: async (result) => {
       setPreview(null);
+      setValueIssues([]);
       notices.push('ok', `已按配置文件强制覆盖系统值：${result.file}`);
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
-    onError: (error: Error) => notices.push('error', error.message),
+    onError: (error: Error) => {
+      setValueIssues(error instanceof ApiError ? error.issues : []);
+      notices.push('error', error.message);
+    },
   });
 
   const previewLoad = useMutation({
     mutationFn: () => api.previewUiConfig(configFile.trim()),
     onSuccess: (result) => {
       setPreview(result);
+      setValueIssues(uiConfigIssues(result.config));
       notices.push(
         'ok',
         result.same
@@ -77,6 +84,7 @@ export default function SettingsPage() {
     },
     onError: (error: Error) => {
       setPreview(null);
+      setValueIssues(error instanceof ApiError ? error.issues : []);
       notices.push('error', error.message);
     },
   });
@@ -84,14 +92,21 @@ export default function SettingsPage() {
   const applyUiConfig = useMutation({
     mutationFn: () => {
       if (preview === null) throw new Error('先执行预览');
+      // 界面侧先自检一次，避免把明显不合法的值发给后端
+      const issues = uiConfigIssues(preview.config);
+      if (issues.length > 0) throw new ApiError('界面侧取值检测未通过，已阻止保存', issues);
       return api.applyUiConfig({ file: preview.file, config: preview.config });
     },
     onSuccess: async (result) => {
       setPreview(null);
+      setValueIssues([]);
       notices.push('ok', `已从界面保存到系统：${result.file}`);
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
-    onError: (error: Error) => notices.push('error', error.message),
+    onError: (error: Error) => {
+      setValueIssues(error instanceof ApiError ? error.issues : []);
+      notices.push('error', error.message);
+    },
   });
 
   if (draft === null) {
@@ -249,7 +264,7 @@ export default function SettingsPage() {
           >
             {forceLoad.isPending ? '覆盖中…' : '强制按配置文件加载（覆盖系统值）'}
           </button>
-          {preview !== null && !preview.same && (
+          {preview !== null && !preview.same && valueIssues.length === 0 && (
             <button
               type="button"
               className="rounded bg-emerald-600 px-3 py-1 text-sm text-white disabled:opacity-50"
@@ -263,6 +278,22 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
+
+        {valueIssues.length > 0 && (
+          <div className="rounded border border-rose-300 bg-rose-50 p-2 text-xs text-rose-900">
+            <p className="mb-1 font-semibold">
+              取值检测未通过（{valueIssues.length} 项），已阻止保存
+            </p>
+            <ul className="list-disc pl-4">
+              {valueIssues.map((issue) => (
+                <li key={`${issue.path}-${issue.message}`}>
+                  <span className="font-mono">{issue.path === '' ? '配置' : issue.path}</span>：
+                  {issue.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {preview !== null && (
           <table className="w-full text-xs">

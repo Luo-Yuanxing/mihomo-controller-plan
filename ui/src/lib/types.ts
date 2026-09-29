@@ -43,6 +43,8 @@ export interface UiConfigDiffItem {
 export interface UiConfigPreview {
   file: string;
   config: UiConfig;
+  /** 后端逐项取值检测结果（为空表示合法）。 */
+  issues?: { path: string; message: string }[];
   diff: UiConfigDiffItem[];
   same: boolean;
 }

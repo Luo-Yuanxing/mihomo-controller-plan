@@ -18,6 +18,17 @@ import type {
 
 const token = (window as unknown as { mcpApiToken?: string }).mcpApiToken ?? '';
 
+/** 后端 400 时带上逐项取值检测明细，界面按字段展示。 */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly issues: { path: string; message: string }[] = [],
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -32,7 +43,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const payload: unknown = text === '' ? null : JSON.parse(text);
   if (!response.ok) {
     const message = (payload as { error?: string } | null)?.error;
-    throw new Error(message ?? `请求失败：HTTP ${response.status}`);
+    const issues = (payload as { issues?: { path: string; message: string }[] } | null)?.issues;
+    throw new ApiError(message ?? `请求失败：HTTP ${response.status}`, issues ?? []);
   }
   return payload as T;
 }
