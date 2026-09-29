@@ -15,12 +15,12 @@ export interface UiConfig {
 }
 
 export const DEFAULT_UI_CONFIG: UiConfig = {
-  ruleTypes: ['DOMAIN-SUFFIX', 'DOMAIN'],
+  ruleTypes: ['DOMAIN', 'DOMAIN-SUFFIX'],
   policies: [
     { value: 'PROXY', label: '代理' },
     { value: 'DIRECT', label: '直连' },
   ],
-  defaults: { ruleType: 'DOMAIN-SUFFIX', policy: 'PROXY' },
+  defaults: { ruleType: 'DOMAIN', policy: 'PROXY' },
   failedConnections: { refetchIntervalMs: 5000, lines: 5000 },
   settings: { logsRefetchIntervalMs: 5000 },
 };
