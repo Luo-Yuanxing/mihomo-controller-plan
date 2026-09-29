@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { ensureAppConfigFile, readAppConfig, saveAppSettings } from './app-config.js';
 import { renderConfig } from './config/template.js';
 import type { AppContext, SubscriptionState } from './context.js';
 import { createCoreApi } from './core/api.js';
@@ -17,13 +18,8 @@ import { registerRoutes } from './routes.js';
 import { openRulesDatabase } from './rules/db.js';
 import { RuleValidationError } from './rules/render.js';
 import { createRuleRepo } from './rules/repo.js';
-import {
-  CONTROL_PORT,
-  loadSettings,
-  saveSettings as persistSettings,
-  type Settings,
-} from './settings.js';
-import { ensureUiConfigFile, getUiConfig } from './ui-config.js';
+import { CONTROL_PORT, type Settings } from './settings.js';
+import { getUiConfig } from './ui-config.js';
 import { createUiConfigService } from './ui-config-store.js';
 import { downloadSubscription } from './sub/download.js';
 import {
@@ -95,10 +91,12 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const log = createLogger(dataDir);
   ensureGeodata(dataDir, appDir, log);
 
-  let settings: Settings = loadSettings(dataDir);
+  // 统一配置文件（工作目录 config.json）：界面常量 + 应用设置同住一个文件，先读再补 secret
+  const appConfigFile = ensureAppConfigFile(appDir, dataDir, log);
+  let settings: Settings = readAppConfig(appConfigFile).settings;
   if (settings.core.secret === '') {
     settings = { ...settings, core: { ...settings.core, secret: randomBytes(16).toString('hex') } };
-    await persistSettings(dataDir, settings);
+    await saveAppSettings(appConfigFile, settings);
   }
 
   // 单实例：拿不到锁直接抛错（fail-stop，计划 §4.4）
@@ -109,11 +107,11 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const subscriptionProvider = 'sub-main';
   const ruleProvider = 'custom';
 
-  // 界面常量：先在 app 启动路径预生成配置文件，再由 SQLite 里的系统值覆盖，之后 UI 才启动
-  const uiConfigFile = ensureUiConfigFile(appDir, dataDir, log);
-  const uiConfigService = createUiConfigService(db, uiConfigFile, log, {
+  // 界面常量：生效值就住在统一配置文件里，文件是唯一真相源
+  const uiConfigService = createUiConfigService(appConfigFile, log, {
     // 预览对比要用到当前设置（内核路径、端口、订阅、ProxyOverride）
     currentSettings: () => settings,
+    countRules: () => repo.list().length,
   });
 
   /** 订阅文件存在且含节点才算可用；空订阅按无订阅处理，避免 PROXY 组静默直连。 */
@@ -191,7 +189,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
         },
       };
       context.settings = settings;
-      await persistSettings(dataDir, settings);
+      await saveAppSettings(appConfigFile, settings);
     },
   });
 
@@ -225,7 +223,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
         proxy: { ...next.proxy, override: ensureLocalBypass(next.proxy.override) },
       };
       context.settings = settings;
-      await persistSettings(dataDir, settings);
+      await saveAppSettings(appConfigFile, settings);
       log.info('设置已保存');
       return settings;
     },

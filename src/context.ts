@@ -37,13 +37,13 @@ export interface AppContext {
   subscription: SubscriptionState;
   subscriptionProvider: string;
   ruleProvider: string;
-  /** 当前生效的界面常量（data/ui-config.json）。 */
+  /** 当前生效的界面常量（统一配置文件 config.json 的界面常量段）。 */
   uiConfig: UiConfig;
-  /** 系统值快照：配置文件路径 + 生效值 + 落库时间。 */
+  /** 生效值快照：来源文件 + 生效值 + 文件修改时间。 */
   uiConfigState(): StoredUiConfig;
-  /** 强制按配置文件加载：读文件直接覆盖系统值并落库。 */
+  /** 强制按配置文件加载：读文件直接覆盖生效值并写回统一配置文件。 */
   forceLoadUiConfig(file?: string): Promise<UiConfigLoadResult>;
-  /** 预览方式加载：只读文件并与系统值逐项对比，不改任何状态。 */
+  /** 预览方式加载：只读文件并与生效值逐项对比，不改任何状态。 */
   previewUiConfig(file?: string): Promise<{
     file: string;
     config: UiConfig;
@@ -51,9 +51,9 @@ export interface AppContext {
     rules: RuleEntry[] | null;
     app: import('./ui-config.js').AppSettingsFile | null;
   }>;
-  /** 把界面上的值保存进系统（持久化并立即生效）。 */
+  /** 把界面上的值写进统一配置文件（立即生效）。 */
   applyUiConfig(input: { file?: string; config: unknown }): Promise<UiConfigLoadResult>;
-  /** 写入 settings.json 并刷新内存中的设置。 */
+  /** 写回统一配置文件并刷新内存中的设置。 */
   saveSettings(next: Settings): Promise<Settings>;
   /** 重新渲染 config.yaml；端口/secret 变化后需要重启内核才生效。 */
   writeConfig(): Promise<void>;

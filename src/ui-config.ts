@@ -1,11 +1,9 @@
 /**
- * 界面常量：结构定义、默认值、配置文件读取、内存中的系统值。
- * 前端配置文件（JSON，可放到任意路径）与后端持久化（SQLite，见 ui-config-store.ts）分离：
- * 文件只作"加载源"，系统值由后端独立保存，重启后仍生效。
+ * 界面常量：结构定义、默认值、文件解析、内存中的生效值。
+ * 持久化见 app-config.ts：界面常量与应用设置同住在工作目录的 config.json 里，文件就是唯一真相源。
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Logger } from 'pino';
 import { z } from 'zod';
 
 export const uiConfigSchema = z.object({
@@ -39,12 +37,13 @@ export const uiConfigFileSchema = uiConfigSchema.extend({
   rules: z.array(ruleEntrySchema).optional(),
 });
 
-/** 应用设置（内核/订阅/系统代理）能出现在 config.json 里的字段，都是可选的。 */
+/** 应用设置（内核/订阅/系统代理）在统一配置文件里的字段，都是可选的（缺项按默认值补齐）。 */
 export const appSettingsFileSchema = z.object({
   core: z
     .object({
       binaryPath: z.string().min(1),
       mixedPort: z.number().int().min(1).max(65535),
+      secret: z.string(),
     })
     .partial()
     .optional(),
@@ -57,7 +56,7 @@ export const appSettingsFileSchema = z.object({
     })
     .partial()
     .optional(),
-  proxy: z.object({ override: z.string() }).partial().optional(),
+  proxy: z.object({ enabled: z.boolean(), override: z.string() }).partial().optional(),
 });
 
 export type AppSettingsFile = z.infer<typeof appSettingsFileSchema>;
@@ -244,9 +243,6 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   settings: { logsRefetchIntervalMs: 5000 },
 };
 
-/** 预生成的 config.json：界面默认值 + 空规则表（让用户一眼看到 rules 键）。 */
-export const DEFAULT_UI_CONFIG_FILE = { ...DEFAULT_UI_CONFIG, rules: [] };
-
 /** 文件级校验：界面常量 + 可选的 rules 段（类型要在 ruleTypes 白名单里）。 */
 function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
   const issues = uiConfigIssues(raw);
@@ -350,7 +346,7 @@ export function uiConfigPath(dataDir: string): string {
 
 /**
  * 严格解析配置文件路径：非空 + 以 .json 结尾 + 存在且是文件，返回绝对路径。
- * 只由用户触发的加载/预览/保存调用；启动恢复系统值不做这一步（库里旧路径失效不应挡住启动）。
+ * 只由用户触发的加载/预览/保存调用；启动恢复生效值不做这一步（旧路径失效不应挡住启动）。
  */
 export function resolveConfigFile(file: string): string {
   const raw = file.trim();
@@ -375,30 +371,6 @@ export function resolveConfigFile(file: string): string {
   return resolved;
 }
 
-/**
- * 启动时在 app 启动路径预生成配置文件（内容为默认值），该目录不可写时退回 data 目录。
- * 只负责"有文件可改"，系统值仍以后端持久化数据为准。
- */
-export function ensureUiConfigFile(appDir: string, dataDir: string, log?: Logger): string {
-  const fallback = uiConfigPath(dataDir);
-  for (const target of [path.join(appDir, 'config.json'), fallback]) {
-    try {
-      if (!fs.existsSync(target)) {
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.writeFileSync(target, `${JSON.stringify(DEFAULT_UI_CONFIG_FILE, null, 2)}\n`, 'utf8');
-        log?.info({ file: target }, '已预生成界面常量配置文件');
-      }
-      return target;
-    } catch (error) {
-      log?.warn(
-        { file: target, err: error instanceof Error ? error.message : String(error) },
-        '界面常量配置文件不可用，改用备用路径',
-      );
-    }
-  }
-  return fallback;
-}
-
 let active: UiConfig = DEFAULT_UI_CONFIG;
 
 /** 当前生效的界面常量。 */
@@ -406,7 +378,7 @@ export function getUiConfig(): UiConfig {
   return active;
 }
 
-/** 更新内存中的系统值（调用方负责持久化）。 */
+/** 更新内存中的生效值（调用方负责写回文件）。 */
 export function setActiveUiConfig(config: UiConfig): UiConfig {
   active = config;
   return active;

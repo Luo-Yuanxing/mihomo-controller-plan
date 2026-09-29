@@ -54,7 +54,8 @@ export function resolveDataDir(
 export function dataPaths(dataDir: string) {
   return {
     dataDir,
-    settings: path.join(dataDir, 'settings.json'),
+    /** 统一配置文件的备用位置（工作目录不可写时才用，见 app-config.ts）。 */
+    appConfig: path.join(dataDir, 'config.json'),
     database: path.join(dataDir, 'rules.db'),
     config: path.join(dataDir, 'config.yaml'),
     subscription: path.join(dataDir, 'subscription.yaml'),

@@ -25,7 +25,7 @@ import { resolveBinaryPath } from './util/paths.js';
 import { logPaths, tailLines } from './util/logger.js';
 import type { RuleInput } from './rules/repo.js';
 
-/** 规则类型白名单来自 data/ui-config.json，每次请求按当前值校验。 */
+/** 规则类型白名单来自统一配置文件 config.json，每次请求按当前值校验。 */
 function ruleSchemas(ruleTypes: readonly string[]) {
   const ruleInputSchema = z.object({
     enabled: z.boolean().default(true),
@@ -293,7 +293,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { count: entries.length, changed: result.changed };
   };
 
-  /** 强制按配置文件加载：直接覆盖系统值。 */
+  /** 强制按配置文件加载：直接覆盖生效值。 */
   app.post('/api/ui-config/load-force', async (request, reply) => {
     const parsed = uiConfigFileSchema.safeParse(request.body ?? {});
     if (!parsed.success) return invalid(reply, parsed.error);
@@ -376,15 +376,17 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     }
   });
 
-  /** 从界面保存到系统：校验后持久化并立即生效。 */
+  /** 从界面保存到系统：校验后写回统一配置文件并立即生效。 */
   app.post('/api/ui-config/apply', async (request, reply) => {
     const parsed = uiConfigFileSchema.extend({ config: z.unknown() }).safeParse(request.body ?? {});
     if (!parsed.success) return invalid(reply, parsed.error);
     try {
-      return await ctx.applyUiConfig({
+      const result = await ctx.applyUiConfig({
         ...(parsed.data.file === undefined ? {} : { file: parsed.data.file }),
         config: parsed.data.config,
       });
+      // 和 load-force 一样返回生效值快照本身（界面直接读 file/config/updatedAt）
+      return { ...result.state, rules: result.rules };
     } catch (error) {
       return uiConfigFailure(reply, error);
     }

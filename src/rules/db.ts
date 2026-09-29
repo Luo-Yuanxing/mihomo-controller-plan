@@ -18,13 +18,6 @@ CREATE TABLE IF NOT EXISTS rules (
   no_resolve  INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
-
--- 运行期设置的持久化（键值）：界面常量的系统值存这里，与前端 JSON 文件解耦
-CREATE TABLE IF NOT EXISTS settings_kv (
-  key         TEXT PRIMARY KEY,
-  value       TEXT NOT NULL,
-  updated_at  TEXT NOT NULL
-);
 `;
 
 export function openRulesDatabase(dataDir: string): RulesDatabase {
