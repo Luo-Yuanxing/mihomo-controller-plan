@@ -417,7 +417,7 @@ export default function RulesPage() {
 
       <div>
         <div className="mb-1 flex items-center gap-2 text-sm">
-          <span className="font-semibold">rule-provider 原文</span>
+          <span className="font-semibold">预览模式</span>
         </div>
         <textarea
           readOnly

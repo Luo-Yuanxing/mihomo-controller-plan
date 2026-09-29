@@ -54,7 +54,7 @@ function renderGroupLines(group: RenderedGroup, provider: string): string[] {
 export function renderConfig(options: TemplateOptions): string {
   const { settings, secret } = options;
   const lines = [
-    '# 由 mihomo-controller-plan 生成，请勿手工修改',
+    '# 预览模式',
     `mixed-port: ${settings.core.mixedPort}`,
     'mode: rule',
     'log-level: info',
