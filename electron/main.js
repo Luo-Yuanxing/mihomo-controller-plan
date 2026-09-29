@@ -2,7 +2,7 @@
  * Electron 壳：主进程即后台常驻程序。
  * 计划 §4.1 进程模型、§4.4 单实例、FR-12 托盘常驻与退出保护、§8 托盘菜单三项。
  */
-import { app, BrowserWindow, Menu, Tray, dialog, nativeImage } from 'electron';
+import { app, BrowserWindow, Menu, Tray, dialog, nativeImage, session } from 'electron';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -177,6 +177,11 @@ app.on('second-instance', showWindow);
 app.whenReady().then(() => {
   // 托盘是唯一退出入口，移除 Electron 默认菜单里的退出项
   Menu.setApplicationMenu(null);
+  // 窗口只访问 127.0.0.1 上的本机后端，固定直连：系统代理指向自己的 mixed 端口时，
+  // 界面请求会被自己的内核吃掉（无订阅即 REJECT-DROP），面板会白屏且点不动任何按钮
+  void session.defaultSession.setProxy({ mode: 'direct' }).catch((error) => {
+    process.stderr.write(`设置直连失败（不影响内核）：${String(error)}\n`);
+  });
   void bootstrap()
     .then(() => {
       createWindow();
