@@ -7,6 +7,7 @@ import type { RulesDatabase } from './rules/db.js';
 import {
   DEFAULT_UI_CONFIG,
   parseUiConfig,
+  resolveConfigFile,
   readUiConfigFile,
   setActiveUiConfig,
   type UiConfig,
@@ -105,11 +106,12 @@ export function createUiConfigService(
   return {
     state: () => state,
     forceLoad: (file?: string) => {
-      const target = file ?? state.file;
+      // 严格：路径必须合法且文件存在
+      const target = resolveConfigFile(file ?? state.file);
       return commit(target, readUiConfigFile(target), '界面常量已按配置文件强制覆盖系统值');
     },
     preview: (file?: string) => {
-      const target = file ?? state.file;
+      const target = resolveConfigFile(file ?? state.file);
       const config = readUiConfigFile(target);
       return {
         file: target,
@@ -119,7 +121,7 @@ export function createUiConfigService(
     },
     apply: (input: { file?: string; config: unknown }) =>
       commit(
-        input.file ?? state.file,
+        resolveConfigFile(input.file ?? state.file),
         parseUiConfig(input.config ?? DEFAULT_UI_CONFIG),
         '界面常量已从界面保存到系统',
       ),

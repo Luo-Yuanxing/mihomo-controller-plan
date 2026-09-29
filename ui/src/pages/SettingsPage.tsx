@@ -36,6 +36,15 @@ export default function SettingsPage() {
   const [issuesFrom, setIssuesFrom] = useState<'backend' | 'backup' | null>(null);
   const notices = useNotices();
 
+  // 路径格式即时提示（后端仍是最终判定：非空 + .json + 存在且是文件）
+  const trimmedConfigFile = configFile.trim();
+  const pathIssue =
+    trimmedConfigFile === ''
+      ? '配置文件路径不能为空'
+      : trimmedConfigFile.toLowerCase().endsWith('.json')
+        ? null
+        : '配置文件必须以 .json 结尾';
+
   /**
    * 后端是最终标准：优先用后端返回的 issues；
    * 只有后端没给明细（网络异常等）时，才拿前端备份规则兜底提示。
@@ -259,11 +268,12 @@ export default function SettingsPage() {
             }}
           />
         </Field>
+        {pathIssue !== null && <p className="text-xs text-rose-700">{pathIssue}</p>}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
-            disabled={previewLoad.isPending || configFile.trim() === ''}
+            disabled={previewLoad.isPending || pathIssue !== null}
             onClick={() => {
               notices.clear();
               previewLoad.mutate();
@@ -274,7 +284,7 @@ export default function SettingsPage() {
           <button
             type="button"
             className="rounded bg-slate-900 px-3 py-1 text-sm text-white disabled:opacity-50"
-            disabled={forceLoad.isPending || configFile.trim() === ''}
+            disabled={forceLoad.isPending || pathIssue !== null}
             onClick={() => {
               notices.clear();
               forceLoad.mutate();
@@ -313,8 +323,14 @@ export default function SettingsPage() {
             <ul className="list-disc pl-4">
               {valueIssues.map((issue) => (
                 <li key={`${issue.path}-${issue.message}`}>
-                  <span className="font-mono">{issue.path === '' ? '配置' : issue.path}</span>：
-                  {issue.message}
+                  <span className="font-mono">
+                    {issue.path === ''
+                      ? '配置'
+                      : issue.path === 'file'
+                        ? '配置文件路径'
+                        : issue.path}
+                  </span>
+                  ：{issue.message}
                 </li>
               ))}
             </ul>

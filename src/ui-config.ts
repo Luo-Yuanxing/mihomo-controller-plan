@@ -213,6 +213,33 @@ export function uiConfigPath(dataDir: string): string {
 }
 
 /**
+ * 严格解析配置文件路径：非空 + 以 .json 结尾 + 存在且是文件，返回绝对路径。
+ * 只由用户触发的加载/预览/保存调用；启动恢复系统值不做这一步（库里旧路径失效不应挡住启动）。
+ */
+export function resolveConfigFile(file: string): string {
+  const raw = file.trim();
+  if (raw === '') {
+    throw new UiConfigValidationError([{ path: 'file', message: '配置文件路径不能为空' }]);
+  }
+  if (path.extname(raw).toLowerCase() !== '.json') {
+    throw new UiConfigValidationError([{ path: 'file', message: '配置文件必须以 .json 结尾' }]);
+  }
+  const resolved = path.resolve(raw);
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(resolved);
+  } catch {
+    throw new UiConfigValidationError([
+      { path: 'file', message: `配置文件不存在或不可读：${resolved}` },
+    ]);
+  }
+  if (!stat.isFile()) {
+    throw new UiConfigValidationError([{ path: 'file', message: `不是文件：${resolved}` }]);
+  }
+  return resolved;
+}
+
+/**
  * 启动时在 app 启动路径预生成配置文件（内容为默认值），该目录不可写时退回 data 目录。
  * 只负责"有文件可改"，系统值仍以后端持久化数据为准。
  */

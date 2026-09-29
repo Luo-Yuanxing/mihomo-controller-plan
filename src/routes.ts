@@ -180,7 +180,8 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/rules', () => ({ rules: ctx.repo.list(), provider: ctx.ruleProvider }));
 
-  const uiConfigFileSchema = z.object({ file: z.string().min(1).optional() });
+  // 路径本身（非空、.json、存在且是文件）由 resolveConfigFile 严格校验
+  const uiConfigFileSchema = z.object({ file: z.string().trim().min(1).max(512).optional() });
 
   /** 取值不合法时返回 400 + 逐项明细，界面按字段展示。 */
   const uiConfigFailure = (reply: FastifyReply, error: unknown): FastifyReply => {

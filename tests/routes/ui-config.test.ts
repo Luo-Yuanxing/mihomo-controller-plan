@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
@@ -155,33 +155,62 @@ describe.skipIf(!canLoadFastify)('/api/ui-config', () => {
     await app.close();
   });
 
-  it('确认保存把界面值写进系统（不依赖文件）', async () => {
+  it('确认保存把界面值写进系统，路径存成绝对路径', async () => {
     const app = buildApp(dataDir);
+    const file = uiConfigPath(dataDir);
+    writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
+
     const response = await app.inject({
       method: 'POST',
       url: '/api/ui-config/apply',
       payload: {
-        file: 'D:/anywhere/mine.json',
+        file,
         config: { ...DEFAULT_UI_CONFIG, defaults: { ruleType: 'DOMAIN', policy: 'DIRECT' } },
       },
     });
 
     expect(response.statusCode).toBe(200);
     const body = response.json<{ file: string; config: typeof DEFAULT_UI_CONFIG }>();
-    expect(body.file).toBe('D:/anywhere/mine.json');
+    expect(body.file).toBe(file);
     expect(body.config.defaults).toEqual({ ruleType: 'DOMAIN', policy: 'DIRECT' });
     await app.close();
   });
 
-  it('配置文件不存在或非法时返回 400', async () => {
+  it('路径不严格（非 .json / 不存在 / 是目录）一律 400 并带 issues', async () => {
     const app = buildApp(dataDir);
-    const missing = await app.inject({
+    const cases: { file: string; message: string }[] = [
+      { file: 'aaa', message: '必须以 .json 结尾' },
+      { file: path.join(dataDir, 'nope.json'), message: '不存在或不可读' },
+      { file: dataDir, message: '必须以 .json 结尾' },
+    ];
+    for (const item of cases) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/ui-config/apply',
+        payload: { file: item.file, config: DEFAULT_UI_CONFIG },
+      });
+      expect(response.statusCode, item.file).toBe(400);
+      const body = response.json<{ issues: { path: string; message: string }[] }>();
+      expect(body.issues[0]?.path, item.file).toBe('file');
+      expect(body.issues[0]?.message, item.file).toContain(item.message);
+    }
+    // 目录但以 .json 结尾（不存在）也算不存在
+    const dirAsJson = path.join(dataDir, 'sub.json');
+    mkdirSync(dirAsJson, { recursive: true });
+    const asDir = await app.inject({
       method: 'POST',
       url: '/api/ui-config/preview',
-      payload: { file: path.join(dataDir, 'nope.json') },
+      payload: { file: dirAsJson },
     });
-    expect(missing.statusCode).toBe(400);
+    expect(asDir.statusCode).toBe(400);
+    expect(asDir.json<{ issues: { message: string }[] }>().issues[0]?.message).toContain(
+      '不是文件',
+    );
+    await app.close();
+  });
 
+  it('配置文件内容非法时返回 400 且系统值不变', async () => {
+    const app = buildApp(dataDir);
     writeFileSync(uiConfigPath(dataDir), '{"ruleTypes": []}', 'utf8');
     const forced = await app.inject({ method: 'POST', url: '/api/ui-config/load-force' });
     expect(forced.statusCode).toBe(400);

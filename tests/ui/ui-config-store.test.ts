@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { openRulesDatabase, type RulesDatabase } from '../../src/rules/db.js';
 import { DEFAULT_UI_CONFIG, getRuleTypes, uiConfigPath } from '../../src/ui-config.js';
 import {
+  createUiConfigService,
   diffUiConfig,
   loadStoredUiConfig,
   readSetting,
@@ -97,5 +98,23 @@ describe.skipIf(!canLoadSqlite)('界面常量持久化', () => {
       '规则类型',
       '默认规则类型',
     ]);
+  });
+
+  it('严格路径：forceLoad / apply 都要求 .json 且文件存在', () => {
+    const dataDir = tempDataDir();
+    const db = open(dataDir);
+    const service = createUiConfigService(db, uiConfigPath(dataDir));
+
+    expect(() => service.forceLoad('not-json')).toThrow('必须以 .json 结尾');
+    expect(() => service.preview(path.join(dataDir, 'missing.json'))).toThrow('不存在或不可读');
+    expect(() => service.apply({ file: 'aaa', config: DEFAULT_UI_CONFIG })).toThrow(
+      '必须以 .json 结尾',
+    );
+
+    // 合法路径：写入并落库为绝对路径
+    const file = uiConfigPath(dataDir);
+    writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
+    const applied = service.apply({ config: DEFAULT_UI_CONFIG });
+    expect(applied.file).toBe(file);
   });
 });
