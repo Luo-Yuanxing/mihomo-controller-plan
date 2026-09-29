@@ -221,15 +221,6 @@ export default function SettingsPage() {
             onChange={(event) => patch({ proxy: { ...draft.proxy, override: event.target.value } })}
           />
         </Field>
-        <Field label="开启守护">
-          <input
-            type="checkbox"
-            checked={draft.proxy.enabled}
-            onChange={(event) =>
-              patch({ proxy: { ...draft.proxy, enabled: event.target.checked } })
-            }
-          />
-        </Field>
       </section>
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">

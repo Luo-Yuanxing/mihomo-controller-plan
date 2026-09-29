@@ -246,7 +246,7 @@ export default function StatusPage() {
               disabled={busy}
               onClick={() => enableProxy.mutate()}
             >
-              开启
+              开启守护模式
             </button>
             <button
               type="button"
