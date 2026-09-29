@@ -113,9 +113,7 @@ if (!fs.existsSync(source)) fail(`没有找到打包产物：${source}\n请先�
 const already = runningProcesses();
 if (already.length > 0) {
   if (!force) {
-    fail(
-      `目标程序正在运行（PID ${already.join(', ')}）：先关掉它，或加 --force 让脚本自动结束。`,
-    );
+    fail(`目标程序正在运行（PID ${already.join(', ')}）：先关掉它，或加 --force 让脚本自动结束。`);
   }
   if (!dryRun) stopProcesses(already);
 }
