@@ -15,7 +15,15 @@ const apiToken = process.env['MCP_API_TOKEN'] ?? '';
 let win = null;
 /** @type {Tray | null} */
 let tray = null;
-/** @type {{ url: string, close(): Promise<void>, context: { log: { info: Function, warn: Function } } } | null} */
+/**
+ * 开发期后端跑在独立进程（此处为 null），打包后后端就在本进程内。
+ * @type {{ url: string, close(): Promise<void>, context: {
+ *   log: { info: Function, warn: Function },
+ *   guard: { enable(): Promise<unknown>, disable(): Promise<unknown>, apply(): Promise<unknown> },
+ *   writeConfig(): Promise<void>,
+ *   restartKernel(): Promise<unknown>,
+ * } } | null}
+ */
 let runningServer = null;
 let appUrl = devServerUrl;
 let quitting = false;
@@ -62,20 +70,58 @@ function createWindow() {
   return win;
 }
 
-/** 托盘菜单"立即写入系统代理"：相当于手动触发一次守护（计划 §5.5 兜底按钮）。 */
-async function applySystemProxyFromTray() {
-  try {
-    const response = await fetch(`${appUrl}/api/proxy/apply`, {
+/**
+ * 托盘是面板打不开时的兜底入口：直接调用同进程的后端对象，不经 HTTP。
+ * 开发期后端在独立进程里（runningServer === null），退回 HTTP。
+ */
+async function callBackend(httpPath, action) {
+  if (runningServer === null) {
+    const response = await fetch(`${appUrl}${httpPath}`, {
       method: 'POST',
       headers: apiToken === '' ? {} : { 'x-api-token': apiToken },
     });
     const payload = await response.json().catch(() => null);
-    runningServer?.context.log.info({ ok: response.ok }, '托盘：已请求立即写入系统代理');
     if (!response.ok) {
-      dialog.showErrorBox('写入系统代理失败', String(payload?.error ?? `HTTP ${response.status}`));
+      throw new Error(String(payload?.error ?? `HTTP ${response.status}`));
     }
+    return payload;
+  }
+  return action(runningServer.context);
+}
+
+/** 托盘菜单"立即写入系统代理"：相当于手动触发一次守护（计划 §5.5 兜底按钮）。 */
+async function applySystemProxyFromTray() {
+  try {
+    await callBackend('/api/proxy/apply', (context) => context.guard.apply());
+    runningServer?.context.log.info('托盘：已写入系统代理');
   } catch (error) {
     dialog.showErrorBox('写入系统代理失败', String(error));
+  }
+}
+
+/** 托盘菜单"开启/关闭系统代理"：面板白屏或断网时仍能改回来。 */
+async function setSystemProxyFromTray(enable) {
+  const label = enable ? '开启' : '关闭';
+  try {
+    await callBackend(enable ? '/api/proxy/enable' : '/api/proxy/disable', (context) =>
+      enable ? context.guard.enable() : context.guard.disable(),
+    );
+    runningServer?.context.log.info(`托盘：已${label}系统代理`);
+  } catch (error) {
+    dialog.showErrorBox(`${label}系统代理失败`, String(error));
+  }
+}
+
+/** 托盘菜单"启动/重启内核"：等价于后端的 /api/kernel/restart。 */
+async function restartKernelFromTray() {
+  try {
+    const status = await callBackend('/api/kernel/restart', async (context) => {
+      await context.writeConfig();
+      return context.restartKernel();
+    });
+    runningServer?.context.log.info({ status }, '托盘：内核已重启');
+  } catch (error) {
+    dialog.showErrorBox('启动内核失败', String(error));
   }
 }
 
@@ -117,6 +163,9 @@ function createTray(iconPath) {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: '显示窗口', click: showWindow },
+      { label: '启动 / 重启内核', click: () => void restartKernelFromTray() },
+      { label: '开启系统代理', click: () => void setSystemProxyFromTray(true) },
+      { label: '关闭系统代理', click: () => void setSystemProxyFromTray(false) },
       { label: '立即写入系统代理', click: () => void applySystemProxyFromTray() },
       { type: 'separator' },
       { label: '退出', click: quitFromTray },
