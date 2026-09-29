@@ -76,7 +76,6 @@
 | 前端 | React + Vite + TypeScript | — |
 | UI | Tailwind CSS + shadcn/ui | 只做 3 个页面：规则页、状态页、设置页 |
 | 数据请求 | TanStack Query | 缓存与刷新策略 |
-| 表格 | TanStack Table | 规则列表 |
 | 桌面壳 | Electron | 主进程即 Node |
 | 日志 | pino | 结构化 + 轮转 |
 | 测试 | Vitest | 单元与接口测试 |
