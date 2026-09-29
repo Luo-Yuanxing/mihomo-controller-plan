@@ -1,5 +1,9 @@
 appId: com.mihomo.controller.panel
 productName: 代理控制面板
+# 产物统一带版本号：zip 名与主程序 exe 名都能直接看出是哪个版本，多版本可并存
+artifactName: '${productName}-${version}-${arch}.${ext}'
+# executableName 不做宏替换，exe 的版本号后缀由 scripts/after-pack.cjs 补上
+afterPack: scripts/after-pack.cjs
 asar: true
 # better-sqlite3 是原生模块，必须解包到 app.asar.unpacked
 asarUnpack:

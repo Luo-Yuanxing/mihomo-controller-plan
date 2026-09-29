@@ -6,10 +6,21 @@
 
 ```bash
 npm install
-npm run dev        # 前端 + 后端
+npm run dev        # 前端 + 后端（开发）
 npm test           # Vitest
-npm run dist       # electron-builder 产出免安装文件夹
+npm run dist       # 产出 release/ 下的免安装目录与 zip
 ```
+
+## 构建产物（v1.0.0）
+
+| 产物 | 说明 |
+| --- | --- |
+| `release/代理控制面板-1.0.0-x64.zip` | 免安装压缩包，解压即用（约 151 MB，含 mihomo.exe 与 geo 数据） |
+| `release/win-unpacked/代理控制面板-1.0.0.exe` | 免安装目录里的主程序，exe 名带版本号，多版本可并存 |
+
+- 版本号只改 `package.json` 一处：zip 名按 `artifactName` 模板带版本，**exe 名的版本后缀由 `scripts/after-pack.cjs` 补**——electron-builder 的 `win.executableName` 不展开 `${version}` 宏。
+- `npm run build` 会先跑 `scripts/clean.mjs` 清空 `dist/` 与 `ui/dist/`：tsc 不删除源文件已删的历史输出，不清会被原样打进包。
+- 随包分发 `resources/bin/mihomo.exe`、`resources/geo/`；`resources/data-skeleton/` 只带空的 `config.json`、`settings.json`，不含开发机的订阅与密钥。
 
 ## 目录
 
