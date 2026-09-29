@@ -21,16 +21,19 @@ const inputClass = 'w-full rounded border border-slate-300 px-2 py-1 font-mono t
 
 /**
  * 选导出目标路径：Electron 里弹 Windows 保存对话框，默认文件名与目录沿用当前配置文件；
- * 纯浏览器（无 preload）时退回输入框里填的路径。
+ * 拿不到对话框（浏览器里打开、或主进程还是改动前启动的）时退回输入框里填的路径。
  */
+function dialogApi(): { saveJson(path: string): Promise<string | null> } | undefined {
+  return (window as unknown as { mcpDialog?: { saveJson(path: string): Promise<string | null> } })
+    .mcpDialog;
+}
+
 async function pickExportPath(configFile: string): Promise<string | null> {
-  const dialogApi = (
-    window as unknown as { mcpDialog?: { saveJson(path: string): Promise<string | null> } }
-  ).mcpDialog;
-  if (dialogApi === undefined) return configFile;
+  const api = dialogApi();
+  if (api === undefined) return configFile;
 
   const dir = configFile.replace(/[\\/][^\\/]*$/, '');
-  return dialogApi.saveJson(dir === '' ? 'config.json' : `${dir}\\config.json`);
+  return api.saveJson(dir === '' ? 'config.json' : `${dir}\\config.json`);
 }
 
 export default function SettingsPage() {
@@ -161,7 +164,12 @@ export default function SettingsPage() {
     },
     onSuccess: (result) => {
       if (result === null) return;
-      notices.push('ok', `已导出到 ${result.file}（含 ${String(result.rules)} 条规则）`);
+      notices.push(
+        'ok',
+        dialogApi() === undefined
+          ? `已导出到 ${result.file}（含 ${String(result.rules)} 条规则）；当前窗口没有系统保存对话框，路径取自输入框`
+          : `已导出到 ${result.file}（含 ${String(result.rules)} 条规则）`,
+      );
     },
     onError: (error: Error) => notices.push('error', error.message),
   });
