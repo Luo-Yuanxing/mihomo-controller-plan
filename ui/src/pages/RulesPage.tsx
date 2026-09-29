@@ -11,6 +11,16 @@ interface EditableRule extends RuleInput {
   dirty: boolean;
 }
 
+/** 列表筛选：下拉项用 all 表示不筛选，匹配值为字符串包含匹配。 */
+interface RuleFilters {
+  enabled: 'all' | 'yes' | 'no';
+  type: string;
+  value: string;
+  policy: string;
+}
+
+const EMPTY_FILTERS: RuleFilters = { enabled: 'all', type: 'all', value: '', policy: 'all' };
+
 let keySeed = 0;
 function nextKey(): string {
   keySeed += 1;
@@ -61,6 +71,7 @@ export default function RulesPage() {
   const [rows, setRows] = useState<EditableRule[]>([]);
   const [removed, setRemoved] = useState<number[]>([]);
   const [orderDirty, setOrderDirty] = useState(false);
+  const [filters, setFilters] = useState<RuleFilters>(EMPTY_FILTERS);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
@@ -131,15 +142,38 @@ export default function RulesPage() {
 
   const providerName = rulesQuery.data?.provider ?? 'custom';
 
+  const valueQuery = filters.value.trim().toLowerCase();
+  const visibleRows = rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => {
+      if (filters.enabled === 'yes' && !row.enabled) return false;
+      if (filters.enabled === 'no' && row.enabled) return false;
+      if (filters.type !== 'all' && row.type !== filters.type) return false;
+      if (filters.policy !== 'all' && row.policy !== filters.policy) return false;
+      if (valueQuery !== '' && !row.value.toLowerCase().includes(valueQuery)) return false;
+      return true;
+    });
+  const filtering =
+    filters.enabled !== 'all' ||
+    filters.type !== 'all' ||
+    filters.policy !== 'all' ||
+    valueQuery !== '';
+  const policyChoices = Array.from(
+    new Set([...POLICY_OPTIONS.map((option) => option.value), ...rows.map((row) => row.policy)]),
+  );
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-base font-semibold">规则（共 {rows.length} 条）</h2>
+        <h2 className="text-base font-semibold">
+          规则（共 {rows.length} 条{filtering ? `，匹配 ${visibleRows.length} 条` : ''}）
+        </h2>
         <button
           type="button"
           onClick={() => {
             setRows((current) => [...current, emptyRule()]);
             setOrderDirty(true);
+            setFilters(EMPTY_FILTERS);
           }}
           className="rounded border border-slate-300 bg-white px-2 py-1 text-sm hover:bg-slate-50"
         >
@@ -174,9 +208,87 @@ export default function RulesPage() {
               <th className="px-2 py-2">no-resolve</th>
               <th className="px-2 py-2">操作</th>
             </tr>
+            <tr className="border-t border-slate-200">
+              <th className="px-2 py-1">
+                <select
+                  aria-label="筛选启用状态"
+                  className="w-full rounded border border-slate-300 bg-white px-1 py-1 text-xs normal-case text-slate-900"
+                  value={filters.enabled}
+                  onChange={(event) =>
+                    setFilters((current) => ({
+                      ...current,
+                      enabled: event.target.value as RuleFilters['enabled'],
+                    }))
+                  }
+                >
+                  <option value="all">全部</option>
+                  <option value="yes">已启用</option>
+                  <option value="no">已停用</option>
+                </select>
+              </th>
+              <th className="px-2 py-1" />
+              <th className="px-2 py-1">
+                <select
+                  aria-label="筛选类型"
+                  className="w-40 rounded border border-slate-300 bg-white px-1 py-1 text-xs normal-case text-slate-900"
+                  value={filters.type}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, type: event.target.value }))
+                  }
+                >
+                  <option value="all">全部</option>
+                  {RULE_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </th>
+              <th className="px-2 py-1">
+                <input
+                  type="search"
+                  aria-label="筛选匹配值"
+                  placeholder="包含字符串"
+                  className="w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs normal-case text-slate-900"
+                  value={filters.value}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, value: event.target.value }))
+                  }
+                />
+              </th>
+              <th className="px-2 py-1">
+                <select
+                  aria-label="筛选目标策略"
+                  className="w-24 rounded border border-slate-300 bg-white px-1 py-1 text-xs normal-case text-slate-900"
+                  value={filters.policy}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, policy: event.target.value }))
+                  }
+                >
+                  <option value="all">全部</option>
+                  {policyChoices.map((policy) => (
+                    <option key={policy} value={policy}>
+                      {policy}
+                    </option>
+                  ))}
+                </select>
+              </th>
+              <th className="px-2 py-1" />
+              <th className="px-2 py-1">
+                {filtering && (
+                  <button
+                    type="button"
+                    className="text-xs normal-case text-slate-500 hover:text-slate-900"
+                    onClick={() => setFilters(EMPTY_FILTERS)}
+                  >
+                    清除
+                  </button>
+                )}
+              </th>
+            </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
+            {visibleRows.map(({ row, index }) => (
               <tr key={row.key} className="border-t border-slate-200">
                 <td className="px-2 py-1">
                   <input
@@ -258,10 +370,12 @@ export default function RulesPage() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && (
+            {visibleRows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                  还没有规则，点"新增规则"添加一条。
+                  {rows.length === 0
+                    ? '还没有规则，点"新增规则"添加一条。'
+                    : '没有符合筛选条件的规则'}
                 </td>
               </tr>
             )}
