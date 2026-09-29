@@ -22,7 +22,9 @@
     "format": "prettier --write .",
     "test": "vitest run --passWithNoTests",
     "start": "npm run build && electron .",
-    "dist": "node scripts/check-mihomo-binary.mjs && npm run build && electron-builder"
+    "dist": "node scripts/check-mihomo-binary.mjs && npm run build && electron-builder",
+    "deploy": "node scripts/deploy.mjs",
+    "release": "npm run dist && npm run deploy"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.66.0",
