@@ -10,6 +10,7 @@
  *   node scripts/deploy.mjs --dry      # 只报告会做什么
  *   node scripts/deploy.mjs --force    # 目标程序还在跑时自动结束它
  *   node scripts/deploy.mjs --dir D:\apps   # 换安装根目录
+ *   node scripts/deploy.mjs --no-shortcut   # 不动桌面快捷方式
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -22,6 +23,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const argv = process.argv.slice(2);
 const dryRun = argv.includes('--dry');
 const force = argv.includes('--force');
+const noShortcut = argv.includes('--no-shortcut');
 const dirArg = argv.indexOf('--dir');
 
 /** 安装根目录：默认 P:\Program Files，该盘不存在时退到用户级应用目录。 */
@@ -108,6 +110,100 @@ function syncTree(from, to, stats, relative = '') {
   }
 }
 
+/**
+ * 桌面快捷方式的映射：目标目录带版本号，快捷方式也要跟着换，否则旧版被删后就是死链。
+ * 用 PowerShell 的 WScript.Shell 读写 .lnk，并顺路清掉指向已卸载版本的死链。
+ */
+function desktopDir() {
+  const fromEnv = process.env['USERPROFILE'];
+  const desktop = path.join(fromEnv ?? '', 'Desktop');
+  if (fs.existsSync(desktop)) return desktop;
+  return path.join(process.env['PUBLIC'] ?? 'C:\\Users\\Public', 'Desktop');
+}
+
+function desktopLinks() {
+  const dir = desktopDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((name) => /代理控制面板|mihomo/i.test(name) && /\.lnk$/i.test(name));
+}
+
+/** 读一条 .lnk 的目标与工作目录（按 \t 分隔返回，避免中文编码问题）。 */
+function readLink(linkPath) {
+  const script = [
+    '$sh = New-Object -ComObject WScript.Shell',
+    `$s = $sh.CreateShortcut(${quote(linkPath)})`,
+    '[Console]::Out.Write("$($s.TargetPath)`t$($s.WorkingDirectory)")',
+  ].join('; ');
+  const output = execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  const [linkTarget = '', working = ''] = output.split('\t');
+  return { target: linkTarget, working };
+}
+
+function quote(value) {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/** 打开（或重新指向）桌面快捷方式；改名用临时脚本写，参数全部经 base64 传递，避免中文被代码页吃掉。 */
+function writeLink(linkPath, iconSource) {
+  const script = `
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
+$sh = New-Object -ComObject WScript.Shell
+$s = $sh.CreateShortcut($payload.link)
+$s.TargetPath = $payload.exe
+$s.WorkingDirectory = $payload.work
+if ($payload.icon -ne '' -and (Test-Path $payload.icon)) { $s.IconLocation = "$($payload.icon),0" }
+$s.Description = $payload.name
+$s.Save()
+`;
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  const payload = JSON.stringify({
+    link: linkPath,
+    exe: exePath,
+    work: target,
+    name: product,
+    icon: iconSource,
+  });
+  execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], {
+    input: payload,
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+}
+
+function updateShortcuts() {
+  const links = desktopLinks();
+  const source = links.find((name) => readLink(path.join(desktopDir(), name)).target === exePath);
+  const template = path.join(desktopDir(), source ?? `${exeName} - 快捷方式.lnk`);
+
+  for (const name of links) {
+    const linkPath = path.join(desktopDir(), name);
+    const { target: linkTarget, working } = readLink(linkPath);
+    if (linkTarget === exePath) continue;
+    const stale = linkTarget === '' || !fs.existsSync(linkTarget);
+    if (stale) {
+      // 指向的版本已经不在了，这条是死链，留着只会在桌面上越攒越多
+      process.stdout.write(`  删除死链快捷方式：${name}\n`);
+      if (!dryRun) fs.rmSync(linkPath, { force: true });
+      continue;
+    }
+    if (!/代理控制面板/.test(linkTarget)) continue;
+    process.stdout.write(`  快捷方式换版本：${name}\n    ${linkTarget} → ${exePath}\n`);
+    if (!dryRun) writeLink(linkPath, working === '' ? '' : path.join(working, 'tray.png'));
+  }
+
+  if (fs.existsSync(template) || (source !== undefined && fs.existsSync(exePath))) {
+    process.stdout.write(`  桌面快捷方式就位：${path.basename(template)}\n`);
+    if (!dryRun) writeLink(template, '');
+  }
+}
+
 if (!fs.existsSync(source)) fail(`没有找到打包产物：${source}\n请先执行 npm run dist`);
 
 const already = runningProcesses();
@@ -141,3 +237,5 @@ if (dryRun) {
   if (!listing.includes(exeName)) fail(`同步后没找到主程序：${exePath}`);
   process.stdout.write(`完成：${exePath}\n`);
 }
+
+if (!noShortcut && !dryRun && fs.existsSync(exePath)) updateShortcuts();
