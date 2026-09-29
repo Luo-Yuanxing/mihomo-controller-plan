@@ -20,10 +20,11 @@ const inputClass = 'w-full rounded border border-slate-300 px-2 py-1 font-mono t
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: api.settings });
+  const uiConfigQuery = useQuery({ queryKey: ['ui-config'], queryFn: api.uiConfig });
   const logsQuery = useQuery({
     queryKey: ['logs'],
     queryFn: () => api.logs(200),
-    refetchInterval: 5000,
+    refetchInterval: uiConfigQuery.data?.config.settings.logsRefetchIntervalMs ?? 5000,
   });
 
   const [draft, setDraft] = useState<Settings | null>(null);
@@ -44,6 +45,15 @@ export default function SettingsPage() {
       });
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       await queryClient.invalidateQueries({ queryKey: ['status'] });
+    },
+    onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
+  });
+
+  const reloadUiConfig = useMutation({
+    mutationFn: api.reloadUiConfig,
+    onSuccess: async (result) => {
+      setNotice({ kind: 'ok', text: `界面常量已重载：${result.file}` });
+      await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
     onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
   });
@@ -159,6 +169,30 @@ export default function SettingsPage() {
             }
           />
         </Field>
+      </section>
+
+      <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
+        <h2 className="text-base font-semibold">界面常量（ui-config.json）</h2>
+        <p className="break-all font-mono text-xs text-slate-500">
+          {uiConfigQuery.data?.file ?? '读取中…'}
+        </p>
+        <p className="text-xs text-slate-500">
+          规则类型 {uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—'}；目标策略{' '}
+          {uiConfigQuery.data?.config.policies.map((option) => option.label).join(' / ') ?? '—'}
+        </p>
+        <div>
+          <button
+            type="button"
+            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+            disabled={reloadUiConfig.isPending}
+            onClick={() => {
+              setNotice(null);
+              reloadUiConfig.mutate();
+            }}
+          >
+            {reloadUiConfig.isPending ? '重载中…' : '重载常量'}
+          </button>
+        </div>
       </section>
 
       <div>

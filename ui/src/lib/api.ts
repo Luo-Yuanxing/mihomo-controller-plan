@@ -11,6 +11,7 @@ import type {
   SubscriptionConfig,
   SubscriptionState,
   SyncResult,
+  UiConfig,
 } from './types';
 
 const token = (window as unknown as { mcpApiToken?: string }).mcpApiToken ?? '';
@@ -64,6 +65,10 @@ export const api = {
   syncRules: () => post<SyncResult>('/api/rules/sync'),
 
   settings: () => request<Settings>('/api/settings'),
+
+  uiConfig: () => request<{ file: string; config: UiConfig }>('/api/ui-config'),
+  reloadUiConfig: () => post<{ file: string; config: UiConfig }>('/api/ui-config/reload'),
+
   saveSettings: (settings: Settings) =>
     request<{ settings: Settings; needsRestart: boolean }>('/api/settings', {
       method: 'PUT',

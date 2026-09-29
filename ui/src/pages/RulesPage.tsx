@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
-import { POLICY_OPTIONS, RULE_TYPES, type Rule, type RuleInput } from '../lib/types';
+import type { Rule, RuleInput, UiConfig } from '../lib/types';
+import { useUiConfig } from '../lib/uiConfig';
 
 interface EditableRule extends RuleInput {
   id: number | null;
@@ -40,15 +41,15 @@ function toEditable(rule: Rule): EditableRule {
   };
 }
 
-function emptyRule(): EditableRule {
+function emptyRule(config: UiConfig): EditableRule {
   return {
     id: null,
     key: nextKey(),
     dirty: true,
     enabled: true,
-    type: 'DOMAIN-SUFFIX',
+    type: config.defaults.ruleType,
     value: '',
-    policy: 'PROXY',
+    policy: config.defaults.policy,
     noResolve: true,
   };
 }
@@ -65,6 +66,7 @@ function toInput(row: EditableRule): RuleInput {
 
 export default function RulesPage() {
   const queryClient = useQueryClient();
+  const uiConfig = useUiConfig();
   const rulesQuery = useQuery({ queryKey: ['rules'], queryFn: api.rules });
   const providerQuery = useQuery({ queryKey: ['ruleProvider'], queryFn: api.ruleProvider });
 
@@ -159,7 +161,7 @@ export default function RulesPage() {
     filters.policy !== 'all' ||
     valueQuery !== '';
   const policyChoices = Array.from(
-    new Set([...POLICY_OPTIONS.map((option) => option.value), ...rows.map((row) => row.policy)]),
+    new Set([...uiConfig.policies.map((option) => option.value), ...rows.map((row) => row.policy)]),
   );
 
   return (
@@ -171,7 +173,7 @@ export default function RulesPage() {
         <button
           type="button"
           onClick={() => {
-            setRows((current) => [...current, emptyRule()]);
+            setRows((current) => [...current, emptyRule(uiConfig)]);
             setOrderDirty(true);
             setFilters(EMPTY_FILTERS);
           }}
@@ -237,7 +239,7 @@ export default function RulesPage() {
                   }
                 >
                   <option value="all">全部</option>
-                  {RULE_TYPES.map((type) => (
+                  {uiConfig.ruleTypes.map((type) => (
                     <option key={type} value={type}>
                       {type}
                     </option>
@@ -320,7 +322,7 @@ export default function RulesPage() {
                     value={row.type}
                     onChange={(event) => patchRow(row.key, { type: event.target.value })}
                   >
-                    {RULE_TYPES.map((type) => (
+                    {uiConfig.ruleTypes.map((type) => (
                       <option key={type} value={type}>
                         {type}
                       </option>
@@ -341,10 +343,10 @@ export default function RulesPage() {
                     value={row.policy}
                     onChange={(event) => patchRow(row.key, { policy: event.target.value })}
                   >
-                    {!POLICY_OPTIONS.some((option) => option.value === row.policy) && (
+                    {!uiConfig.policies.some((option) => option.value === row.policy) && (
                       <option value={row.policy}>{row.policy}</option>
                     )}
-                    {POLICY_OPTIONS.map((option) => (
+                    {uiConfig.policies.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>

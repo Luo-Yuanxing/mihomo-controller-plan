@@ -3,13 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
-import {
-  POLICY_OPTIONS,
-  RULE_TYPES,
-  type FailedConnection,
-  type RuleInput,
-  type RuleType,
-} from '../lib/types';
+import type { FailedConnection, RuleInput } from '../lib/types';
+import { useUiConfig } from '../lib/uiConfig';
 
 function displayTime(value: string): string {
   const timestamp = Date.parse(value);
@@ -20,16 +15,17 @@ function displayTime(value: string): string {
 
 export default function FailedConnectionsPage() {
   const queryClient = useQueryClient();
+  const uiConfig = useUiConfig();
   const failedQuery = useQuery({
     queryKey: ['failedConnections'],
-    queryFn: () => api.failedConnections(),
-    refetchInterval: 5000,
+    queryFn: () => api.failedConnections(uiConfig.failedConnections.lines),
+    refetchInterval: uiConfig.failedConnections.refetchIntervalMs,
   });
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [hostQuery, setHostQuery] = useState('');
-  const [ruleType, setRuleType] = useState<RuleType>('DOMAIN-SUFFIX');
-  const [policy, setPolicy] = useState('PROXY');
+  const [ruleType, setRuleType] = useState(uiConfig.defaults.ruleType);
+  const [policy, setPolicy] = useState(uiConfig.defaults.policy);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   const connections = failedQuery.data?.connections ?? [];
@@ -121,9 +117,9 @@ export default function FailedConnectionsPage() {
           <select
             className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
             value={ruleType}
-            onChange={(event) => setRuleType(event.target.value as RuleType)}
+            onChange={(event) => setRuleType(event.target.value)}
           >
-            {RULE_TYPES.map((type) => (
+            {uiConfig.ruleTypes.map((type) => (
               <option key={type} value={type}>
                 {type}
               </option>
@@ -137,7 +133,7 @@ export default function FailedConnectionsPage() {
             value={policy}
             onChange={(event) => setPolicy(event.target.value)}
           >
-            {POLICY_OPTIONS.map((option) => (
+            {uiConfig.policies.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

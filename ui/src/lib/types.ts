@@ -2,16 +2,28 @@
  * 与后端 REST 返回结构一一对应的类型（来源：src/routes.ts）。
  * 后端改了字段，这里要同步改。
  */
-/** 只保留域名类规则，与后端 src/rules/render.ts 保持一致。 */
-export const RULE_TYPES = ['DOMAIN-SUFFIX', 'DOMAIN'] as const;
+/**
+ * 界面可改的简单常量，来源 data/ui-config.json（GET /api/ui-config）。
+ * 下面的默认值只在后端不可用时兜底，改选项请改 JSON 再点"重载常量"。
+ */
+export interface UiConfig {
+  ruleTypes: string[];
+  policies: { value: string; label: string }[];
+  defaults: { ruleType: string; policy: string };
+  failedConnections: { refetchIntervalMs: number; lines: number };
+  settings: { logsRefetchIntervalMs: number };
+}
 
-export type RuleType = (typeof RULE_TYPES)[number];
-
-/** 目标策略只开放直连/代理两项，PROXY 为默认首选。 */
-export const POLICY_OPTIONS = [
-  { value: 'PROXY', label: '代理' },
-  { value: 'DIRECT', label: '直连' },
-] as const;
+export const DEFAULT_UI_CONFIG: UiConfig = {
+  ruleTypes: ['DOMAIN-SUFFIX', 'DOMAIN'],
+  policies: [
+    { value: 'PROXY', label: '代理' },
+    { value: 'DIRECT', label: '直连' },
+  ],
+  defaults: { ruleType: 'DOMAIN-SUFFIX', policy: 'PROXY' },
+  failedConnections: { refetchIntervalMs: 5000, lines: 5000 },
+  settings: { logsRefetchIntervalMs: 5000 },
+};
 
 export interface Rule {
   id: number;
