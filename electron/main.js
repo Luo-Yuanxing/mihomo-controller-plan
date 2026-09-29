@@ -31,20 +31,6 @@ let appUrl = devServerUrl;
 let quitting = false;
 let serverClosed = false;
 
-/** 导出配置：弹 Windows 保存对话框，默认落在传入路径（配置文件所在文件夹）。 */
-ipcMain.handle('mcp:save-json', async (_event, defaultPath) => {
-  const options = {
-    title: '导出配置',
-    filters: [{ name: 'JSON', extensions: ['json'] }],
-    ...(typeof defaultPath === 'string' && defaultPath !== '' ? { defaultPath } : {}),
-  };
-  const result =
-    win !== null && !win.isDestroyed()
-      ? await dialog.showSaveDialog(win, options)
-      : await dialog.showSaveDialog(options);
-  return result.canceled || result.filePath === '' ? null : result.filePath;
-});
-
 /**
  * 界面离线时点的那两个按钮走进程间调用：主进程直接调后端对象（开发期后端在独立进程，退回 HTTP）。
  * 系统级动作（注册表、内核进程）只由后端执行——壳和界面都不自己动系统。
