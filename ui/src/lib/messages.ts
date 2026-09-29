@@ -114,6 +114,18 @@ export const ZH = {
   'failed.columnError': '错误',
   'failed.none': '暂无失败连接',
   'failed.noMatch': '无匹配主机',
+  'failed.blacklistedAll': '{count} 个目标都在黑名单里（可关掉黑名单开关查看）',
+  'failed.blacklistToggle': '黑名单过滤',
+  'failed.blacklistToggleTitle': '关闭后列表不做黑名单筛选，被拉黑的目标也会显示',
+  'failed.blacklistHidden': '黑名单已隐藏 {count} 个目标',
+  'failed.blacklistBadge': '黑名单',
+  'failed.blacklistAdd': '加入黑名单',
+  'failed.blacklistRemove': '移出黑名单',
+  'failed.blacklistAdded': '已加入黑名单 {count} 个',
+  'failed.blacklistAddedSkipped': '；{count} 个本来就在黑名单里',
+  'failed.blacklistRemoved': '已移出黑名单 {count} 个',
+  'failed.blacklistRemoveMissing': '；{count} 个原本不在黑名单里',
+  'failed.blacklistRowAction': '把 {host} 加入黑名单',
 
   // 状态页（StatusPage.tsx）
   'status.stateRunning': '运行中',
@@ -199,7 +211,7 @@ export const ZH = {
   'settings.binaryInvalidChars': '内核路径含非法字符：< > " | ? *',
   'settings.binaryNotExe': '内核路径必须以 .exe 结尾',
   'settings.effectiveValues':
-    '当前生效值：规则类型 {types}；目标策略 {policies}；失败连接 {lines} 行',
+    '当前生效值：规则类型 {types}；目标策略 {policies}；失败连接 {lines} 行；黑名单 {blacklist} 个主机',
   'settings.needsSetup':
     '初始化标记还是 true：请从别处导入一份配置字符串，或直接点“立即初始化”沿用当前内容。',
   'settings.importPlaceholder': '把别处生成的配置字符串粘到这里，再点“导入字符串”',
@@ -339,6 +351,20 @@ export const EN: Record<MessageKey, string> = {
   'failed.columnError': 'Error',
   'failed.none': 'No failed connections',
   'failed.noMatch': 'No matching host',
+  'failed.blacklistedAll':
+    'All {count} targets are blacklisted (turn the blacklist filter off to see them)',
+  'failed.blacklistToggle': 'Blacklist filter',
+  'failed.blacklistToggleTitle':
+    'When off, the list skips blacklist filtering and shows blacklisted targets too',
+  'failed.blacklistHidden': '{count} targets hidden by the blacklist',
+  'failed.blacklistBadge': 'blacklisted',
+  'failed.blacklistAdd': 'Blacklist',
+  'failed.blacklistRemove': 'Unblacklist',
+  'failed.blacklistAdded': '{count} hosts blacklisted',
+  'failed.blacklistAddedSkipped': '; {count} were already blacklisted',
+  'failed.blacklistRemoved': '{count} hosts removed from the blacklist',
+  'failed.blacklistRemoveMissing': '; {count} were not blacklisted',
+  'failed.blacklistRowAction': 'Blacklist {host}',
 
   'status.stateRunning': 'Running',
   'status.stateAdopted': 'Adopted',
@@ -427,7 +453,7 @@ export const EN: Record<MessageKey, string> = {
   'settings.binaryInvalidChars': 'Kernel path contains invalid characters: < > " | ? *',
   'settings.binaryNotExe': 'Kernel path must end with .exe',
   'settings.effectiveValues':
-    'Current values: rule types {types}; target policies {policies}; failed connections {lines} lines',
+    'Current values: rule types {types}; target policies {policies}; failed connections {lines} lines; blacklist {blacklist} hosts',
   'settings.needsSetup':
     'The initialized flag is still true: import a config string from elsewhere, or click “Initialize now” to keep the current content.',
   'settings.importPlaceholder': 'Paste a config string generated elsewhere, then click “Import”',

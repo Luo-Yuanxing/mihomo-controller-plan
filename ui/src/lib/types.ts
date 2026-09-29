@@ -14,6 +14,11 @@ export interface UiConfig {
   defaults: { ruleType: string; policy: string };
   /** 只存"取多少"，不存"多久刷一次"：刷新节奏是代码常量（见各页面）。 */
   failedConnections: { lines: number };
+  /**
+   * 失败连接黑名单：命中主机的目标不进列表。
+   * enabled 是开关的默认位置（界面上的即时开关只影响本次筛选，不回写文件）。
+   */
+  blacklist: { enabled: boolean; hosts: string[] };
   settings: { logsLines: number };
 }
 
@@ -26,6 +31,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   ],
   defaults: { ruleType: 'DOMAIN', policy: 'PROXY' },
   failedConnections: { lines: 5000 },
+  blacklist: { enabled: true, hosts: [] },
   settings: { logsLines: 500 },
 };
 
@@ -166,4 +172,37 @@ export interface FailedConnection {
 export interface LogsResponse {
   app: string[];
   core: string[];
+}
+
+/** 失败连接黑名单（GET/PUT /api/blacklist）。 */
+export interface BlacklistState {
+  /** 开关的默认位置（config.json）；界面上的即时开关另算。 */
+  enabled: boolean;
+  hosts: string[];
+}
+
+/** 黑名单的加/移结果：added/removed 是本次真正生效的条数，missing/skipped 是没变的。 */
+export interface BlacklistChangeResult extends BlacklistState {
+  added: number;
+  removed: number;
+  missing: number;
+  skipped: number;
+}
+
+/** 失败连接列表里被黑名单挡下的目标（只回显前若干条，真实条数看 hiddenCount）。 */
+export interface BlacklistMatch {
+  host: string;
+  port: number;
+  network: string;
+}
+
+/** GET /api/failed-connections 的返回：connections 已按筛选口径过滤过。 */
+export interface FailedConnectionsResponse {
+  file: string;
+  scannedLines: number;
+  connections: FailedConnection[];
+  blacklist: BlacklistState & {
+    matched: BlacklistMatch[];
+    hiddenCount: number;
+  };
 }

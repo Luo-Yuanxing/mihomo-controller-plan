@@ -251,6 +251,7 @@ export default function SettingsPage() {
             policies:
               uiConfigQuery.data?.config.policies.map((option) => option.label).join(' / ') ?? '—',
             lines: uiConfigQuery.data?.config.failedConnections.lines ?? '—',
+            blacklist: uiConfigQuery.data?.config.blacklist.hosts.length ?? '—',
           })}
         </p>
         {needsSetup && (

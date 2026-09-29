@@ -1,7 +1,9 @@
 /** 后端 REST 客户端；Electron 内置服务与 Vite dev 代理都是同源，无需带完整地址。 */
 import type {
+  BlacklistChangeResult,
+  BlacklistState,
   CoreStatus,
-  FailedConnection,
+  FailedConnectionsResponse,
   LogsResponse,
   ProxyGroupSummary,
   ProxyState,
@@ -62,10 +64,22 @@ export const api = {
   /** 离线兜底：无条件写系统代理期望值 + 重启内核。 */
   offlineRestart: () => post<{ proxy: ProxyState; kernel: CoreStatus }>('/api/offline/restart'),
   logs: (lines = 500) => request<LogsResponse>(`/api/logs?lines=${String(lines)}`),
-  failedConnections: (lines = 5000) =>
-    request<{ file: string; scannedLines: number; connections: FailedConnection[] }>(
-      `/api/failed-connections?lines=${String(lines)}`,
+  /** skip 为 true 时后端不做黑名单筛选（对应界面上关掉的黑名单开关）。 */
+  failedConnections: (lines = 5000, skipBlacklist = false) =>
+    request<FailedConnectionsResponse>(
+      `/api/failed-connections?lines=${String(lines)}${skipBlacklist ? '&skip=1' : ''}`,
     ),
+  blacklist: () => request<BlacklistState>('/api/blacklist'),
+  addToBlacklist: (hosts: string[]) =>
+    request<BlacklistChangeResult>('/api/blacklist', {
+      method: 'PUT',
+      body: JSON.stringify({ add: hosts }),
+    }),
+  removeFromBlacklist: (hosts: string[]) =>
+    request<BlacklistChangeResult>('/api/blacklist', {
+      method: 'PUT',
+      body: JSON.stringify({ remove: hosts }),
+    }),
 
   rules: () => request<{ rules: Rule[]; provider: string }>('/api/rules'),
   ruleProvider: () =>
