@@ -216,9 +216,6 @@ export default function RulesPage() {
         >
           {saveMutation.isPending ? '保存中…' : '保存并热更新'}
         </button>
-        <span className="text-xs text-slate-500">
-          改动先留在页面上，点"保存并热更新"才写库并通知内核重载。
-        </span>
       </div>
 
       {/* 固定 8 行视口：表头两行（约 72 px）+ 8 × 40 px 数据行 ≈ 24.5 rem，超出在容器内滚动 */}
