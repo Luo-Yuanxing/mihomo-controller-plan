@@ -21,17 +21,6 @@ import { setOffline } from './offline';
 
 const token = (window as unknown as { mcpApiToken?: string }).mcpApiToken ?? '';
 
-/** 后端 400 时带上逐项取值检测明细，界面按字段展示。 */
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    readonly issues: { path: string; message: string }[] = [],
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   let response: Response;
   try {
@@ -55,8 +44,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // 服务端 5xx 说明后端坏了：立刻进离线状态，跳状态页并给出兜底按钮
     if (response.status >= 500) setOffline(true);
     const message = (payload as { error?: string } | null)?.error;
-    const issues = (payload as { issues?: { path: string; message: string }[] } | null)?.issues;
-    throw new ApiError(message ?? `请求失败：HTTP ${response.status}`, issues ?? []);
+    throw new Error(message ?? `请求失败：HTTP ${response.status}`);
   }
   return payload as T;
 }
