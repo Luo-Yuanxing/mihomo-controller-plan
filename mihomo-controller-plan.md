@@ -406,7 +406,7 @@ rules:
 ### 7.2 生成的 rule-provider
 
 ```yaml
-# 由 mihomo-controller-plan 生成，请勿手工修改
+# 预览模式
 payload:
   - DOMAIN-SUFFIX,example.com,PROXY
   - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve

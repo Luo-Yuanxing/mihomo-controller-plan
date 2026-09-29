@@ -418,10 +418,6 @@ export default function RulesPage() {
       <div>
         <div className="mb-1 flex items-center gap-2 text-sm">
           <span className="font-semibold">rule-provider 原文</span>
-          <span className="text-xs text-slate-500">
-            {providerQuery.data?.file ?? ''}
-            {providerQuery.data?.exists === false ? '（尚未生成，以下为预览）' : ''}
-          </span>
         </div>
         <textarea
           readOnly

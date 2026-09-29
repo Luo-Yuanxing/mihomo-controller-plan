@@ -41,7 +41,7 @@ export function renderRuleLine(rule: Rule): string {
 
 /** 渲染 rule-provider 内容（behavior: classical），计划 §7.2。 */
 export function renderRuleProvider(rules: Rule[]): string {
-  const header = ['# 由 mihomo-controller-plan 生成，请勿手工修改'];
+  const header = ['# 预览模式'];
   const enabled = rules.filter((rule) => rule.enabled);
   if (enabled.length === 0) return `${[...header, 'payload: []'].join('\n')}\n`;
 
