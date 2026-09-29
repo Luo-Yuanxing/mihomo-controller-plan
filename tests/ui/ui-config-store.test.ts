@@ -22,22 +22,32 @@ function withRuleTypes(ruleTypes: string[]): typeof DEFAULT_UI_CONFIG {
 }
 
 describe('导入设置的生效值', () => {
-  it('文件不可用时用默认值，并且还在初始化态', () => {
+  /** 加载时的初始化落盘是异步的：轮询到条件成立为止。 */
+  async function waitUntil(check: () => boolean): Promise<void> {
+    for (let i = 0; i < 200; i += 1) {
+      if (check()) return;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error('等待初始化标记落盘超时');
+  }
+
+  it('文件不可用时用默认值，初始化标记落成 false', async () => {
     const dataDir = tempDataDir();
 
     const service = createUiConfigService(uiConfigPath(dataDir));
 
     expect(service.state().config).toEqual(DEFAULT_UI_CONFIG);
-    expect(service.state().initialized).toBe(true);
+    expect(service.state().initialized).toBe(false);
     expect(getRuleTypes()).toEqual(DEFAULT_UI_CONFIG.ruleTypes);
+    await waitUntil(() => readAppConfig(uiConfigPath(dataDir)).initialized === false);
   });
 
-  it('已有配置文件按内容生效，标记为已初始化时不再引导', () => {
+  it('旧文件里 initialized 为 true 时，加载即落成 false', async () => {
     const dataDir = tempDataDir();
     const file = uiConfigPath(dataDir);
     writeFileSync(
       file,
-      JSON.stringify({ ...withRuleTypes(['DOMAIN']), initialized: false }),
+      JSON.stringify({ ...withRuleTypes(['DOMAIN']), initialized: true }),
       'utf8',
     );
 
@@ -46,6 +56,7 @@ describe('导入设置的生效值', () => {
     expect(service.state().config.ruleTypes).toEqual(['DOMAIN']);
     expect(service.state().initialized).toBe(false);
     expect(getRuleTypes()).toEqual(['DOMAIN']);
+    await waitUntil(() => readAppConfig(file).initialized === false);
   });
 
   it('保存界面常量后重启仍读到，且文件里的应用设置段不受影响', async () => {
@@ -65,7 +76,7 @@ describe('导入设置的生效值', () => {
     expect(createUiConfigService(file).state().config.ruleTypes).toEqual(['DOMAIN']);
   });
 
-  it('立即初始化：只把标记改成 false，内容与内存生效值都不动', async () => {
+  it('立即初始化：只把标记落成 false，内容与内存生效值都不动', async () => {
     const dataDir = tempDataDir();
     const file = uiConfigPath(dataDir);
     writeFileSync(file, JSON.stringify({ ...withRuleTypes(['DOMAIN']), initialized: true }), 'utf8');
@@ -105,9 +116,11 @@ describe('导入设置的生效值', () => {
   it('导入串字段不合法时抛错，文件一个字节都不动', async () => {
     const dataDir = tempDataDir();
     const file = uiConfigPath(dataDir);
-    const original = JSON.stringify({ ...DEFAULT_UI_CONFIG, initialized: true });
+    // 不含初始化标记：加载时不会落盘改写文件，才谈得上"一个字节都不动"
+    const original = JSON.stringify(DEFAULT_UI_CONFIG);
     writeFileSync(file, original, 'utf8');
     const service = createUiConfigService(file);
+    await waitUntil(() => readFileSync(file, 'utf8') === original);
 
     await expect(service.importShared('这不是base64!!')).rejects.toThrow('不是合法的 Base64URL 字符串');
     await expect(

@@ -58,7 +58,7 @@ async function createBuilder(): Promise<BuildApp> {
   return (dataDir: string, extra: Record<string, unknown> = {}): FastifyInstance => {
     const log = pino({ level: 'silent' });
     const file = uiConfigPath(dataDir);
-    // 统一配置文件是唯一真相源：没有就先落下初始化文件
+    // 统一配置文件是唯一真相源：没有就先落下文件（旧文件那种 initialized: true）
     if (!existsSync(file)) {
       writeFileSync(file, JSON.stringify({ ...DEFAULT_UI_CONFIG, rules: [], initialized: true }));
     }
@@ -132,19 +132,19 @@ describe.skipIf(!canLoadFastify)('/api/ui-config', () => {
     dataDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-routes-'));
   });
 
-  it('GET 返回生效值快照：当前值 + 初始化标记 + 文件修改时间', async () => {
+  it('GET 返回生效值快照：当前值 + 已初始化的标记 + 文件修改时间', async () => {
     const app = buildApp(dataDir);
     const response = await app.inject({ method: 'GET', url: '/api/ui-config' });
 
     expect(response.statusCode).toBe(200);
     const body = response.json<{ config: typeof DEFAULT_UI_CONFIG; initialized: boolean; updatedAt: string }>();
     expect(body.config.ruleTypes).toEqual(DEFAULT_UI_CONFIG.ruleTypes);
-    expect(body.initialized).toBe(true);
+    expect(body.initialized).toBe(false);
     expect(body.updatedAt).not.toBeNull();
     await app.close();
   });
 
-  it('立即初始化把标记改成 false，文件内容不动', async () => {
+  it('立即初始化把标记落成 false，文件内容不动', async () => {
     const app = buildApp(dataDir);
     const response = await app.inject({ method: 'POST', url: '/api/ui-config/initialize' });
 

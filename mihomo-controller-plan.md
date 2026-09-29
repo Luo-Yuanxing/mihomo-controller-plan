@@ -89,7 +89,7 @@
 | 订阅内容 | 文件 `data/subscription.yaml` | 下载结果，内核以 `file` 类型 provider 读取 |
 | 设置与界面常量（订阅 URL、端口、内核路径、界面选项等） | 文件 `config.json`（工作目录，不可写时退回 `data/`） | 一个文件装完，界面与手改都改它 |
 | 配置怎么进到新机器 | Base64 分享串（界面"导入设置"） | 只有字符串导入与立即初始化两种加载方式，不做文件导入导出；分享串不含订阅与 secret |
-| 是否已配置 | `config.json` 的 `initialized` | true = 初始化文件，界面引导导入；导入或立即初始化后变 false，之后启动直接按文件生效 |
+| 是否已配置 | `config.json` 的 `initialized` | 默认 false = 启动即按文件生效；加载时读到 true（旧文件）会落成 false，不做初始化引导 |
 | 生成物 | 文件 `data/config.yaml`、`data/rules/*.yaml` | 由程序生成，可随时重建 |
 
 ## 4. 架构
@@ -347,10 +347,10 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | PUT | `/api/rules/{id}` | 修改 |
 | DELETE | `/api/rules/{id}` | 删除 |
 | POST | `/api/rules/sync` | 落盘 + 热更新 |
-| GET | `/api/ui-config` | 生效值快照：当前值 + 是否还是初始化文件 + 文件修改时间 |
+| GET | `/api/ui-config` | 生效值快照：当前值 + 初始化标记（加载时即为 false）+ 文件修改时间 |
 | GET | `/api/ui-config/share` | 生成配置分享串（Base64）：界面常量 + 规则 + 内核/代理设置，剔除订阅与 secret |
 | POST | `/api/ui-config/import` | 导入配置分享串：界面常量与 rules 段落盘（带 rules 段时整表覆盖并热更新），带 core/proxy 段时一并写回设置；订阅保持本机现状 |
-| POST | `/api/ui-config/initialize` | 立即初始化：把 config.json 的 `initialized` 改成 false，内容不动 |
+| POST | `/api/ui-config/initialize` | 立即初始化：把 config.json 的 `initialized` 落成 false，内容不动 |
 | POST | `/api/ui-config/apply` | 把界面上的界面常量写回 config.json（存过一次就算配置好了） |
 | GET | `/api/proxy` | 系统代理期望值 / 实际值 / 是否一致 |
 | POST | `/api/proxy/enable` | 开启并纳入守护（每次都会无条件重写一遍注册表三项） |

@@ -25,10 +25,10 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   settings: { logsRefetchIntervalMs: 5000 },
 };
 
-/** 生效值快照（GET /api/ui-config）：当前值 + 是否还是初始化文件 + 文件修改时间。 */
+/** 生效值快照（GET /api/ui-config）：当前值 + 初始化标记（加载时即为 false）+ 文件修改时间。 */
 export interface UiConfigState {
   config: UiConfig;
-  /** true = 还是初始化文件，界面要引导用户导入一份配置。 */
+  /** false = 已初始化，启动就按文件生效，界面不加载引导。 */
   initialized: boolean;
   updatedAt: string | null;
 }

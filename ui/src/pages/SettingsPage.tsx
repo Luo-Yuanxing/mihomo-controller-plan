@@ -77,7 +77,7 @@ export default function SettingsPage() {
   const initializeConfig = useMutation({
     mutationFn: () => api.initializeUiConfig(),
     onSuccess: async () => {
-      notices.push('ok', '已初始化：之后启动直接按 config.json 生效');
+      notices.push('ok', '已初始化：之后启动直接按 config.json 生效，不再加载引导');
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
     onError: (error: Error) => notices.push('error', error.message),
@@ -104,7 +104,7 @@ export default function SettingsPage() {
     setDraft((current) => (current === null ? current : { ...current, ...next }));
   }
 
-  /** 初始化文件（还没配置过）：这一区高亮，引导用户先导入一份配置。 */
+  /** 初始化标记遗留为 true 时（旧文件）才需要手动点一下。 */
   const needsSetup = uiConfigQuery.data?.initialized === true;
 
   // 浏览器碰不到文件系统，前端只能查格式；能不能读到文件由后端保存时判定
@@ -201,7 +201,7 @@ export default function SettingsPage() {
         </p>
         {needsSetup && (
           <p className="text-xs font-medium text-amber-700">
-            这还是初始化配置：请从别处导入一份配置字符串，或直接点"立即初始化"沿用当前内容。
+            初始化标记还是 true：请从别处导入一份配置字符串，或直接点"立即初始化"沿用当前内容。
           </p>
         )}
         <textarea
@@ -237,7 +237,7 @@ export default function SettingsPage() {
             type="button"
             className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
             disabled={initializeConfig.isPending || !needsSetup}
-            title="只把初始化标记改成 false，内容不动"
+            title="把初始化标记落成 false，内容不动"
             onClick={() => {
               notices.clear();
               initializeConfig.mutate();

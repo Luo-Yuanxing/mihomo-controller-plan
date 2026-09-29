@@ -25,7 +25,7 @@ function withRuleTypes(ruleTypes: string[]): typeof DEFAULT_UI_CONFIG {
 }
 
 describe('ensureAppConfigFile', () => {
-  it('在工作目录预生成初始化配置文件（界面常量 + 应用设置 + 空规则）', () => {
+  it('在工作目录预生成配置文件（界面常量 + 应用设置 + 空规则）', () => {
     const appDir = tempDir('mcp-app-');
     const dataDir = tempDir('mcp-data-');
 
@@ -36,8 +36,8 @@ describe('ensureAppConfigFile', () => {
     expect(config.ui).toEqual(DEFAULT_UI_CONFIG);
     expect(config.settings).toEqual(DEFAULT_SETTINGS);
     expect(config.rules).toEqual([]);
-    // 预生成的是初始化文件：界面会引导用户导入一份配置
-    expect(config.initialized).toBe(true);
+    // 预生成的就是已初始化：启动直接按文件生效，不加载引导
+    expect(config.initialized).toBe(false);
   });
 
   it('已存在的文件不被覆盖', () => {
@@ -91,7 +91,7 @@ describe('readAppConfig', () => {
     expect(readAppConfig(broken)).toEqual(DEFAULT_APP_CONFIG);
   });
 
-  it('老文件没有初始化标记时按"已配置"处理，免得老用户被拉去引导', () => {
+  it('老文件没有初始化标记时按"已初始化"处理，启动不加载引导', () => {
     const dir = tempDir('mcp-app-');
     const file = path.join(dir, 'config.json');
     writeFileSync(file, JSON.stringify(withRuleTypes(['DOMAIN'])));
