@@ -26,6 +26,33 @@ const STATE_LABEL: Record<string, string> = {
   failed: '内核异常',
 };
 
+interface StateMark {
+  icon: string;
+  className: string;
+}
+
+const STATE_UNKNOWN: StateMark = {
+  icon: '○',
+  className: 'border-slate-400 bg-white text-slate-600',
+};
+
+/** 内核状态标记：鲜艳底色 + 图样，一眼能看出是否在运行。 */
+const STATE_MARK: Record<string, StateMark> = {
+  running: {
+    icon: '●',
+    className: 'border-emerald-400 bg-emerald-100 text-emerald-800',
+  },
+  adopted: {
+    icon: '◆',
+    className: 'border-sky-400 bg-sky-100 text-sky-800',
+  },
+  stopped: STATE_UNKNOWN,
+  failed: {
+    icon: '▲',
+    className: 'border-rose-400 bg-rose-100 text-rose-800',
+  },
+};
+
 export default function App() {
   const [active, setActive] = useState<string>('rules');
   const offline = useOffline();
@@ -36,6 +63,7 @@ export default function App() {
     refetchInterval: 5000,
   });
   const kernelState = status.data?.kernel.state ?? 'stopped';
+  const stateMark = STATE_MARK[kernelState] ?? STATE_UNKNOWN;
 
   // 一进离线状态就跳到状态页，那里能看到内核与系统代理的实时情况
   useEffect(() => {
@@ -69,7 +97,10 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <span className="ml-auto text-xs text-slate-500">
+        <span
+          className={`ml-auto flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${stateMark.className}`}
+        >
+          <span className={kernelState === 'running' ? 'animate-pulse' : ''}>{stateMark.icon}</span>
           {STATUS_HINT(kernelState, status.data?.kernel.error ?? null)}
         </span>
       </header>
