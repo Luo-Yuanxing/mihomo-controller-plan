@@ -136,6 +136,15 @@ export default function SettingsPage() {
     },
   });
 
+  /** 导出：界面常量 + 自定义规则写成一份 config.json，默认写到上面填的路径。 */
+  const exportConfig = useMutation({
+    mutationFn: () => api.exportUiConfig(configFile.trim()),
+    onSuccess: (result) => {
+      notices.push('ok', `已导出到 ${result.file}（含 ${String(result.rules)} 条规则）`);
+    },
+    onError: (error: Error) => notices.push('error', error.message),
+  });
+
   if (draft === null) {
     return <p className="text-sm text-slate-500">读取设置中…</p>;
   }
@@ -279,6 +288,17 @@ export default function SettingsPage() {
               {applyUiConfig.isPending ? '保存中…' : '确认保存到系统'}
             </button>
           )}
+          <button
+            type="button"
+            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+            disabled={exportConfig.isPending || pathIssue !== null}
+            onClick={() => {
+              notices.clear();
+              exportConfig.mutate();
+            }}
+          >
+            {exportConfig.isPending ? '导出中…' : '导出到该路径（含规则）'}
+          </button>
         </div>
 
         {valueIssues.length > 0 && (

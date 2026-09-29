@@ -89,6 +89,11 @@ export const api = {
     post<UiConfigPreview>('/api/ui-config/preview', file === undefined ? {} : { file }),
   applyUiConfig: (input: { file?: string; config: UiConfig }) =>
     post<UiConfigState>('/api/ui-config/apply', input),
+  exportUiConfig: (file?: string) =>
+    post<{ file: string; rules: number; bytes: number }>(
+      '/api/ui-config/export',
+      file === undefined ? {} : { file },
+    ),
 
   saveSettings: (settings: Settings) =>
     request<{ settings: Settings; needsRestart: boolean; groupsRebuilt: boolean }>(
