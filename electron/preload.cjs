@@ -14,3 +14,8 @@ contextBridge.exposeInMainWorld('mcpApp', {
   /** 安全关闭：先关闭系统代理并停内核，再退出应用。 */
   quitSafely: () => ipcRenderer.invoke('mcp:quit-safely'),
 });
+
+contextBridge.exposeInMainWorld('mcpI18n', {
+  /** 界面切了语言：通知主进程重建托盘菜单与对话框文案。 */
+  setLanguage: (language) => ipcRenderer.send('mcp:set-language', language),
+});

@@ -5,6 +5,7 @@
 import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, session } from 'electron';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { DEFAULT_LANGUAGE, isLanguage, t } from './messages.mjs';
 import { offlineAction } from './offline-actions.mjs';
 
 /** 开发期由 Vite dev server 提供界面，打包后加载内置后端（同一进程）。 */
@@ -30,6 +31,8 @@ let runningServer = null;
 let appUrl = devServerUrl;
 let quitting = false;
 let serverClosed = false;
+/** 托盘菜单与对话框的语言：跟 config.json 的 language 走，界面切换语言后经 IPC 同步。 */
+let language = DEFAULT_LANGUAGE;
 
 /**
  * 界面离线时点的那两个按钮走进程间调用：主进程直接调后端对象（开发期后端在独立进程，退回 HTTP）。
@@ -40,8 +43,8 @@ ipcMain.handle('mcp:offline-action', async (_event, name) => {
     const { httpPath, run } = offlineAction(name);
     return await callBackend(httpPath, run);
   } catch (error) {
-    const hint = runningServer === null ? '（开发期后端是独立进程，请重启 npm run dev）' : '';
-    throw new Error(`后端不可用，无法执行该动作：${String(error)}${hint}`);
+    const hint = runningServer === null ? t(language, 'devBackendHint') : '';
+    throw new Error(t(language, 'actionFailed', { error: String(error), hint }));
   }
 });
 
@@ -50,6 +53,9 @@ ipcMain.handle('mcp:quit-safely', async () => {
   await quitSafely();
   return true;
 });
+
+/** 界面切了语言：重建托盘菜单，之后的对话框也用新语言。 */
+ipcMain.on('mcp:set-language', (_event, next) => setLanguage(next));
 
 function showWindow() {
   if (win === null || win.isDestroyed()) {
@@ -121,7 +127,10 @@ async function setSystemProxyFromTray(enable) {
     );
     runningServer?.context.log.info(`托盘：已${label}系统代理`);
   } catch (error) {
-    dialog.showErrorBox(`${label}系统代理失败`, String(error));
+    dialog.showErrorBox(
+      t(language, enable ? 'proxyEnableFailed' : 'proxyDisableFailed'),
+      String(error),
+    );
   }
 }
 
@@ -134,7 +143,7 @@ async function restartKernelFromTray() {
     });
     runningServer?.context.log.info({ status }, '托盘：内核已重启');
   } catch (error) {
-    dialog.showErrorBox('启动内核失败', String(error));
+    dialog.showErrorBox(t(language, 'kernelStartFailed'), String(error));
   }
 }
 
@@ -155,13 +164,16 @@ async function shutdownSafely() {
   } catch (error) {
     const choice = dialog.showMessageBoxSync({
       type: 'warning',
-      buttons: ['取消退出', '仍然退出'],
+      buttons: [
+        t(language, 'quitDisabledProxyCancel'),
+        t(language, 'quitDisabledProxyConfirm'),
+      ],
       defaultId: 1,
       cancelId: 0,
       noLink: true,
-      title: '无法关闭系统代理',
-      message: '后端不可用，系统代理可能仍指向内核端口',
-      detail: `仍然退出后，请到「Windows 设置 → 网络和 Internet → 代理」手动关闭。\n\n原因：${String(error)}`,
+      title: t(language, 'quitDisabledProxyTitle'),
+      message: t(language, 'quitDisabledProxyMessage'),
+      detail: t(language, 'quitDisabledProxyDetail', { error: String(error) }),
     });
     return choice === 1;
   }
@@ -182,13 +194,13 @@ async function quitSafely() {
 function confirmQuit() {
   const options = {
     type: 'warning',
-    buttons: ['取消', '退出'],
+    buttons: [t(language, 'quitCancel'), t(language, 'quitConfirm')],
     defaultId: 0,
     cancelId: 0,
     noLink: true,
-    title: '退出代理控制面板',
-    message: '退出后代理将停止',
-    detail: '退出前会关闭系统代理，内核一并停止。',
+    title: t(language, 'quitTitle'),
+    message: t(language, 'quitMessage'),
+    detail: t(language, 'quitDetail'),
   };
   const choice =
     win !== null && !win.isDestroyed() && win.isVisible()
@@ -199,6 +211,22 @@ function confirmQuit() {
   void quitSafely();
 }
 
+/** 托盘菜单与提示语按当前语言重建：切换语言后立刻生效。 */
+function applyTrayMenu() {
+  if (tray === null) return;
+  tray.setToolTip(t(language, 'appTitle'));
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: t(language, 'trayShowWindow'), click: showWindow },
+      { label: t(language, 'trayRestartKernel'), click: () => void restartKernelFromTray() },
+      { label: t(language, 'trayEnableProxy'), click: () => void setSystemProxyFromTray(true) },
+      { label: t(language, 'trayDisableProxy'), click: () => void setSystemProxyFromTray(false) },
+      { type: 'separator' },
+      { label: t(language, 'trayQuitSafely'), click: () => void confirmQuit() },
+    ]),
+  );
+}
+
 function createTray(iconPath) {
   const image = nativeImage.createFromPath(iconPath);
   if (image.isEmpty()) {
@@ -206,20 +234,34 @@ function createTray(iconPath) {
   }
 
   tray = new Tray(image);
-  tray.setToolTip('代理控制面板');
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: '显示窗口', click: showWindow },
-      { label: '启动 / 重启内核', click: () => void restartKernelFromTray() },
-      { label: '开启系统代理', click: () => void setSystemProxyFromTray(true) },
-      { label: '关闭系统代理', click: () => void setSystemProxyFromTray(false) },
-      { type: 'separator' },
-      { label: '安全退出（先关闭系统代理）', click: () => void confirmQuit() },
-    ]),
-  );
+  applyTrayMenu();
   tray.on('click', showWindow);
   tray.on('double-click', showWindow);
   return tray;
+}
+
+/** 语言切换的唯一入口：非法值忽略，值没变则什么都不做。 */
+function setLanguage(next) {
+  if (!isLanguage(next) || next === language) return;
+  language = next;
+  applyTrayMenu();
+}
+
+/** 启动时先按配置里的语言：打包模式直接问同进程的后端，开发期走 HTTP。 */
+async function loadInitialLanguage() {
+  try {
+    if (runningServer !== null) {
+      setLanguage(runningServer.context.uiConfig.language);
+      return;
+    }
+    const response = await fetch(`${appUrl}/api/ui-config`, {
+      headers: apiToken === '' ? {} : { 'x-api-token': apiToken },
+    });
+    const payload = await response.json();
+    setLanguage(payload?.config?.language);
+  } catch {
+    // 读不到就先用默认语言，界面加载完成后会再同步一次
+  }
 }
 
 // 安全基线：禁止打开新窗口，禁止跳到外部地址
@@ -260,6 +302,8 @@ async function bootstrap() {
     // 托盘起不来不影响代理工作，只少了交互入口
     runningServer?.context.log.warn({ err: String(error) }, '托盘创建失败');
   }
+
+  await loadInitialLanguage();
 }
 
 // 单实例：重复双击时唤起已有窗口（计划 §4.4）
