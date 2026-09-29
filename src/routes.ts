@@ -11,6 +11,7 @@ import { proxyGroups } from './core/api.js';
 import { parseFailedConnections } from './logs/failed-connections.js';
 import { RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { countSubscriptionProxies } from './sub/download.js';
+import { planProxyGroups, readSubscriptionGroups } from './sub/groups.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
 import { UiConfigValidationError } from './ui-config.js';
@@ -88,9 +89,23 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     const needsRestart =
       previous.core.mixedPort !== settings.core.mixedPort ||
       previous.core.controllerPort !== settings.core.controllerPort ||
-      previous.core.secret !== settings.core.secret;
+      previous.core.secret !== settings.core.secret ||
+      // 代理组结构变了要多一次重启才会进内核
+      previous.subscription.proxyGroup !== settings.subscription.proxyGroup;
     return { settings, needsRestart };
   });
+
+  /** 订阅文件里的代理组：设置页用它选"PROXY 指代哪个组"。 */
+  app.get('/api/subscription/groups', () => ({
+    file: ctx.paths.subscription,
+    exists: countSubscriptionProxies(ctx.paths.subscription) > 0,
+    selected: ctx.settings.subscription.proxyGroup,
+    groups: readSubscriptionGroups(ctx.paths.subscription).groups.map((group) => ({
+      name: group.name,
+      type: group.type,
+      members: group.members.length,
+    })),
+  }));
 
   app.get('/api/subscription', () => ({
     config: {
@@ -98,6 +113,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
       interval: ctx.settings.subscription.interval,
       useProxy: ctx.settings.subscription.useProxy,
       userAgent: ctx.settings.subscription.userAgent,
+      proxyGroup: ctx.settings.subscription.proxyGroup,
     },
     state: ctx.subscription,
     file: ctx.paths.subscription,
@@ -110,6 +126,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
       interval: z.number().int().positive().optional(),
       useProxy: z.boolean().optional(),
       userAgent: z.string().min(1).optional(),
+      proxyGroup: z.string().optional(),
     });
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return invalid(reply, parsed.error);
@@ -120,6 +137,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
       interval: parsed.data.interval ?? current.interval,
       useProxy: parsed.data.useProxy ?? current.useProxy,
       userAgent: parsed.data.userAgent ?? current.userAgent,
+      proxyGroup: parsed.data.proxyGroup ?? current.proxyGroup,
     };
     await ctx.saveSettings({ ...ctx.settings, subscription: next });
     ctx.subscription.url = next.url;
@@ -388,6 +406,8 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/config', async () => {
     const yaml = await readFileIfExists(ctx.paths.config);
+    const subscriptionProvider =
+      countSubscriptionProxies(ctx.paths.subscription) > 0 ? ctx.subscriptionProvider : null;
     return {
       file: ctx.paths.config,
       yaml:
@@ -395,9 +415,15 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
         renderConfig({
           settings: ctx.settings,
           secret: ctx.settings.core.secret,
-          subscriptionProvider:
-            countSubscriptionProxies(ctx.paths.subscription) > 0 ? ctx.subscriptionProvider : null,
+          subscriptionProvider,
           ruleProvider: ctx.ruleProvider,
+          proxyGroupPlan:
+            subscriptionProvider === null
+              ? null
+              : planProxyGroups({
+                  file: ctx.paths.subscription,
+                  chosen: ctx.settings.subscription.proxyGroup,
+                }),
         }),
     };
   });

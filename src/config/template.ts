@@ -3,6 +3,10 @@
  * 计划 §7.1 生成的 config.yaml。
  */
 import type { Settings } from '../settings.js';
+import type { RenderedGroup } from '../sub/groups.js';
+
+/** 目标策略里的"代理"落在哪个组：规则策略值、生成配置的组名都用它。 */
+export const PROXY_GROUP_NAME = 'PROXY';
 
 export interface TemplateOptions {
   settings: Settings;
@@ -10,6 +14,38 @@ export interface TemplateOptions {
   /** 为 null 时不引用订阅文件，代理组用 REJECT-DROP 占位：命中 PROXY 的流量直接丢弃并超时。 */
   subscriptionProvider: string | null;
   ruleProvider: string;
+  /**
+   * 用户在设置里选了"PROXY 指代订阅哪个组"时的组定义（含递归引用到的组）。
+   * null / 空数组 = PROXY 直接用订阅全部节点。
+   */
+  proxyGroupPlan?: RenderedGroup[] | null;
+}
+
+/** 标识符与 http(s) 网址才不加引号，其余（含空格、• 等）一律双引号包住。 */
+const SAFE_SCALAR = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const SAFE_URL = /^https?:\/\/[A-Za-z0-9._~:/?#@!$&'()*+,;=%-]+$/;
+
+function yamlScalar(value: unknown): string {
+  if (typeof value === 'string') {
+    return SAFE_SCALAR.test(value) || SAFE_URL.test(value) ? value : JSON.stringify(value);
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return JSON.stringify(value) ?? 'null';
+}
+
+/** 复刻组：节点成员由 use 提供，组与组的引用写在 proxies。 */
+function renderGroupLines(group: RenderedGroup, provider: string): string[] {
+  const lines = [
+    `  - name: ${yamlScalar(group.name)}`,
+    `    type: ${yamlScalar(group.type)}`,
+    '    use:',
+    `      - ${provider}`,
+  ];
+  if (group.refs.length > 0) {
+    lines.push('    proxies:', ...group.refs.map((ref) => `      - ${yamlScalar(ref)}`));
+  }
+  for (const { key, value } of group.extra) lines.push(`    ${key}: ${yamlScalar(value)}`);
+  return lines;
 }
 
 /**
@@ -61,24 +97,36 @@ export function renderConfig(options: TemplateOptions): string {
     '    behavior: classical',
     `    path: ./rules/${options.ruleProvider}.yaml`,
     '',
-    'proxy-groups:',
-    '  - name: PROXY',
-    '    type: select',
   );
 
-  if (options.subscriptionProvider === null) {
+  const plan = options.subscriptionProvider === null ? null : (options.proxyGroupPlan ?? null);
+
+  lines.push('proxy-groups:');
+  if (plan !== null && plan.length > 0 && options.subscriptionProvider !== null) {
+    for (const group of plan) lines.push(...renderGroupLines(group, options.subscriptionProvider));
+  } else if (options.subscriptionProvider === null) {
     // 无订阅时不能用 DIRECT 兜底，否则命中 PROXY 的规则会静默变成直连（被墙且无提示）
-    lines.push('    proxies:', '      - REJECT-DROP');
+    lines.push(
+      `  - name: ${PROXY_GROUP_NAME}`,
+      '    type: select',
+      '    proxies:',
+      '      - REJECT-DROP',
+    );
   } else {
-    lines.push('    use:', `      - ${options.subscriptionProvider}`);
+    lines.push(
+      `  - name: ${PROXY_GROUP_NAME}`,
+      '    type: select',
+      '    use:',
+      `      - ${options.subscriptionProvider}`,
+    );
   }
 
   lines.push(
     '',
     'rules:',
-    `  - RULE-SET,${options.ruleProvider},PROXY`,
+    `  - RULE-SET,${options.ruleProvider},${PROXY_GROUP_NAME}`,
     '  - GEOIP,CN,DIRECT',
-    '  - MATCH,PROXY',
+    `  - MATCH,${PROXY_GROUP_NAME}`,
     '',
   );
 

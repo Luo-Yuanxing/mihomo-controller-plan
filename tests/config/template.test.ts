@@ -34,4 +34,40 @@ describe('renderConfig', () => {
     expect(yaml).not.toContain('      - DIRECT');
     expect(yaml).toContain('MATCH,PROXY');
   });
+
+  it('选了 PROXY 指代的组时按该组复刻，节点仍由 provider 提供', () => {
+    const yaml = renderConfig({
+      ...base,
+      subscriptionProvider: 'sub-main',
+      proxyGroupPlan: [
+        { name: 'PROXY', type: 'select', refs: ['failover'], extra: [] },
+        {
+          name: 'failover',
+          type: 'fallback',
+          refs: [],
+          extra: [
+            { key: 'url', value: 'http://www.gstatic.com/generate_204' },
+            { key: 'interval', value: 300 },
+          ],
+        },
+      ],
+    });
+
+    expect(yaml).toContain('  - name: PROXY\n    type: select\n    use:\n      - sub-main');
+    expect(yaml).toContain('    proxies:\n      - failover');
+    expect(yaml).toContain('  - name: failover\n    type: fallback\n    use:\n      - sub-main');
+    expect(yaml).toContain('    url: http://www.gstatic.com/generate_204');
+    expect(yaml).toContain('    interval: 300');
+    expect(yaml).toContain('MATCH,PROXY');
+  });
+
+  it('组名带特殊字符时加引号，避免 YAML 解析歧义', () => {
+    const yaml = renderConfig({
+      ...base,
+      subscriptionProvider: 'sub-main',
+      proxyGroupPlan: [{ name: 'PROXY', type: 'select', refs: ['自动 选择'], extra: [] }],
+    });
+
+    expect(yaml).toContain('    proxies:\n      - "自动 选择"');
+  });
 });

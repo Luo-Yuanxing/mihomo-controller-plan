@@ -21,6 +21,7 @@ import { loadSettings, saveSettings as persistSettings, type Settings } from './
 import { ensureUiConfigFile, getUiConfig } from './ui-config.js';
 import { createUiConfigService } from './ui-config-store.js';
 import { countSubscriptionProxies, downloadSubscription } from './sub/download.js';
+import { planProxyGroups, type RenderedGroup } from './sub/groups.js';
 import { writeFileAtomic } from './util/atomic.js';
 import { acquireLock } from './util/lock.js';
 import { createLogger, logPaths } from './util/logger.js';
@@ -117,6 +118,20 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   };
   let subscriptionTimer: NodeJS.Timeout | null = null;
 
+  /**
+   * 用户选的"PROXY 指代订阅哪个组"。订阅换掉、组没了都会回退成 null（= 用订阅全部节点），
+   * 保证生成出来的配置一定能起。
+   */
+  const currentPlan = (): RenderedGroup[] | null => {
+    if (!hasUsableSubscription()) return null;
+    const chosen = settings.subscription.proxyGroup;
+    const plan = planProxyGroups({ file: paths.subscription, chosen });
+    if (plan === null && chosen !== '') {
+      log.warn({ group: chosen }, '订阅里没有这个代理组，PROXY 回退为订阅全部节点');
+    }
+    return plan;
+  };
+
   const syncSubscriptionTimer = (): void => {
     if (subscriptionTimer !== null) {
       clearInterval(subscriptionTimer);
@@ -136,6 +151,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       secret: settings.core.secret,
       subscriptionProvider: hasUsableSubscription() ? subscriptionProvider : null,
       ruleProvider,
+      proxyGroupPlan: currentPlan(),
     });
     await writeFileAtomic(paths.config, yaml);
   };
@@ -218,6 +234,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       context.subscription.refreshing = true;
       try {
         const hadUsableSubscription = hasUsableSubscription();
+        const planBefore = JSON.stringify(currentPlan());
         const result = await downloadSubscription(
           {
             url: settings.subscription.url,
@@ -236,8 +253,12 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
         log.info({ bytes: result.bytes, proxies: result.proxies }, '订阅已更新');
         const state = core.status().state;
         if (state === 'running' || state === 'adopted') {
-          // 占位组与订阅组结构不同，只有前后都可用才能只刷 provider，否则整体重启
-          if (hadUsableSubscription && usableSubscription) {
+          // 代理组结构变了（占位 ↔ 订阅、复刻的组换了）只能整体重启，结构没变才只刷 provider
+          if (
+            hadUsableSubscription &&
+            usableSubscription &&
+            planBefore === JSON.stringify(currentPlan())
+          ) {
             await api.reloadProxyProvider(subscriptionProvider);
           } else {
             const status = await core.restart();

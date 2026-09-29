@@ -3,7 +3,8 @@
     "url": "",
     "interval": 86400,
     "useProxy": false,
-    "userAgent": "clash-verge/v3"
+    "userAgent": "clash-verge/v3",
+    "proxyGroup": ""
   },
   "core": {
     "binaryPath": "resources/bin/mihomo.exe",

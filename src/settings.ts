@@ -13,6 +13,8 @@ export const settingsSchema = z.object({
     interval: z.number().int().positive(),
     useProxy: z.boolean(),
     userAgent: z.string().min(1),
+    /** PROXY 策略指代订阅里的哪个组；空串 = 订阅全部节点。 */
+    proxyGroup: z.string(),
   }),
   core: z.object({
     binaryPath: z.string().min(1),
@@ -35,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
     interval: 86_400,
     useProxy: false,
     userAgent: 'clash-verge/v3',
+    proxyGroup: '',
   },
   core: {
     binaryPath: 'resources/bin/mihomo.exe',

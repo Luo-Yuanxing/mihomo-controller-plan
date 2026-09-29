@@ -1,8 +1,12 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import pino from 'pino';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { AppContext } from '../../src/context.js';
 import type { CoreApi, ProxySnapshot } from '../../src/core/api.js';
+import { DEFAULT_SETTINGS } from '../../src/settings.js';
 import { DEFAULT_UI_CONFIG, getUiConfig } from '../../src/ui-config.js';
 
 // 与 routes/ui-config.test.ts 同一门槛：fastify v5 需要 Node >= 20。
@@ -34,7 +38,16 @@ function fakeApi(): FakeApi {
   };
 }
 
-type BuildApp = (api: CoreApi) => FastifyInstance;
+const SUBSCRIPTION = `
+proxies:
+  - { name: '香港', type: vless, server: hk.example.com, port: 443 }
+  - { name: '日本', type: vless, server: jp.example.com, port: 443 }
+proxy-groups:
+  - { name: Proxy, type: select, proxies: ['香港', '日本'] }
+  - { name: failover, type: fallback, proxies: ['香港', '日本'], url: 'http://www.gstatic.com/generate_204', interval: 300 }
+`;
+
+type BuildApp = (api: CoreApi, extra?: Record<string, unknown>) => FastifyInstance;
 
 async function createBuilder(): Promise<BuildApp> {
   const [{ default: Fastify }, { registerRoutes }] = await Promise.all([
@@ -42,7 +55,7 @@ async function createBuilder(): Promise<BuildApp> {
     import('../../src/routes.js'),
   ]);
 
-  return (api: CoreApi): FastifyInstance => {
+  return (api: CoreApi, extra: Record<string, unknown> = {}): FastifyInstance => {
     const context = {
       appVersion: 'test',
       appDir: '',
@@ -51,6 +64,8 @@ async function createBuilder(): Promise<BuildApp> {
       dataFallback: false,
       log: pino({ level: 'silent' }),
       api,
+      settings: DEFAULT_SETTINGS,
+      ...extra,
       get uiConfig() {
         return getUiConfig();
       },
@@ -119,6 +134,41 @@ describe.skipIf(!canLoadFastify)('/api/proxies', () => {
     expect(unknown.statusCode).toBe(404);
     expect(empty.statusCode).toBe(400);
     expect(api.selected).toEqual([]);
+    await app.close();
+  });
+});
+
+describe.skipIf(!canLoadFastify)('/api/subscription/groups', () => {
+  let buildApp: BuildApp;
+
+  beforeAll(async () => {
+    buildApp = await createBuilder();
+  });
+
+  it('列出订阅里的组与当前选择', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'mcp-groups-'));
+    const subscription = path.join(dir, 'subscription.yaml');
+    writeFileSync(subscription, SUBSCRIPTION, 'utf8');
+
+    const app = buildApp(fakeApi(), {
+      paths: { subscription },
+      settings: {
+        ...DEFAULT_SETTINGS,
+        subscription: { ...DEFAULT_SETTINGS.subscription, proxyGroup: 'Proxy' },
+      },
+    });
+    const response = await app.inject({ method: 'GET', url: '/api/subscription/groups' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      file: subscription,
+      exists: true,
+      selected: 'Proxy',
+      groups: [
+        { name: 'Proxy', type: 'select', members: 2 },
+        { name: 'failover', type: 'fallback', members: 2 },
+      ],
+    });
     await app.close();
   });
 });
