@@ -356,6 +356,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | PUT | `/api/proxies/{group}` | 切换该组的出口节点 |
 | GET | `/api/proxies/{group}/delay` | 并发测组内各节点时延（毫秒） |
 | GET | `/api/logs` | 最近 N 行日志 |
+| GET | `/api/failed-connections` | 从内核日志里汇总失败连接（界面用，多选后可加成规则） |
 | GET | `/api/ping` | 最轻的问候请求，界面离线时每秒探一次 |
 | POST | `/api/offline/shutdown` | 离线兜底：关系统代理 + 停内核 |
 | POST | `/api/offline/restart` | 离线兜底：无条件写系统代理期望值 + 重写配置 + 重启内核 |
@@ -426,6 +427,7 @@ payload:
 | 页面 | 内容 |
 | --- | --- |
 | 规则 | 代理出口（PROXY 指代哪个订阅组 + 出口节点按钮块，可一键测各节点时延）+ 规则表格（增删改、启停、拖拽排序）+ 原始 yaml 文本框 + 保存并热更新 |
+| 失败连接 | 内核日志里的失败目标（按协议/主机/端口汇总，只统计最近 10 分钟）多选后批量加成规则 |
 | 状态 | 内核状态与版本、端口、订阅信息与刷新订阅、系统代理三项状态、重启内核按钮 |
 | 设置 | 内核路径、端口、订阅 URL、系统代理开关、日志查看 |
 
