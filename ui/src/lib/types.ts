@@ -25,7 +25,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   settings: { logsRefetchIntervalMs: 5000 },
 };
 
-/** 系统值快照（GET /api/ui-config）。 */
+/** 生效值快照（GET /api/ui-config）：来源文件 + 当前值 + 文件修改时间。 */
 export interface UiConfigState {
   file: string;
   config: UiConfig;

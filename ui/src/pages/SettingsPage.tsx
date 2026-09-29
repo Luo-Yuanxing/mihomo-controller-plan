@@ -84,7 +84,7 @@ export default function SettingsPage() {
     mutationFn: () => api.forceLoadUiConfig(configFile.trim()),
     onSuccess: async (result) => {
       setPreview(null);
-      notices.push('ok', `已按配置文件强制覆盖系统值：${result.file}`);
+      notices.push('ok', `已按配置文件强制覆盖生效值：${result.file}`);
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
     onError: (error: Error) => notices.push('error', error.message),
@@ -97,8 +97,8 @@ export default function SettingsPage() {
       notices.push(
         'ok',
         result.same
-          ? '配置文件与系统值一致，无需保存'
-          : '配置文件与系统值不一致（红色项），确认后可一键保存到系统',
+          ? '配置文件与生效值一致，无需保存'
+          : '配置文件与生效值不一致（红色项），确认后可一键保存到 config.json',
       );
     },
     onError: (error: Error) => {
@@ -232,7 +232,7 @@ export default function SettingsPage() {
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
         <h2 className="text-base font-semibold">界面常量（config.json）</h2>
         <p className="text-xs text-slate-500">
-          系统值（存库）：规则类型 {uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—'}
+          生效值（config.json）：规则类型 {uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—'}
           ；目标策略{' '}
           {uiConfigQuery.data?.config.policies.map((option) => option.label).join(' / ') ?? '—'}；
           失败连接 {uiConfigQuery.data?.config.failedConnections.refetchIntervalMs ?? '—'}ms /{' '}
@@ -270,7 +270,7 @@ export default function SettingsPage() {
               forceLoad.mutate();
             }}
           >
-            {forceLoad.isPending ? '覆盖中…' : '强制按配置文件加载（覆盖系统值）'}
+            {forceLoad.isPending ? '覆盖中…' : '强制按配置文件加载（覆盖生效值）'}
           </button>
           {preview !== null && !preview.same && (
             <button
@@ -292,7 +292,7 @@ export default function SettingsPage() {
             <thead className="bg-slate-50 text-left uppercase text-slate-500">
               <tr>
                 <th className="px-2 py-1">字段</th>
-                <th className="px-2 py-1">系统值</th>
+                <th className="px-2 py-1">生效值</th>
                 <th className="px-2 py-1">配置文件</th>
               </tr>
             </thead>
