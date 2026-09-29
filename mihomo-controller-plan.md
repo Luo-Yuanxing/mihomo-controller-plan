@@ -245,7 +245,7 @@ mihomo-controller-plan/
 | 落盘 | 写 `subscription.yaml.tmp` → `rename` 覆盖，再 `PUT /providers/proxies/sub-main` |
 | 失败 | 保留旧文件并返回错误；首次启动时失败则直接停止 |
 | 刷新 | 只有手动触发（状态页"刷新订阅"）；不装定时器，避免后台悄悄换节点 |
-| PROXY 指代 | `proxyGroup` 空 = `PROXY` 组用订阅全部节点；非空 = 按订阅里同名组复刻（类型、url 等原样带过，节点仍由 provider 提供，组引用递归生成）。找不到该组就回退成全部节点 |
+| PROXY 指代 | `proxyGroup` 空 = `PROXY` 组用订阅全部节点；非空 = 按订阅里同名组复刻（类型、url 等原样带过，节点仍由 provider 提供，组引用递归生成）。找不到该组就回退成全部节点；改这里会立即重建代理组（重启内核），否则界面列的还是旧组的节点 |
 
 内核侧配置成文件 provider，避免"访问订阅域名本身需要代理"的自举问题：
 

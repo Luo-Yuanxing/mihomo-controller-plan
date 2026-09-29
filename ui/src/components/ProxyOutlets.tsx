@@ -63,10 +63,19 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
       });
     },
     onSuccess: async (result) => {
-      push('ok', result.needsRestart ? '已保存；重启内核后生效' : '已保存');
+      push(
+        'ok',
+        result.groupsRebuilt
+          ? '已保存，代理组已重建'
+          : result.needsRestart
+            ? '已保存；重启内核后生效'
+            : '已保存',
+      );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['settings'] }),
         queryClient.invalidateQueries({ queryKey: ['subscription-groups'] }),
+        queryClient.invalidateQueries({ queryKey: ['proxyGroups'] }),
+        queryClient.invalidateQueries({ queryKey: ['status'] }),
       ]);
     },
     onError: (error: Error) => push('error', error.message),

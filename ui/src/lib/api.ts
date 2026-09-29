@@ -91,10 +91,13 @@ export const api = {
     post<UiConfigState>('/api/ui-config/apply', input),
 
   saveSettings: (settings: Settings) =>
-    request<{ settings: Settings; needsRestart: boolean }>('/api/settings', {
-      method: 'PUT',
-      body: JSON.stringify(settings),
-    }),
+    request<{ settings: Settings; needsRestart: boolean; groupsRebuilt: boolean }>(
+      '/api/settings',
+      {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      },
+    ),
 
   subscription: () =>
     request<{

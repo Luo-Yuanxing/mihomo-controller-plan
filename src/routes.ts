@@ -87,10 +87,24 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     const needsRestart =
       previous.core.mixedPort !== settings.core.mixedPort ||
       previous.core.controllerPort !== settings.core.controllerPort ||
-      previous.core.secret !== settings.core.secret ||
-      // 代理组结构变了要多一次重启才会进内核
-      previous.subscription.proxyGroup !== settings.subscription.proxyGroup;
-    return { settings, needsRestart };
+      previous.core.secret !== settings.core.secret;
+
+    // 换了指代的组，代理组结构就变了：不重建的话界面列的还是旧组的节点
+    let groupsRebuilt = false;
+    if (previous.subscription.proxyGroup !== settings.subscription.proxyGroup) {
+      const state = ctx.kernel.status().state;
+      if (state === 'running' || state === 'adopted') {
+        const status = await ctx.kernel.restart();
+        if (status.state === 'failed') {
+          return reply
+            .status(502)
+            .send({ error: `设置已保存，但内核重启失败：${status.error ?? '未知原因'}` });
+        }
+        groupsRebuilt = true;
+      }
+    }
+
+    return { settings, needsRestart, groupsRebuilt };
   });
 
   /** 订阅文件里的代理组：设置页用它选"PROXY 指代哪个组"。 */

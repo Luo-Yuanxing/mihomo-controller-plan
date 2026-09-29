@@ -189,3 +189,74 @@ describe.skipIf(!canLoadFastify)('/api/subscription/groups', () => {
     await app.close();
   });
 });
+
+describe.skipIf(!canLoadFastify)('PUT /api/settings', () => {
+  let buildApp: BuildApp;
+
+  beforeAll(async () => {
+    buildApp = await createBuilder();
+  });
+
+  function withProxyGroup(proxyGroup: string) {
+    return { ...DEFAULT_SETTINGS, subscription: { ...DEFAULT_SETTINGS.subscription, proxyGroup } };
+  }
+
+  const extra = () => {
+    const restarts: string[] = [];
+    return {
+      restarts,
+      context: {
+        subscription: {
+          url: '',
+          useProxy: false,
+          userAgent: '',
+          lastOkAt: null,
+          lastError: null,
+          bytes: null,
+          refreshing: false,
+        },
+        saveSettings: async (next: unknown) => next,
+        writeConfig: async () => undefined,
+        kernel: {
+          status: () => ({ state: 'running' }),
+          restart: async () => {
+            restarts.push('restart');
+            return { state: 'running' };
+          },
+        },
+      },
+    };
+  };
+
+  it('换了 PROXY 指代的组就重建代理组（重启内核）', async () => {
+    const { restarts, context } = extra();
+    const app = buildApp(fakeApi(), { ...context, settings: withProxyGroup('Proxy') });
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: withProxyGroup('failover'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ groupsRebuilt: boolean }>().groupsRebuilt).toBe(true);
+    expect(restarts).toHaveLength(1);
+    await app.close();
+  });
+
+  it('只改端口不重建代理组，只提示需要重启', async () => {
+    const { restarts, context } = extra();
+    const app = buildApp(fakeApi(), { ...context, settings: withProxyGroup('Proxy') });
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: { ...withProxyGroup('Proxy'), core: { ...DEFAULT_SETTINGS.core, mixedPort: 7891 } },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ groupsRebuilt: boolean; needsRestart: boolean }>();
+    expect(body.groupsRebuilt).toBe(false);
+    expect(body.needsRestart).toBe(true);
+    expect(restarts).toHaveLength(0);
+    await app.close();
+  });
+});
