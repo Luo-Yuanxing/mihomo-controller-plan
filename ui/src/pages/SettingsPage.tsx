@@ -205,8 +205,7 @@ export default function SettingsPage() {
           </p>
         )}
         <textarea
-          wrap="off"
-          className="h-24 w-full resize-y overflow-x-auto whitespace-pre rounded border border-slate-300 px-2 py-1 font-mono text-xs"
+          className="h-24 w-full resize-none overflow-x-hidden overflow-y-auto break-all rounded border border-slate-300 px-2 py-1 font-mono text-xs"
           placeholder="把别处生成的配置字符串粘到这里，再点“导入字符串”"
           value={shareText}
           onChange={(event) => setShareText(event.target.value)}
