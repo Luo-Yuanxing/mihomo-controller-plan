@@ -28,6 +28,10 @@ export function renderConfig(options: TemplateOptions): string {
     `external-controller: 127.0.0.1:${settings.core.controllerPort}`,
     `secret: "${secret}"`,
     '',
+    // 代理组的当前选择落 cache.db，否则每次重启都回到第一个节点
+    'profile:',
+    '  store-selected: true',
+    '',
     'dns:',
     '  enable: true',
     '  enhanced-mode: fake-ip',

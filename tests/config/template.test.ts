@@ -18,6 +18,8 @@ describe('renderConfig', () => {
     expect(yaml).toContain('proxy-providers:');
     expect(yaml).toContain('path: ./subscription.yaml');
     expect(yaml).toContain('    use:\n      - sub-main');
+    // 用户选的出口要能跨重启保留，否则每次都回到组内第一个节点
+    expect(yaml).toContain('profile:\n  store-selected: true');
   });
 
   it('无订阅文件时用 REJECT-DROP 占位，命中 PROXY 的流量丢弃超时', () => {
