@@ -2,7 +2,7 @@
  * 三页外壳：规则 / 状态 / 设置。
  * 计划 §8 界面。
  */
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from './lib/api';
 import { useOffline } from './lib/offline';
@@ -55,6 +55,7 @@ const STATE_MARK: Record<string, StateMark> = {
 
 export default function App() {
   const [active, setActive] = useState<string>('rules');
+  const queryClient = useQueryClient();
   const offline = useOffline();
   const current = TABS.find((tab) => tab.key === active) ?? TABS[0];
   const status = useQuery({
@@ -64,6 +65,7 @@ export default function App() {
   });
   const kernelState = status.data?.kernel.state ?? 'stopped';
   const stateMark = STATE_MARK[kernelState] ?? STATE_UNKNOWN;
+  const refresh = useMutation({ mutationFn: () => queryClient.invalidateQueries() });
 
   // 一进离线状态就跳到状态页，那里能看到内核与系统代理的实时情况
   useEffect(() => {
@@ -97,8 +99,17 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <button
+          type="button"
+          title="刷新页面数据"
+          disabled={refresh.isPending}
+          onClick={() => refresh.mutate()}
+          className="ml-auto rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-50"
+        >
+          {refresh.isPending ? '刷新中…' : '刷新'}
+        </button>
         <span
-          className={`ml-auto flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${stateMark.className}`}
+          className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${stateMark.className}`}
         >
           <span className={kernelState === 'running' ? 'animate-pulse' : ''}>{stateMark.icon}</span>
           {STATUS_HINT(kernelState, status.data?.kernel.error ?? null)}
