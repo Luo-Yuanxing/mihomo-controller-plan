@@ -298,7 +298,6 @@ export default function StatusPage() {
 
       <p className="text-xs text-slate-500">
         数据目录：{data?.app.dataDir ?? '—'}
-        {data?.app.dataFallback === true ? '（回退到 LOCALAPPDATA）' : ''}
       </p>
     </div>
   );
