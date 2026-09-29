@@ -14,6 +14,7 @@ const canLoadFastify = Number(process.versions.node.split('.')[0] ?? 0) >= 20;
 
 const SNAPSHOT: ProxySnapshot = {
   PROXY: { name: 'PROXY', type: 'Selector', now: '香港', all: ['香港', '日本'] },
+  GLOBAL: { name: 'GLOBAL', type: 'Selector', now: 'PROXY', all: ['PROXY'] },
   香港: { name: '香港', type: 'Vless' },
   日本: { name: '日本', type: 'Vless' },
 };
@@ -88,7 +89,11 @@ describe.skipIf(!canLoadFastify)('/api/proxies', () => {
     const response = await app.inject({ method: 'GET', url: '/api/proxies' });
 
     expect(response.statusCode).toBe(200);
-    const body = response.json<{ groups: { name: string; now: string; all: string[] }[] }>();
+    const body = response.json<{
+      target: string;
+      groups: { name: string; now: string; all: string[] }[];
+    }>();
+    expect(body.target).toBe('PROXY');
     expect(body.groups).toHaveLength(1);
     expect(body.groups[0]?.name).toBe('PROXY');
     expect(body.groups[0]?.now).toBe('香港');

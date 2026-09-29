@@ -6,12 +6,13 @@ describe('proxyGroups', () => {
     const snapshot: ProxySnapshot = {
       PROXY: { name: 'PROXY', type: 'Selector', now: '香港', all: ['香港', '日本'] },
       failover: { name: 'failover', type: 'Fallback', all: ['日本'] },
+      GLOBAL: { name: 'GLOBAL', type: 'Selector', now: 'PROXY', all: ['PROXY', '香港'] },
       空组: { name: '空组', type: 'Selector', now: 'DIRECT', all: [] },
       香港: { name: '香港', type: 'Vless' },
     };
 
     const groups = proxyGroups(snapshot);
-    expect(groups).toHaveLength(2);
+    expect(groups).toHaveLength(2); // GLOBAL 是内核自建的，不列出来
     expect(groups.map((group) => group.name).sort()).toEqual(['PROXY', 'failover']);
     expect(groups.find((group) => group.name === 'failover')?.now).toBe('');
     expect(groups.find((group) => group.name === 'PROXY')?.now).toBe('香港');

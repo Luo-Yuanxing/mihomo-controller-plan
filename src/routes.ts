@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { renderConfig } from './config/template.js';
+import { PROXY_GROUP_NAME, renderConfig } from './config/template.js';
 import type { AppContext } from './context.js';
 import { proxyGroups } from './core/api.js';
 import { parseFailedConnections } from './logs/failed-connections.js';
@@ -338,7 +338,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
    */
   app.get('/api/proxies', async (_request, reply) => {
     try {
-      return { groups: proxyGroups(await ctx.api.proxies()) };
+      return { target: PROXY_GROUP_NAME, groups: proxyGroups(await ctx.api.proxies()) };
     } catch (error) {
       return reply.status(502).send({ error: errorText(error) });
     }

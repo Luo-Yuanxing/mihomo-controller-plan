@@ -20,10 +20,15 @@ export interface ProxyGroupSummary {
   all: string[];
 }
 
+/** 内核自己生成的组，规则用不到，不列给用户选。 */
+const AUTO_GROUPS = new Set(['GLOBAL', 'COMPATIBLE']);
+
 /** 从 GET /proxies 快照里挑出代理组：带 all 列表的即为组，按名称排序。 */
 export function proxyGroups(snapshot: ProxySnapshot): ProxyGroupSummary[] {
   return Object.values(snapshot)
-    .filter((entry) => Array.isArray(entry.all) && entry.all.length > 0)
+    .filter(
+      (entry) => Array.isArray(entry.all) && entry.all.length > 0 && !AUTO_GROUPS.has(entry.name),
+    )
     .map((entry) => ({
       name: entry.name,
       type: entry.type,
