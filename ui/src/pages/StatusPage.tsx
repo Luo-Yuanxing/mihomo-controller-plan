@@ -260,7 +260,7 @@ export default function StatusPage() {
               disabled={busy}
               onClick={() => disableProxy.mutate()}
             >
-              关闭
+              关闭系统代理
             </button>
           </div>
         </div>
