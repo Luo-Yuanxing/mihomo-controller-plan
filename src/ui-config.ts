@@ -5,6 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Logger } from 'pino';
 import { z } from 'zod';
 
 export const uiConfigSchema = z.object({
@@ -35,6 +36,30 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
 
 export function uiConfigPath(dataDir: string): string {
   return path.join(dataDir, 'ui-config.json');
+}
+
+/**
+ * 启动时在 app 启动路径预生成配置文件（内容为默认值），该目录不可写时退回 data 目录。
+ * 只负责"有文件可改"，系统值仍以后端持久化数据为准。
+ */
+export function ensureUiConfigFile(appDir: string, dataDir: string, log?: Logger): string {
+  const fallback = uiConfigPath(dataDir);
+  for (const target of [path.join(appDir, 'ui-config.json'), fallback]) {
+    try {
+      if (!fs.existsSync(target)) {
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, `${JSON.stringify(DEFAULT_UI_CONFIG, null, 2)}\n`, 'utf8');
+        log?.info({ file: target }, '已预生成界面常量配置文件');
+      }
+      return target;
+    } catch (error) {
+      log?.warn(
+        { file: target, err: error instanceof Error ? error.message : String(error) },
+        '界面常量配置文件不可用，改用备用路径',
+      );
+    }
+  }
+  return fallback;
 }
 
 let active: UiConfig = DEFAULT_UI_CONFIG;

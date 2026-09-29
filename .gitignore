@@ -20,3 +20,6 @@ resources/geo/*
 .env
 .env.local
 *.log
+
+# 启动时在 app 启动路径预生成的界面常量配置文件
+/ui-config.json

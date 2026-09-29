@@ -18,7 +18,7 @@ import { openRulesDatabase } from './rules/db.js';
 import { RuleValidationError } from './rules/render.js';
 import { createRuleRepo } from './rules/repo.js';
 import { loadSettings, saveSettings as persistSettings, type Settings } from './settings.js';
-import { getUiConfig, uiConfigPath } from './ui-config.js';
+import { ensureUiConfigFile, getUiConfig } from './ui-config.js';
 import { createUiConfigService } from './ui-config-store.js';
 import { countSubscriptionProxies, downloadSubscription } from './sub/download.js';
 import { writeFileAtomic } from './util/atomic.js';
@@ -98,8 +98,9 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const subscriptionProvider = 'sub-main';
   const ruleProvider = 'custom';
 
-  // 界面常量：系统值来自 SQLite（首次用 data/ui-config.json 初始化），配置文件只是加载源
-  const uiConfigService = createUiConfigService(db, uiConfigPath(dataDir), log);
+  // 界面常量：先在 app 启动路径预生成配置文件，再由 SQLite 里的系统值覆盖，之后 UI 才启动
+  const uiConfigFile = ensureUiConfigFile(appDir, dataDir, log);
+  const uiConfigService = createUiConfigService(db, uiConfigFile, log);
 
   /** 订阅文件存在且含节点才算可用；空订阅按无订阅处理，避免 PROXY 组静默直连。 */
   const hasUsableSubscription = (): boolean => countSubscriptionProxies(paths.subscription) > 0;
