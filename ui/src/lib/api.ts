@@ -18,6 +18,7 @@ import type {
   UiConfigState,
 } from './types';
 import { setOffline } from './offline';
+import { t } from './i18n';
 
 const token = (window as unknown as { mcpApiToken?: string }).mcpApiToken ?? '';
 
@@ -44,7 +45,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     // 服务端 5xx 说明后端坏了：立刻进离线状态，跳状态页并给出兜底按钮
     if (response.status >= 500) setOffline(true);
     const message = (payload as { error?: string } | null)?.error;
-    throw new Error(message ?? `请求失败：HTTP ${response.status}`);
+    throw new Error(message ?? t('api.requestFailed', { status: response.status }));
   }
   return payload as T;
 }

@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { useT } from '../lib/useI18n';
 import type { NoticeKind } from '../lib/useNotices';
 
 const SELECTOR_TYPES = new Set(['Selector', 'select']);
@@ -13,6 +14,7 @@ function delayColor(ms: number | undefined): string {
 }
 
 export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: string) => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const groupsQuery = useQuery({
     queryKey: ['proxyGroups'],
@@ -36,7 +38,7 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
   const select = useMutation({
     mutationFn: (name: string) => api.selectProxy(target, name),
     onSuccess: async (result) => {
-      push('ok', `${result.group} 已切到 ${result.now}，新连接立即生效`);
+      push('ok', t('outlets.switched', { group: result.group, now: result.now }));
       setNode('');
       await queryClient.invalidateQueries({ queryKey: ['proxyGroups'] });
     },
@@ -56,7 +58,7 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
   const saveGroup = useMutation({
     mutationFn: (next: string) => {
       const settings = settingsQuery.data;
-      if (settings === undefined) throw new Error('还没读到设置，稍后再试');
+      if (settings === undefined) throw new Error(t('outlets.settingsUnavailable'));
       return api.saveSettings({
         ...settings,
         subscription: { ...settings.subscription, proxyGroup: next },
@@ -66,10 +68,10 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
       push(
         'ok',
         result.groupsRebuilt
-          ? '已保存，代理组已重建'
+          ? t('outlets.savedRebuilt')
           : result.needsRestart
-            ? '已保存；重启内核后生效'
-            : '已保存',
+            ? t('outlets.savedNeedsRestart')
+            : t('common.saved'),
       );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['settings'] }),
@@ -84,21 +86,19 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
   return (
     <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-base font-semibold">代理出口</h2>
-        <span className="text-xs text-slate-500">
-          目标策略选"代理"的规则走这里；没命中的规则一律直连
-        </span>
+        <h2 className="text-base font-semibold">{t('outlets.title')}</h2>
+        <span className="text-xs text-slate-500">{t('outlets.hint')}</span>
       </div>
 
       <label className="flex items-center gap-2 text-sm">
-        <span className="w-28 shrink-0 text-slate-500">PROXY 指代</span>
+        <span className="w-28 shrink-0 text-slate-500">{t('outlets.proxyGroup')}</span>
         <select
           className="w-72 rounded border border-slate-300 px-1 py-1"
           value={proxyGroup}
           disabled={settingsQuery.data === undefined || saveGroup.isPending}
           onChange={(event) => saveGroup.mutate(event.target.value)}
         >
-          <option value="">订阅全部节点</option>
+          <option value="">{t('outlets.allNodes')}</option>
           {proxyGroup !== '' &&
             !(subGroupsQuery.data?.groups ?? []).some((item) => item.name === proxyGroup) && (
               <option value={proxyGroup}>{proxyGroup}</option>
@@ -112,16 +112,18 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
       </label>
 
       <div className="flex items-center gap-2 text-sm">
-        <span className="w-28 shrink-0 text-slate-500">当前出口</span>
+        <span className="w-28 shrink-0 text-slate-500">{t('outlets.currentExit')}</span>
         {group === undefined ? (
           <span className="text-slate-500">
-            {groupsQuery.isError ? String(groupsQuery.error) : '内核未运行，读不到代理组'}
+            {groupsQuery.isError ? String(groupsQuery.error) : t('outlets.groupsUnavailable')}
           </span>
         ) : (
           <>
             <span className="text-slate-500">{group.now || '—'}</span>
             {!SELECTOR_TYPES.has(group.type) && (
-              <span className="text-xs text-slate-500">（{group.type} 组自动选出口）</span>
+              <span className="text-xs text-slate-500">
+                {t('outlets.autoGroup', { type: group.type })}
+              </span>
             )}
             <button
               type="button"
@@ -129,7 +131,7 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
               disabled={delay.isPending}
               onClick={() => delay.mutate()}
             >
-              {delay.isPending ? '测延迟中…' : '测延迟'}
+              {delay.isPending ? t('outlets.delayTesting') : t('outlets.delayTest')}
             </button>
           </>
         )}
@@ -162,7 +164,7 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
                   <span className="truncate">{name}</span>
                   {delays !== null && (
                     <span className={`shrink-0 ${delayColor(ms)}`}>
-                      {ms === undefined ? '超时' : `${String(ms)} ms`}
+                      {ms === undefined ? t('outlets.timeout') : `${String(ms)} ms`}
                     </span>
                   )}
                 </button>

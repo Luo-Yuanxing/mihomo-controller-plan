@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import NoticeStack from '../components/NoticeStack';
 import { api } from '../lib/api';
+import { LANGUAGES, setLanguage, type Language } from '../lib/i18n';
+import { useLanguage, useT } from '../lib/useI18n';
 import type { Settings } from '../lib/types';
 import { useNotices } from '../lib/useNotices';
 
@@ -19,6 +21,8 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 const inputClass = 'w-full rounded border border-slate-300 px-2 py-1 font-mono text-sm';
 
 export default function SettingsPage() {
+  const t = useT();
+  const language = useLanguage();
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: api.settings });
   const uiConfigQuery = useQuery({ queryKey: ['ui-config'], queryFn: api.uiConfig });
@@ -39,10 +43,7 @@ export default function SettingsPage() {
   const saveMutation = useMutation({
     mutationFn: (settings: Settings) => api.saveSettings(settings),
     onSuccess: async (result) => {
-      notices.push(
-        'ok',
-        result.needsRestart ? '设置已保存；端口或 secret 变了，需要重启内核才生效' : '设置已保存',
-      );
+      notices.push('ok', result.needsRestart ? t('settings.savedNeedsRestart') : t('common.saved'));
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       await queryClient.invalidateQueries({ queryKey: ['status'] });
     },
@@ -54,7 +55,7 @@ export default function SettingsPage() {
     mutationFn: () => api.shareUiConfig(),
     onSuccess: (result) => {
       setShareText(result.payload);
-      notices.push('ok', `已生成配置字符串（${String(result.bytes)} 字节），复制即可传给别的面板`);
+      notices.push('ok', t('settings.shareGenerated', { bytes: result.bytes }));
     },
     onError: (error: Error) => notices.push('error', error.message),
   });
@@ -63,11 +64,17 @@ export default function SettingsPage() {
   const importConfig = useMutation({
     mutationFn: (payload: string) => api.importUiConfig(payload),
     onSuccess: async (result) => {
-      const rules = result.rules === null ? '规则未变' : `规则 ${String(result.rules.count)} 条`;
-      notices.push(
-        'ok',
-        `已导入配置（${rules}）${result.warnings.length === 0 ? '' : `；${result.warnings.join('；')}`}`,
-      );
+      const rules =
+        result.rules === null
+          ? t('settings.rulesUnchanged')
+          : t('settings.rulesCount', { count: result.rules.count });
+      const warnings =
+        result.warnings.length === 0
+          ? ''
+          : t('settings.importedWarnings', {
+              warnings: result.warnings.join(t('common.listSeparator')),
+            });
+      notices.push('ok', `${t('settings.imported', { rules })}${warnings}`);
       await queryClient.invalidateQueries();
     },
     onError: (error: Error) => notices.push('error', error.message),
@@ -77,7 +84,7 @@ export default function SettingsPage() {
   const initializeConfig = useMutation({
     mutationFn: () => api.initializeUiConfig(),
     onSuccess: async () => {
-      notices.push('ok', '已初始化：之后启动直接按 config.json 生效，不再加载引导');
+      notices.push('ok', t('settings.initialized'));
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
     onError: (error: Error) => notices.push('error', error.message),
@@ -86,18 +93,35 @@ export default function SettingsPage() {
   const applyUiConfig = useMutation({
     mutationFn: () => {
       const config = uiConfigQuery.data?.config;
-      if (config === undefined) throw new Error('界面常量还没读出来');
+      if (config === undefined) throw new Error(t('settings.uiConfigUnavailable'));
       return api.applyUiConfig(config);
     },
     onSuccess: async () => {
-      notices.push('ok', '界面常量已保存到 config.json');
+      notices.push('ok', t('settings.uiConfigSaved'));
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
     onError: (error: Error) => notices.push('error', error.message),
   });
 
+  /** 切语言：先本地生效（界面立刻变），再把 language 写回 config.json；写失败退回原语言。 */
+  const changeLanguage = useMutation({
+    mutationFn: (input: { next: Language; previous: Language }) => {
+      const config = uiConfigQuery.data?.config;
+      if (config === undefined) throw new Error(t('settings.uiConfigUnavailable'));
+      return api.applyUiConfig({ ...config, language: input.next });
+    },
+    onSuccess: async () => {
+      notices.push('ok', t('settings.languageSaved'));
+      await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
+    },
+    onError: (error: Error, input) => {
+      setLanguage(input.previous);
+      notices.push('error', error.message);
+    },
+  });
+
   if (draft === null) {
-    return <p className="text-sm text-slate-500">读取设置中…</p>;
+    return <p className="text-sm text-slate-500">{t('settings.loading')}</p>;
   }
 
   function patch(next: Partial<Settings>): void {
@@ -111,20 +135,42 @@ export default function SettingsPage() {
   const binaryPath = draft.core.binaryPath.trim();
   const binaryIssue =
     binaryPath === ''
-      ? '内核路径不能为空'
+      ? t('settings.binaryEmpty')
       : /[<>"|?*]/.test(binaryPath)
-        ? '内核路径含非法字符：< > " | ? *'
+        ? t('settings.binaryInvalidChars')
         : binaryPath.toLowerCase().endsWith('.exe')
           ? null
-          : '内核路径必须以 .exe 结尾';
+          : t('settings.binaryNotExe');
 
   return (
     <div className="flex flex-col gap-3">
       <NoticeStack notices={notices.items} onDismiss={notices.dismiss} />
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
-        <h2 className="text-base font-semibold">内核</h2>
-        <Field label="内核路径">
+        <Field label={t('settings.language')} hint={t('settings.languageNote')}>
+          <select
+            className="w-40 rounded border border-slate-300 px-2 py-1 text-sm"
+            value={language}
+            disabled={uiConfigQuery.data === undefined || changeLanguage.isPending}
+            onChange={(event) => {
+              const next = event.target.value as Language;
+              const previous = language;
+              setLanguage(next);
+              changeLanguage.mutate({ next, previous });
+            }}
+          >
+            {LANGUAGES.map((option) => (
+              <option key={option} value={option}>
+                {option === 'zh' ? t('settings.languageZh') : t('settings.languageEn')}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </section>
+
+      <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
+        <h2 className="text-base font-semibold">{t('settings.kernelSection')}</h2>
+        <Field label={t('settings.binaryPath')}>
           <input
             className={inputClass}
             value={draft.core.binaryPath}
@@ -132,7 +178,7 @@ export default function SettingsPage() {
           />
         </Field>
         {binaryIssue !== null && <p className="text-xs text-rose-600">{binaryIssue}</p>}
-        <Field label="混合端口">
+        <Field label={t('settings.mixedPort')}>
           <input
             type="number"
             className={inputClass}
@@ -145,8 +191,8 @@ export default function SettingsPage() {
       </section>
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
-        <h2 className="text-base font-semibold">订阅</h2>
-        <Field label="订阅 URL">
+        <h2 className="text-base font-semibold">{t('settings.subscriptionSection')}</h2>
+        <Field label={t('settings.subscriptionUrl')}>
           <input
             className={inputClass}
             value={draft.subscription.url}
@@ -164,7 +210,7 @@ export default function SettingsPage() {
             }
           />
         </Field>
-        <Field label="下载走本机代理">
+        <Field label={t('settings.useProxy')}>
           <input
             type="checkbox"
             checked={draft.subscription.useProxy}
@@ -176,8 +222,8 @@ export default function SettingsPage() {
       </section>
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
-        <h2 className="text-base font-semibold">系统代理期望值</h2>
-        <Field label="ProxyOverride">
+        <h2 className="text-base font-semibold">{t('settings.proxySection')}</h2>
+        <Field label={t('settings.proxyOverride')}>
           <input
             className={inputClass}
             value={draft.proxy.override}
@@ -191,22 +237,22 @@ export default function SettingsPage() {
           needsSetup ? 'border-2 border-amber-400 ring-2 ring-amber-200' : 'border border-slate-300'
         }`}
       >
-        <h2 className="text-base font-semibold">导入设置</h2>
+        <h2 className="text-base font-semibold">{t('settings.importSection')}</h2>
         <p className="text-xs text-slate-500">
-          当前生效值：规则类型 {uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—'}
-          ；目标策略{' '}
-          {uiConfigQuery.data?.config.policies.map((option) => option.label).join(' / ') ?? '—'}；
-          失败连接 {uiConfigQuery.data?.config.failedConnections.refetchIntervalMs ?? '—'}ms /{' '}
-          {uiConfigQuery.data?.config.failedConnections.lines ?? '—'} 行
+          {t('settings.effectiveValues', {
+            types: uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—',
+            policies:
+              uiConfigQuery.data?.config.policies.map((option) => option.label).join(' / ') ?? '—',
+            interval: uiConfigQuery.data?.config.failedConnections.refetchIntervalMs ?? '—',
+            lines: uiConfigQuery.data?.config.failedConnections.lines ?? '—',
+          })}
         </p>
         {needsSetup && (
-          <p className="text-xs font-medium text-amber-700">
-            初始化标记还是 true：请从别处导入一份配置字符串，或直接点"立即初始化"沿用当前内容。
-          </p>
+          <p className="text-xs font-medium text-amber-700">{t('settings.needsSetup')}</p>
         )}
         <textarea
           className="h-24 w-full resize-none overflow-x-hidden overflow-y-auto break-all rounded border border-slate-300 px-2 py-1 font-mono text-xs"
-          placeholder="把别处生成的配置字符串粘到这里，再点“导入字符串”"
+          placeholder={t('settings.importPlaceholder')}
           value={shareText}
           onChange={(event) => setShareText(event.target.value)}
         />
@@ -220,7 +266,7 @@ export default function SettingsPage() {
               importConfig.mutate(shareText.trim());
             }}
           >
-            {importConfig.isPending ? '导入中…' : '导入字符串'}
+            {importConfig.isPending ? t('settings.importing') : t('settings.importButton')}
           </button>
           <button
             type="button"
@@ -231,36 +277,36 @@ export default function SettingsPage() {
               shareConfig.mutate();
             }}
           >
-            {shareConfig.isPending ? '生成中…' : '生成字符串'}
+            {shareConfig.isPending ? t('settings.generating') : t('settings.shareButton')}
           </button>
           <button
             type="button"
             className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
             disabled={initializeConfig.isPending || !needsSetup}
-            title="把初始化标记落成 false，内容不动"
+            title={t('settings.initializeTitle')}
             onClick={() => {
               notices.clear();
               initializeConfig.mutate();
             }}
           >
-            {initializeConfig.isPending ? '初始化中…' : '立即初始化'}
+            {initializeConfig.isPending
+              ? t('settings.initializing')
+              : t('settings.initializeButton')}
           </button>
           <button
             type="button"
             className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
             disabled={applyUiConfig.isPending || uiConfigQuery.data === undefined}
-            title="把上面显示的界面常量写回 config.json"
+            title={t('settings.applyTitle')}
             onClick={() => {
               notices.clear();
               applyUiConfig.mutate();
             }}
           >
-            {applyUiConfig.isPending ? '保存中…' : '保存界面常量'}
+            {applyUiConfig.isPending ? t('common.saving') : t('settings.applyButton')}
           </button>
         </div>
-        <p className="text-xs text-slate-400">
-          字符串里只有界面常量、自定义规则、内核路径与系统代理期望值；订阅与内核 secret 不外传。
-        </p>
+        <p className="text-xs text-slate-400">{t('settings.shareNote')}</p>
       </section>
 
       <div className="flex gap-2">
@@ -270,12 +316,12 @@ export default function SettingsPage() {
           disabled={saveMutation.isPending}
           onClick={() => saveMutation.mutate(draft)}
         >
-          {saveMutation.isPending ? '保存中…' : '保存设置'}
+          {saveMutation.isPending ? t('common.saving') : t('settings.saveButton')}
         </button>
       </div>
 
       <section className="rounded border border-slate-300 bg-white p-3">
-        <h2 className="mb-2 text-base font-semibold">日志（最近 200 行）</h2>
+        <h2 className="mb-2 text-base font-semibold">{t('settings.logsTitle')}</h2>
         <div className="grid grid-cols-2 gap-3">
           {(['app', 'core'] as const).map((key) => (
             <div key={key}>
@@ -283,7 +329,7 @@ export default function SettingsPage() {
                 {key === 'app' ? 'app.log' : 'core.log'}
               </p>
               <pre className="h-56 overflow-auto rounded bg-slate-900 p-2 font-mono text-xs text-slate-100">
-                {(logsQuery.data?.[key] ?? []).join('\n') || '（暂无日志）'}
+                {(logsQuery.data?.[key] ?? []).join('\n') || t('settings.noLogs')}
               </pre>
             </div>
           ))}

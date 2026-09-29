@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import NoticeStack from '../components/NoticeStack';
 import { api } from '../lib/api';
+import { locale } from '../lib/i18n';
+import { useT } from '../lib/useI18n';
 import type { FailedConnection, RuleInput } from '../lib/types';
 import { useUiConfig } from '../lib/uiConfig';
 import { useNotices } from '../lib/useNotices';
@@ -11,10 +13,11 @@ function displayTime(value: string): string {
   const timestamp = Date.parse(value);
   return Number.isNaN(timestamp)
     ? value
-    : new Date(timestamp).toLocaleString('zh-CN', { hour12: false });
+    : new Date(timestamp).toLocaleString(locale(), { hour12: false });
 }
 
 export default function FailedConnectionsPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const uiConfig = useUiConfig();
   const failedQuery = useQuery({
@@ -81,8 +84,8 @@ export default function FailedConnectionsPage() {
       notices.push(
         result.syncError === null ? 'ok' : 'error',
         result.syncError === null
-          ? `已新增 ${String(result.count)} 条规则，热更新耗时 ${String(result.sync?.elapsedMs ?? 0)} ms`
-          : `已新增 ${String(result.count)} 条规则，但热更新失败：${result.syncError}`,
+          ? t('failed.added', { count: result.count, ms: result.sync?.elapsedMs ?? 0 })
+          : t('failed.addedSyncFailed', { count: result.count, error: result.syncError }),
       );
       setSelected(new Set());
       await Promise.all([
@@ -97,23 +100,29 @@ export default function FailedConnectionsPage() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-base font-semibold">失败连接（{connections.length} 个目标）</h2>
-        <span className="text-sm text-slate-500">已选 {selectedRows.length} 个</span>
+        <h2 className="text-base font-semibold">
+          {t('failed.heading', { count: connections.length })}
+        </h2>
+        <span className="text-sm text-slate-500">
+          {t('failed.selected', { count: selectedRows.length })}
+        </span>
         {normalizedQuery !== '' && (
-          <span className="text-sm text-slate-500">匹配 {visibleConnections.length} 个</span>
+          <span className="text-sm text-slate-500">
+            {t('failed.matched', { count: visibleConnections.length })}
+          </span>
         )}
         <label className="ml-auto flex items-center gap-1 text-sm text-slate-500">
-          筛选主机
+          {t('failed.filterHost')}
           <input
             type="search"
             className="w-44 rounded border border-slate-300 px-2 py-1 font-mono text-slate-900"
-            placeholder="例如 com"
+            placeholder={t('failed.filterHostPlaceholder')}
             value={hostQuery}
             onChange={(event) => setHostQuery(event.target.value)}
           />
         </label>
         <label className="flex items-center gap-1 text-sm text-slate-500">
-          规则类型
+          {t('failed.ruleType')}
           <select
             className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
             value={ruleType}
@@ -127,7 +136,7 @@ export default function FailedConnectionsPage() {
           </select>
         </label>
         <label className="flex items-center gap-1 text-sm text-slate-500">
-          目标策略
+          {t('failed.policy')}
           <select
             className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
             value={policy}
@@ -146,7 +155,7 @@ export default function FailedConnectionsPage() {
           disabled={visibleConnections.length === 0}
           onClick={toggleAll}
         >
-          {allVisibleSelected ? '取消全选' : '全选'}
+          {allVisibleSelected ? t('failed.deselectAll') : t('failed.selectAll')}
         </button>
         <button
           type="button"
@@ -157,7 +166,9 @@ export default function FailedConnectionsPage() {
             addRules.mutate();
           }}
         >
-          {addRules.isPending ? '添加中…' : `添加 ${String(selectedRows.length)} 条规则`}
+          {addRules.isPending
+            ? t('failed.adding')
+            : t('failed.add', { count: selectedRows.length })}
         </button>
       </div>
 
@@ -178,17 +189,17 @@ export default function FailedConnectionsPage() {
               <th className="w-10 px-2 py-2">
                 <input
                   type="checkbox"
-                  aria-label="全选"
+                  aria-label={t('failed.selectAll')}
                   checked={connections.length > 0 && selected.size === connections.length}
                   onChange={toggleAll}
                 />
               </th>
-              <th className="px-2 py-2">协议</th>
-              <th className="px-2 py-2">主机</th>
-              <th className="px-2 py-2">端口</th>
-              <th className="px-2 py-2">失败次数</th>
-              <th className="px-2 py-2">最近失败</th>
-              <th className="px-2 py-2">错误</th>
+              <th className="px-2 py-2">{t('failed.columnNetwork')}</th>
+              <th className="px-2 py-2">{t('failed.columnHost')}</th>
+              <th className="px-2 py-2">{t('failed.columnPort')}</th>
+              <th className="px-2 py-2">{t('failed.columnCount')}</th>
+              <th className="px-2 py-2">{t('failed.columnLastSeen')}</th>
+              <th className="px-2 py-2">{t('failed.columnError')}</th>
             </tr>
           </thead>
           <tbody>
@@ -197,7 +208,7 @@ export default function FailedConnectionsPage() {
                 <td className="px-2 py-2">
                   <input
                     type="checkbox"
-                    aria-label={`选择 ${connection.host}`}
+                    aria-label={t('failed.selectHost', { host: connection.host })}
                     checked={selected.has(connection.id)}
                     onChange={() => toggle(connection.id)}
                   />
@@ -218,10 +229,10 @@ export default function FailedConnectionsPage() {
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
                   {failedQuery.isLoading
-                    ? '读取日志中…'
+                    ? t('common.loading')
                     : connections.length === 0
-                      ? '暂无失败连接'
-                      : '无匹配主机'}
+                      ? t('failed.none')
+                      : t('failed.noMatch')}
                 </td>
               </tr>
             )}

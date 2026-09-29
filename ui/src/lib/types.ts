@@ -7,6 +7,8 @@
  * 下面的默认值只在后端不可用时兜底，改选项请改 JSON 再点"重载常量"。
  */
 export interface UiConfig {
+  /** 界面语言：只有中文与英语，默认中文。 */
+  language: 'zh' | 'en';
   ruleTypes: string[];
   policies: { value: string; label: string }[];
   defaults: { ruleType: string; policy: string };
@@ -15,6 +17,7 @@ export interface UiConfig {
 }
 
 export const DEFAULT_UI_CONFIG: UiConfig = {
+  language: 'zh',
   ruleTypes: ['DOMAIN', 'DOMAIN-SUFFIX'],
   policies: [
     { value: 'PROXY', label: '代理' },

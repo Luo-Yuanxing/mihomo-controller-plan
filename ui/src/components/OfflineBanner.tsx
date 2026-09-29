@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { setOffline, useOffline } from '../lib/offline';
+import { useT } from '../lib/useI18n';
 
 type OfflineAction = 'shutdown' | 'restart';
 
@@ -14,6 +15,7 @@ function offlineBridge(): { action(name: OfflineAction): Promise<unknown> } | un
 }
 
 export default function OfflineBanner() {
+  const t = useT();
   const offline = useOffline();
   const [busy, setBusy] = useState<OfflineAction | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -57,11 +59,7 @@ export default function OfflineBanner() {
       } else {
         await api.offlineRestart();
       }
-      setNote(
-        action === 'shutdown'
-          ? '已发起：关闭系统代理并停止内核'
-          : '已发起：写入系统代理期望值并重启内核',
-      );
+      setNote(action === 'shutdown' ? t('offline.shutdownStarted') : t('offline.restartStarted'));
     } catch (error) {
       setNote(error instanceof Error ? error.message : String(error));
     } finally {
@@ -72,8 +70,8 @@ export default function OfflineBanner() {
   return (
     <div className="border-b-4 border-rose-700 bg-rose-600 px-4 py-3 text-white shadow-lg">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-lg font-bold">离线：后端无响应</span>
-        <span className="text-xs">每秒重试一次，通了会自动恢复</span>
+        <span className="text-lg font-bold">{t('offline.title')}</span>
+        <span className="text-xs">{t('offline.hint')}</span>
         <div className="ml-auto flex gap-3">
           <button
             type="button"
@@ -81,7 +79,7 @@ export default function OfflineBanner() {
             disabled={busy !== null}
             onClick={() => void run('shutdown')}
           >
-            {busy === 'shutdown' ? '处理中…' : '完全关闭代理'}
+            {busy === 'shutdown' ? t('common.working') : t('offline.shutdown')}
           </button>
           <button
             type="button"
@@ -89,7 +87,7 @@ export default function OfflineBanner() {
             disabled={busy !== null}
             onClick={() => void run('restart')}
           >
-            {busy === 'restart' ? '处理中…' : '立即重启内核'}
+            {busy === 'restart' ? t('common.working') : t('offline.restart')}
           </button>
         </div>
       </div>

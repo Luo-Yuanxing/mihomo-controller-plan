@@ -4,15 +4,22 @@ import { useEffect, useState } from 'react';
 import NoticeStack from '../components/NoticeStack';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
+import { t, type MessageKey } from '../lib/i18n';
+import { useT } from '../lib/useI18n';
 import type { ProxyValues } from '../lib/types';
 import { useNotices, type NoticeKind } from '../lib/useNotices';
 
-const STATE_TEXT: Record<string, string> = {
-  running: '运行中',
-  adopted: '已接管',
-  stopped: '未运行',
-  failed: '异常',
+const STATE_TEXT: Record<string, MessageKey> = {
+  running: 'status.stateRunning',
+  adopted: 'status.stateAdopted',
+  stopped: 'status.stateStopped',
+  failed: 'status.stateFailed',
 };
+
+function stateText(state: string): string {
+  const key = STATE_TEXT[state];
+  return key === undefined ? state : t(key);
+}
 
 function useAction<T>(
   queryClient: QueryClient,
@@ -38,12 +45,13 @@ const PROXY_ROWS: { label: string; key: keyof ProxyValues }[] = [
 ];
 
 function proxyValue(values: ProxyValues | null, key: keyof ProxyValues): string {
-  if (values === null) return '读不到';
+  if (values === null) return t('status.unreadable');
   const value = values[key];
   return typeof value === 'boolean' ? (value ? '1' : '0') : value;
 }
 
 export default function StatusPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const notices = useNotices();
   const statusQuery = useQuery({
@@ -52,21 +60,19 @@ export default function StatusPage() {
     refetchInterval: 5000,
   });
 
-  const restart = useAction(
-    queryClient,
-    notices.push,
-    api.restartKernel,
-    (status) => `内核状态：${status.state}`,
+  const restart = useAction(queryClient, notices.push, api.restartKernel, (status) =>
+    t('status.kernelState', { state: status.state }),
   );
   const startKernel = useAction(queryClient, notices.push, api.startKernel, (status) =>
-    status.state === 'failed' ? `启动失败：${status.error ?? '未知原因'}` : '内核已启动',
+    status.state === 'failed'
+      ? t('status.startFailed', { error: status.error ?? t('common.unknownReason') })
+      : t('status.kernelStarted'),
   );
-  const stopKernel = useAction(queryClient, notices.push, api.stopKernel, () => '内核已停止');
-  const refresh = useAction(
-    queryClient,
-    notices.push,
-    api.refreshSubscription,
-    () => '订阅已更新并通知内核重载',
+  const stopKernel = useAction(queryClient, notices.push, api.stopKernel, () =>
+    t('status.kernelStopped'),
+  );
+  const refresh = useAction(queryClient, notices.push, api.refreshSubscription, () =>
+    t('status.subscriptionRefreshed'),
   );
   const removeSubscription = useMutation({
     mutationFn: api.deleteSubscription,
@@ -74,8 +80,10 @@ export default function StatusPage() {
       notices.push(
         result.kernel.state === 'failed' ? 'error' : 'ok',
         result.kernel.state === 'failed'
-          ? `订阅已删除，但内核重启失败：${result.kernel.error ?? '未知原因'}`
-          : '订阅已删除，网络已切换为直连',
+          ? t('status.subscriptionDeletedRestartFailed', {
+              error: result.kernel.error ?? t('common.unknownReason'),
+            })
+          : t('status.subscriptionDeleted'),
       );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['status'] }),
@@ -85,18 +93,14 @@ export default function StatusPage() {
     },
     onError: (error: Error) => notices.push('error', error.message),
   });
-  const enableProxy = useAction(queryClient, notices.push, api.enableProxy, () => '系统代理已开启');
-  const disableProxy = useAction(
-    queryClient,
-    notices.push,
-    api.disableProxy,
-    () => '系统代理已关闭',
+  const enableProxy = useAction(queryClient, notices.push, api.enableProxy, () =>
+    t('status.proxyEnabled'),
   );
-  const recover = useAction(
-    queryClient,
-    notices.push,
-    api.recover,
-    (result) => `一键修复：${result.steps.join('；')}`,
+  const disableProxy = useAction(queryClient, notices.push, api.disableProxy, () =>
+    t('status.proxyDisabled'),
+  );
+  const recover = useAction(queryClient, notices.push, api.recover, (result) =>
+    t('status.recovered', { steps: result.steps.join(t('common.listSeparator')) }),
   );
 
   /** 界面跑在 Electron 里时由壳执行安全关闭（先关代理、停内核，再退出）；浏览器里没有这个能力。 */
@@ -138,9 +142,9 @@ export default function StatusPage() {
 
       <section className="rounded border border-slate-300 bg-white p-3">
         <div className="mb-2 flex items-center gap-2">
-          <h2 className="text-base font-semibold">内核</h2>
+          <h2 className="text-base font-semibold">{t('status.kernelSection')}</h2>
           <span className="text-xs text-slate-500">
-            {data === undefined ? '读取中…' : (STATE_TEXT[data.kernel.state] ?? data.kernel.state)}
+            {data === undefined ? t('common.loading') : stateText(data.kernel.state)}
           </span>
           <div className="ml-auto flex gap-2">
             <button
@@ -148,27 +152,27 @@ export default function StatusPage() {
               className="rounded border border-amber-400 bg-amber-50 px-2 py-1 text-sm text-amber-900 hover:bg-amber-100 disabled:opacity-50"
               disabled={busy}
               onClick={() => recover.mutate()}
-              title="重写配置 → 启动内核 → 开系统代理"
+              title={t('status.recoverTitle')}
             >
-              一键修复
+              {t('status.recover')}
             </button>
             <button
               type="button"
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
               disabled={busy || kernelUp}
               onClick={() => startKernel.mutate()}
-              title="启动后自动开启系统代理"
+              title={t('status.startKernelTitle')}
             >
-              启动内核
+              {t('status.startKernel')}
             </button>
             <button
               type="button"
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
               disabled={busy || !kernelUp}
               onClick={() => stopKernel.mutate()}
-              title="停止后自动关闭系统代理"
+              title={t('status.stopKernelTitle')}
             >
-              停止内核
+              {t('status.stopKernel')}
             </button>
             <button
               type="button"
@@ -176,13 +180,13 @@ export default function StatusPage() {
               disabled={busy}
               onClick={() => restart.mutate()}
             >
-              重启内核
+              {t('status.restartKernel')}
             </button>
           </div>
         </div>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
           <div className="flex gap-2">
-            <dt className="text-slate-500">版本</dt>
+            <dt className="text-slate-500">{t('status.labelVersion')}</dt>
             <dd>{data?.kernel.version ?? '—'}</dd>
           </div>
           <div className="flex gap-2">
@@ -190,28 +194,30 @@ export default function StatusPage() {
             <dd>{data?.kernel.pid ?? '—'}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="text-slate-500">控制端口</dt>
+            <dt className="text-slate-500">{t('status.labelController')}</dt>
             <dd className="font-mono">{data?.kernel.controller ?? '—'}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="text-slate-500">混合端口</dt>
+            <dt className="text-slate-500">{t('status.labelMixedPort')}</dt>
             <dd>{data?.kernel.mixedPort ?? '—'}</dd>
           </div>
           <div className="col-span-2 flex gap-2">
-            <dt className="text-slate-500">内核路径</dt>
+            <dt className="text-slate-500">{t('status.labelBinaryPath')}</dt>
             <dd className="break-all font-mono text-xs">{data?.kernel.binaryPath ?? '—'}</dd>
           </div>
           {data?.kernel.error != null && (
-            <div className="col-span-2 text-rose-700">错误：{data.kernel.error}</div>
+            <div className="col-span-2 text-rose-700">
+              {t('status.errorLine', { error: data.kernel.error })}
+            </div>
           )}
         </dl>
       </section>
 
       <section className="rounded border border-slate-300 bg-white p-3">
         <div className="mb-2 flex items-center gap-2">
-          <h2 className="text-base font-semibold">订阅</h2>
+          <h2 className="text-base font-semibold">{t('status.subscriptionSection')}</h2>
           <span className="text-xs text-slate-500">
-            {data?.subscription.refreshing === true ? '刷新中…' : ''}
+            {data?.subscription.refreshing === true ? t('status.refreshing') : ''}
           </span>
           <button
             type="button"
@@ -219,7 +225,7 @@ export default function StatusPage() {
             disabled={busy}
             onClick={() => refresh.mutate()}
           >
-            刷新订阅
+            {t('status.refreshSubscription')}
           </button>
           <button
             type="button"
@@ -228,45 +234,55 @@ export default function StatusPage() {
               busy || (data?.subscription.fileExists !== true && data?.subscription.url === '')
             }
             onClick={() => {
-              if (!window.confirm('删除订阅文件并将网络切换为直连？')) return;
+              if (!window.confirm(t('status.deleteSubscriptionConfirm'))) return;
               removeSubscription.mutate();
             }}
           >
-            删除订阅
+            {t('status.deleteSubscription')}
           </button>
         </div>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
           <div className="col-span-2 flex gap-2">
-            <dt className="text-slate-500">URL</dt>
-            <dd className="break-all font-mono text-xs">{data?.subscription.url || '未配置'}</dd>
+            <dt className="text-slate-500">{t('status.labelUrl')}</dt>
+            <dd className="break-all font-mono text-xs">
+              {data?.subscription.url || t('common.notConfigured')}
+            </dd>
           </div>
           <div className="flex gap-2">
-            <dt className="text-slate-500">订阅文件</dt>
-            <dd>{data?.subscription.fileExists === true ? '已存在' : '未配置'}</dd>
+            <dt className="text-slate-500">{t('status.labelSubscriptionFile')}</dt>
+            <dd>
+              {data?.subscription.fileExists === true
+                ? t('status.exists')
+                : t('common.notConfigured')}
+            </dd>
           </div>
           <div className="flex gap-2">
-            <dt className="text-slate-500">下载走代理</dt>
-            <dd>{data?.subscription.useProxy === true ? '是' : '否'}</dd>
+            <dt className="text-slate-500">{t('status.labelUseProxy')}</dt>
+            <dd>{data?.subscription.useProxy === true ? t('common.yes') : t('common.no')}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="text-slate-500">最近成功</dt>
+            <dt className="text-slate-500">{t('status.labelLastOk')}</dt>
             <dd>{data?.subscription.lastOkAt ?? '—'}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="text-slate-500">大小</dt>
+            <dt className="text-slate-500">{t('status.labelBytes')}</dt>
             <dd>{data?.subscription.bytes ?? '—'}</dd>
           </div>
           {data?.subscription.lastError != null && (
-            <div className="col-span-2 text-rose-700">最近错误：{data.subscription.lastError}</div>
+            <div className="col-span-2 text-rose-700">
+              {t('status.lastErrorLine', { error: data.subscription.lastError })}
+            </div>
           )}
         </dl>
       </section>
 
       <section className="rounded border border-slate-300 bg-white p-3">
         <div className="mb-2 flex items-center gap-2">
-          <h2 className="text-base font-semibold">系统代理</h2>
+          <h2 className="text-base font-semibold">{t('status.proxySection')}</h2>
           <span className="text-xs text-slate-500">
-            {data?.proxy.guarding === true ? '已开启（守护中，每 60 s 巡检）' : '已关闭（未守护）'}
+            {data?.proxy.guarding === true
+              ? t('status.proxyGuardingOn')
+              : t('status.proxyGuardingOff')}
           </span>
           <div className="ml-auto flex gap-2">
             <button
@@ -274,27 +290,27 @@ export default function StatusPage() {
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50"
               disabled={busy}
               onClick={() => enableProxy.mutate()}
-              title="开启并纳入守护"
+              title={t('status.enableProxyTitle')}
             >
-              开启系统代理
+              {t('status.enableProxy')}
             </button>
             <button
               type="button"
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50"
               disabled={busy}
               onClick={() => disableProxy.mutate()}
-              title="关闭并停止守护"
+              title={t('status.disableProxyTitle')}
             >
-              关闭系统代理
+              {t('status.disableProxy')}
             </button>
           </div>
         </div>
         <table className="w-full text-sm">
           <thead className="text-left text-xs uppercase text-slate-500">
             <tr>
-              <th className="px-2 py-1">项目</th>
-              <th className="px-2 py-1">期望值</th>
-              <th className="px-2 py-1">注册表实际值</th>
+              <th className="px-2 py-1">{t('status.labelItem')}</th>
+              <th className="px-2 py-1">{t('status.labelDesired')}</th>
+              <th className="px-2 py-1">{t('status.labelActual')}</th>
             </tr>
           </thead>
           <tbody>
@@ -312,22 +328,17 @@ export default function StatusPage() {
           </tbody>
         </table>
         {data !== undefined && !data.proxy.match && (
-          <p className="mt-1 text-xs text-amber-700">
-            与实际值不一致，最坏 60 s 内会被守护回写；点一下"开启系统代理"也会立刻重写一遍。
-          </p>
+          <p className="mt-1 text-xs text-amber-700">{t('status.proxyMismatch')}</p>
         )}
         {data?.proxy.error != null && (
           <p className="mt-1 text-xs text-rose-700">{data.proxy.error}</p>
         )}
-        <p className="mt-1 text-xs text-slate-500">
-          开关与守护捆绑：开启系统代理即纳入守护，关闭系统代理即停止守护，没有单独的守护开关。
-          内核就绪时会自动走到开启这一侧，内核停止则自动关闭。
-        </p>
+        <p className="mt-1 text-xs text-slate-500">{t('status.proxyNote')}</p>
       </section>
 
       <section className="rounded border border-slate-300 bg-white p-3">
         <div className="mb-2 flex items-center gap-2">
-          <h2 className="text-base font-semibold">退出应用</h2>
+          <h2 className="text-base font-semibold">{t('status.quitSection')}</h2>
           <div className="ml-auto">
             <button
               type="button"
@@ -335,13 +346,10 @@ export default function StatusPage() {
               disabled={quitting}
               onClick={() => {
                 if (quitSafely === undefined) {
-                  notices.push(
-                    'warn',
-                    '当前不在应用内运行，无法从界面退出；请用托盘菜单的「安全退出」。',
-                  );
+                  notices.push('warn', t('status.quitUnavailable'));
                   return;
                 }
-                if (!window.confirm('退出前会先关闭系统代理并停止内核，确定退出？')) return;
+                if (!window.confirm(t('status.quitConfirm'))) return;
                 setQuitting(true);
                 void quitSafely().catch((error: unknown) => {
                   setQuitting(false);
@@ -349,15 +357,11 @@ export default function StatusPage() {
                 });
               }}
             >
-              {quitting ? '正在安全关闭…' : '安全关闭应用'}
+              {quitting ? t('status.quitting') : t('status.quit')}
             </button>
           </div>
         </div>
-        <p className="text-xs text-slate-500">
-          退出请只用这个按钮或托盘菜单的「安全退出」：顺序是先关闭系统代理、再停止内核。
-          从任务管理器结束进程、或在终端按 Ctrl+C 会跳过这一步（Windows 强杀无法被捕获），
-          系统代理会残留指向已经停掉的内核端口。真遇到了就点「关闭系统代理」或「一键修复」恢复。
-        </p>
+        <p className="text-xs text-slate-500">{t('status.quitNote')}</p>
       </section>
 
       <p
@@ -365,10 +369,10 @@ export default function StatusPage() {
         onMouseEnter={() => setDirHintOpen(true)}
         onFocus={() => setDirHintOpen(true)}
       >
-        数据目录：{data?.app.dataDir ?? '—'}
+        {t('status.dataDir', { dir: data?.app.dataDir ?? '—' })}
       </p>
       {dirHintOpen && data?.app.dataFallback === true && (
-        <Notice kind="warn" text={`程序目录不可写，数据实际存放在 ${data.app.dataDir}`} />
+        <Notice kind="warn" text={t('status.dataFallback', { dir: data.app.dataDir })} />
       )}
     </div>
   );

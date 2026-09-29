@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { useT } from '../lib/useI18n';
 import type { Rule, RuleInput, UiConfig } from '../lib/types';
 import { useUiConfig } from '../lib/uiConfig';
 import { useNotices } from '../lib/useNotices';
@@ -67,6 +68,7 @@ function toInput(row: EditableRule): RuleInput {
 }
 
 export default function RulesPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const uiConfig = useUiConfig();
   const rulesQuery = useQuery({ queryKey: ['rules'], queryFn: api.rules });
@@ -139,9 +141,11 @@ export default function RulesPage() {
     onSuccess: async (result) => {
       notices.push(
         'ok',
-        `已热更新 ${result.provider}：${
-          result.changed ? '文件已重写' : '内容无变化，未触发 PUT'
-        }，耗时 ${result.elapsedMs} ms`,
+        t('rules.saved', {
+          provider: result.provider,
+          change: result.changed ? t('rules.savedRewritten') : t('rules.savedUnchanged'),
+          ms: result.elapsedMs,
+        }),
       );
       await queryClient.invalidateQueries({ queryKey: ['rules'] });
       await queryClient.invalidateQueries({ queryKey: ['ruleProvider'] });
@@ -176,7 +180,9 @@ export default function RulesPage() {
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <h2 className="text-base font-semibold">
-          规则（共 {rows.length} 条{filtering ? `，匹配 ${visibleRows.length} 条` : ''}）
+          {filtering
+            ? t('rules.headingFiltered', { count: rows.length, matched: visibleRows.length })
+            : t('rules.heading', { count: rows.length })}
         </h2>
       </div>
 
@@ -203,7 +209,7 @@ export default function RulesPage() {
           }}
           className="rounded border border-slate-300 bg-white px-2 py-1 text-sm hover:bg-slate-50"
         >
-          新增规则
+          {t('rules.add')}
         </button>
         <button
           type="button"
@@ -214,7 +220,7 @@ export default function RulesPage() {
           }}
           className="rounded bg-slate-900 px-3 py-1 text-sm text-white disabled:opacity-50"
         >
-          {saveMutation.isPending ? '保存中…' : '保存规则'}
+          {saveMutation.isPending ? t('common.saving') : t('rules.save')}
         </button>
       </div>
 
@@ -227,26 +233,26 @@ export default function RulesPage() {
                 <button
                   type="button"
                   disabled={rows.length === 0}
-                  title={allEnabled ? '全部禁用' : '全部启用'}
+                  title={allEnabled ? t('rules.disableAll') : t('rules.enableAll')}
                   className={`cursor-pointer uppercase hover:underline disabled:cursor-default disabled:opacity-50 disabled:hover:no-underline ${
                     allEnabled ? 'text-emerald-600' : 'text-rose-600'
                   }`}
                   onClick={toggleAll}
                 >
-                  {allEnabled ? '启用' : '禁用'}
+                  {allEnabled ? t('rules.enabled') : t('rules.disabled')}
                 </button>
               </th>
-              <th className="px-2 py-2">顺序</th>
-              <th className="px-2 py-2">类型</th>
-              <th className="px-2 py-2">匹配值</th>
-              <th className="px-2 py-2">目标策略</th>
-              <th className="px-2 py-2">no-resolve</th>
-              <th className="px-2 py-2">操作</th>
+              <th className="px-2 py-2">{t('rules.columnOrder')}</th>
+              <th className="px-2 py-2">{t('rules.columnType')}</th>
+              <th className="px-2 py-2">{t('rules.columnValue')}</th>
+              <th className="px-2 py-2">{t('rules.columnPolicy')}</th>
+              <th className="px-2 py-2">{t('rules.columnNoResolve')}</th>
+              <th className="px-2 py-2">{t('rules.columnActions')}</th>
             </tr>
             <tr className="border-t border-slate-200">
               <th className="px-2 py-1">
                 <select
-                  aria-label="筛选启用状态"
+                  aria-label={t('rules.filterEnabled')}
                   className="w-full rounded border border-slate-300 bg-white px-1 py-1 text-xs normal-case text-slate-900"
                   value={filters.enabled}
                   onChange={(event) =>
@@ -256,22 +262,22 @@ export default function RulesPage() {
                     }))
                   }
                 >
-                  <option value="all">全部</option>
-                  <option value="yes">已启用</option>
-                  <option value="no">已停用</option>
+                  <option value="all">{t('rules.filterAll')}</option>
+                  <option value="yes">{t('rules.filterYes')}</option>
+                  <option value="no">{t('rules.filterNo')}</option>
                 </select>
               </th>
               <th className="px-2 py-1" />
               <th className="px-2 py-1">
                 <select
-                  aria-label="筛选类型"
+                  aria-label={t('rules.filterType')}
                   className="w-40 rounded border border-slate-300 bg-white px-1 py-1 text-xs normal-case text-slate-900"
                   value={filters.type}
                   onChange={(event) =>
                     setFilters((current) => ({ ...current, type: event.target.value }))
                   }
                 >
-                  <option value="all">全部</option>
+                  <option value="all">{t('rules.filterAll')}</option>
                   {uiConfig.ruleTypes.map((type) => (
                     <option key={type} value={type}>
                       {type}
@@ -282,8 +288,8 @@ export default function RulesPage() {
               <th className="px-2 py-1">
                 <input
                   type="search"
-                  aria-label="筛选匹配值"
-                  placeholder="包含字符串"
+                  aria-label={t('rules.filterValue')}
+                  placeholder={t('rules.filterValuePlaceholder')}
                   className="w-full rounded border border-slate-300 px-2 py-1 font-mono text-xs normal-case text-slate-900"
                   value={filters.value}
                   onChange={(event) =>
@@ -293,14 +299,14 @@ export default function RulesPage() {
               </th>
               <th className="px-2 py-1">
                 <select
-                  aria-label="筛选目标策略"
+                  aria-label={t('rules.filterPolicy')}
                   className="w-24 rounded border border-slate-300 bg-white px-1 py-1 text-xs normal-case text-slate-900"
                   value={filters.policy}
                   onChange={(event) =>
                     setFilters((current) => ({ ...current, policy: event.target.value }))
                   }
                 >
-                  <option value="all">全部</option>
+                  <option value="all">{t('rules.filterAll')}</option>
                   {policyChoices.map((policy) => (
                     <option key={policy} value={policy}>
                       {policy}
@@ -316,7 +322,7 @@ export default function RulesPage() {
                     className="text-xs normal-case text-slate-500 hover:text-slate-900"
                     onClick={() => setFilters(EMPTY_FILTERS)}
                   >
-                    清除
+                    {t('common.clear')}
                   </button>
                 )}
               </th>
@@ -347,7 +353,9 @@ export default function RulesPage() {
                   >
                     ↓
                   </button>
-                  {row.id === null && <span className="ml-1 text-xs text-emerald-600">新</span>}
+                  {row.id === null && (
+                    <span className="ml-1 text-xs text-emerald-600">{t('rules.newBadge')}</span>
+                  )}
                 </td>
                 <td className="px-2 py-1">
                   <select
@@ -399,7 +407,7 @@ export default function RulesPage() {
                     className="text-rose-600 hover:underline"
                     onClick={() => removeRow(row)}
                   >
-                    删除
+                    {t('common.delete')}
                   </button>
                 </td>
               </tr>
@@ -407,9 +415,7 @@ export default function RulesPage() {
             {visibleRows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                  {rows.length === 0
-                    ? '还没有规则，点"新增规则"添加一条。'
-                    : '没有符合筛选条件的规则'}
+                  {rows.length === 0 ? t('rules.empty') : t('rules.emptyFiltered')}
                 </td>
               </tr>
             )}
@@ -419,7 +425,7 @@ export default function RulesPage() {
 
       <div>
         <div className="mb-1 flex items-center gap-2 text-sm">
-          <span className="font-semibold">预览模式</span>
+          <span className="font-semibold">{t('rules.preview')}</span>
         </div>
         <textarea
           readOnly

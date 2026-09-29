@@ -3,6 +3,7 @@
  * 固定在顶部的行为由 NoticeStack 负责（见 useNotices 的存留规则）。
  */
 import type { ReactNode } from 'react';
+import { useT } from '../lib/useI18n';
 import type { NoticeKind } from '../lib/useNotices';
 
 const KIND_STYLE: Record<NoticeKind, string> = {
@@ -20,6 +21,7 @@ export default function Notice({
   text: ReactNode;
   onDismiss?: () => void;
 }) {
+  const t = useT();
   return (
     <div
       className={`flex items-start gap-2 rounded border px-3 py-2 text-sm shadow-sm ${KIND_STYLE[kind]}`}
@@ -28,7 +30,7 @@ export default function Notice({
       {onDismiss !== undefined && (
         <button
           type="button"
-          aria-label="关闭提示"
+          aria-label={t('common.dismissNotice')}
           className="shrink-0 text-xs opacity-60 hover:opacity-100"
           onClick={onDismiss}
         >
