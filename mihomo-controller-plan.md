@@ -441,6 +441,7 @@ payload:
 - 测试：Vitest 覆盖规则渲染、SQLite 读写、原子写、配置预检；注册表操作抽成接口后可 mock。
 - 打包：electron-builder 产出免安装文件夹（exe + resources + data 骨架），压缩成 zip 分发；不做单文件打包、安装包、签名与自动更新。
 - 内核二进制：`resources/bin/mihomo.exe` 作为预设版本随包分发（`extraResources` → `resources/bin`），不入库；`npm run dist` 前先跑 `scripts/check-mihomo-binary.mjs`，缺文件直接失败，避免发出没有内核的包。
+- 原生能力：渲染层只多一个"弹保存文件对话框"（`electron/preload.cjs` + `ipcMain.handle('mcp:save-json')`），导出配置用；写入走"临时文件 → rename 覆盖"，写完即关句柄，不会持续占用配置文件，可反复覆盖同一份。
 
 ---
 
