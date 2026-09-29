@@ -267,7 +267,7 @@ export default function StatusPage() {
         <div className="mb-2 flex items-center gap-2">
           <h2 className="text-base font-semibold">系统代理</h2>
           <span className="text-xs text-slate-500">
-            {data?.proxy.guarding === true ? '守护中（每 60 s 巡检）' : '未接管'}
+            {data?.proxy.guarding === true ? '已开启（守护中，每 60 s 巡检）' : '已关闭（未守护）'}
           </span>
           <div className="ml-auto flex gap-2">
             <button
@@ -275,14 +275,16 @@ export default function StatusPage() {
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50"
               disabled={busy}
               onClick={() => enableProxy.mutate()}
+              title="打开系统代理并纳入守护（每 60 s 巡检回写）；守护不能单独关，关掉系统代理即停止守护"
             >
-              一键打开代理
+              开启系统代理
             </button>
             <button
               type="button"
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50"
               disabled={busy}
               onClick={() => applyProxy.mutate()}
+              title="按期望值立即重写一遍注册表，不改开关也不改守护"
             >
               立即写入
             </button>
@@ -291,8 +293,9 @@ export default function StatusPage() {
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50"
               disabled={busy}
               onClick={() => disableProxy.mutate()}
+              title="关闭系统代理并停止守护，把控制权交还给你（不涉及内核）"
             >
-              一键关闭代理
+              关闭系统代理
             </button>
           </div>
         </div>
@@ -326,6 +329,10 @@ export default function StatusPage() {
         {data?.proxy.error != null && (
           <p className="mt-1 text-xs text-rose-700">{data.proxy.error}</p>
         )}
+        <p className="mt-1 text-xs text-slate-500">
+          开关与守护捆绑：开启系统代理即纳入守护，关闭系统代理即停止守护，没有单独的守护开关。
+          内核就绪时会自动走到开启这一侧，内核停止则自动关闭。
+        </p>
       </section>
 
       <section className="rounded border border-slate-300 bg-white p-3">
@@ -359,7 +366,7 @@ export default function StatusPage() {
         <p className="text-xs text-slate-500">
           退出请只用这个按钮或托盘菜单的「安全退出」：顺序是先关闭系统代理、再停止内核。
           从任务管理器结束进程、或在终端按 Ctrl+C 会跳过这一步（Windows 强杀无法被捕获），
-          系统代理会残留指向已经停掉的内核端口。真遇到了就点「一键关闭代理」或「一键修复」恢复。
+          系统代理会残留指向已经停掉的内核端口。真遇到了就点「关闭系统代理」或「一键修复」恢复。
         </p>
       </section>
 
