@@ -85,7 +85,10 @@ export function parseUiConfig(raw: unknown): UiConfig {
   return uiConfigSchema.parse(raw);
 }
 
-/** 读配置文件：文件缺失或内容非法都抛错，由调用方决定回退策略。 */
+/**
+ * 读配置文件：缺文件、空文件、非法 JSON、缺字段都抛错（带可读原因），
+ * 由调用方决定回退策略——所以空文件不会被当成"全空配置"加载。
+ */
 export function readUiConfigFile(file: string): UiConfig {
   let text: string;
   try {
@@ -93,5 +96,23 @@ export function readUiConfigFile(file: string): UiConfig {
   } catch {
     throw new Error(`配置文件不存在或不可读：${file}`);
   }
-  return parseUiConfig(JSON.parse(text));
+  if (text.trim() === '') {
+    throw new Error(`配置文件是空文件（需要至少含 ruleTypes 等字段）：${file}`);
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (error) {
+    throw new Error(
+      `配置文件不是合法 JSON：${file}（${error instanceof Error ? error.message : String(error)}）`,
+    );
+  }
+
+  try {
+    return parseUiConfig(raw);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message.replace(/\s+/g, ' ') : String(error);
+    throw new Error(`配置文件字段不完整：${file}（${detail}）`);
+  }
 }

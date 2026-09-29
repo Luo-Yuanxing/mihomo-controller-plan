@@ -28,8 +28,9 @@ describe('readUiConfigFile', () => {
   it('文件缺失或内容非法都抛错', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'mcp-ui-config-'));
     expect(() => readUiConfigFile(uiConfigPath(dir))).toThrow('配置文件不存在或不可读');
-    expect(() => readUiConfigFile(tempFile('{"ruleTypes": []}'))).toThrow();
-    expect(() => readUiConfigFile(tempFile('不是 json'))).toThrow();
+    expect(() => readUiConfigFile(tempFile('   '))).toThrow('配置文件是空文件');
+    expect(() => readUiConfigFile(tempFile('不是 json'))).toThrow('配置文件不是合法 JSON');
+    expect(() => readUiConfigFile(tempFile('{"ruleTypes": []}'))).toThrow('配置文件字段不完整');
   });
 });
 
