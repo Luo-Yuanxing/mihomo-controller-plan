@@ -1,0 +1,116 @@
+Date : 2026-09-29 08:41:59
+Directory : c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan
+Total : 58 files,  13054 codes, 228 comments, 612 blanks, all 13894 lines
+
+Languages
++----------------+------------+------------+------------+------------+------------+
+| language       | files      | code       | comment    | blank      | total      |
++----------------+------------+------------+------------+------------+------------+
+| JSON           |          7 |      8,477 |          0 |          7 |      8,484 |
+| TypeScript     |         32 |      2,594 |        192 |        356 |      3,142 |
+| TypeScript JSX |          7 |      1,268 |         10 |         79 |      1,357 |
+| Markdown       |          4 |        421 |          0 |        124 |        545 |
+| JavaScript     |          4 |        237 |         22 |         37 |        296 |
+| YAML           |          1 |         31 |          2 |          6 |         39 |
+| HTML           |          1 |         16 |          1 |          1 |         18 |
+| Ignore         |          1 |          9 |          1 |          1 |         11 |
+| PostCSS        |          1 |          1 |          0 |          1 |          2 |
++----------------+------------+------------+------------+------------+------------+
+
+Directories
++----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                               | files      | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                  |         58 |     13,054 |        228 |        612 |     13,894 |
+| . (Files)                                                                                          |         11 |      8,911 |          4 |        137 |      9,052 |
+| electron                                                                                           |          3 |        212 |         21 |         35 |        268 |
+| resources                                                                                          |          2 |         37 |          0 |          2 |         39 |
+| resources\data-skeleton                                                                            |          2 |         37 |          0 |          2 |         39 |
+| src                                                                                                |         22 |      1,967 |        172 |        260 |      2,399 |
+| src (Files)                                                                                        |          6 |        902 |         65 |        110 |      1,077 |
+| src\config                                                                                         |          1 |         65 |         10 |          8 |         83 |
+| src\core                                                                                           |          4 |        287 |         27 |         38 |        352 |
+| src\logs                                                                                           |          1 |         63 |          1 |         14 |         78 |
+| src\proxy                                                                                          |          1 |        166 |          6 |         21 |        193 |
+| src\rules                                                                                          |          4 |        226 |         19 |         30 |        275 |
+| src\sub                                                                                            |          1 |         66 |         13 |         11 |         90 |
+| src\util                                                                                           |          4 |        192 |         31 |         28 |        251 |
+| tests                                                                                              |          6 |        369 |          7 |         62 |        438 |
+| tests\config                                                                                       |          1 |         30 |          0 |          6 |         36 |
+| tests\logs                                                                                         |          1 |         48 |          0 |          7 |         55 |
+| tests\routes                                                                                       |          1 |        159 |          4 |         22 |        185 |
+| tests\sub                                                                                          |          1 |         25 |          0 |          4 |         29 |
+| tests\ui                                                                                           |          2 |        107 |          3 |         23 |        133 |
+| ui                                                                                                 |         14 |      1,558 |         24 |        116 |      1,698 |
+| ui (Files)                                                                                         |          3 |         50 |          1 |          4 |         55 |
+| ui\src                                                                                             |         11 |      1,508 |         23 |        112 |      1,643 |
+| ui\src (Files)                                                                                     |          3 |         80 |          4 |         10 |         94 |
+| ui\src\components                                                                                  |          1 |          7 |          1 |          1 |          9 |
+| ui\src\lib                                                                                         |          3 |        239 |         13 |         32 |        284 |
+| ui\src\pages                                                                                       |          4 |      1,182 |          5 |         69 |      1,256 |
++----------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++----------------------------------------------------------------------------------------------------+----------------+------------+------------+------------+------------+
+| filename                                                                                           | language       | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------------------------------+----------------+------------+------------+------------+------------+
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\.prettierignore                        | Ignore         |          9 |          1 |          1 |         11 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\.prettierrc.json                       | JSON           |          8 |          0 |          1 |          9 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\AGENTS.md                              | Markdown       |          1 |          0 |          1 |          2 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\Additional requirements.md             | Markdown       |          1 |          0 |          1 |          2 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\README.md                              | Markdown       |         21 |          0 |          8 |         29 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\electron-builder.yml                   | YAML           |         31 |          2 |          6 |         39 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\electron\dev-launcher.mjs              | JavaScript     |         26 |          2 |          6 |         34 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\electron\dev-server.mjs                | JavaScript     |         18 |          1 |          4 |         23 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\electron\main.js                       | JavaScript     |        168 |         18 |         25 |        211 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\eslint.config.js                       | JavaScript     |         25 |          1 |          2 |         28 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\mihomo-controller-plan.md              | Markdown       |        398 |          0 |        114 |        512 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\package-lock.json                      | JSON           |      8,338 |          0 |          1 |      8,339 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\package.json                           | JSON           |         58 |          0 |          1 |         59 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\resources\data-skeleton\settings.json  | JSON           |         19 |          0 |          1 |         20 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\resources\data-skeleton\ui-config.json | JSON           |         18 |          0 |          1 |         19 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\config\template.ts                 | TypeScript     |         65 |         10 |          8 |         83 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\context.ts                         | TypeScript     |         50 |         11 |          3 |         64 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\core\api.ts                        | TypeScript     |         60 |          9 |          5 |         74 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\core\geodata.ts                    | TypeScript     |         16 |          4 |          5 |         25 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\core\manager.ts                    | TypeScript     |        186 |          9 |         24 |        219 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\core\validate.ts                   | TypeScript     |         25 |          5 |          4 |         34 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\logs\failed-connections.ts         | TypeScript     |         63 |          1 |         14 |         78 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\proxy\guard.ts                     | TypeScript     |        166 |          6 |         21 |        193 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\routes.ts                          | TypeScript     |        310 |         10 |         39 |        359 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\rules\db.ts                        | TypeScript     |         28 |          4 |          4 |         36 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\rules\render.ts                    | TypeScript     |         37 |          6 |          8 |         51 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\rules\repo.ts                      | TypeScript     |        128 |          4 |         13 |        145 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\rules\sync.ts                      | TypeScript     |         33 |          5 |          5 |         43 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\server.ts                          | TypeScript     |        296 |         13 |         32 |        341 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\settings.ts                        | TypeScript     |         59 |          6 |          8 |         73 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\sub\download.ts                    | TypeScript     |         66 |         13 |         11 |         90 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\ui-config-store.ts                 | TypeScript     |        137 |         13 |         17 |        167 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\ui-config.ts                       | TypeScript     |         50 |         12 |         11 |         73 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\util\atomic.ts                     | TypeScript     |         16 |          4 |          3 |         23 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\util\lock.ts                       | TypeScript     |         53 |          9 |          8 |         70 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\util\logger.ts                     | TypeScript     |         60 |          6 |          8 |         74 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\util\paths.ts                      | TypeScript     |         63 |         12 |          9 |         84 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\config\template.test.ts          | TypeScript     |         30 |          0 |          6 |         36 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\logs\failed-connections.test.ts  | TypeScript     |         48 |          0 |          7 |         55 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\routes\ui-config.test.ts         | TypeScript     |        159 |          4 |         22 |        185 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\sub\download.test.ts             | TypeScript     |         25 |          0 |          4 |         29 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\ui\ui-config-store.test.ts       | TypeScript     |         66 |          3 |         17 |         86 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\ui\ui-config.test.ts             | TypeScript     |         41 |          0 |          6 |         47 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tsconfig.json                          | JSON           |         21 |          0 |          1 |         22 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\index.html                          | HTML           |         16 |          1 |          1 |         18 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\App.tsx                         | TypeScript JSX |         63 |          4 |          6 |         73 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\components\Notice.tsx           | TypeScript JSX |          7 |          1 |          1 |          9 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\index.css                       | PostCSS        |          1 |          0 |          1 |          2 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\lib\api.ts                      | TypeScript     |         99 |          2 |         12 |        113 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\lib\types.ts                    | TypeScript     |        129 |         10 |         18 |        157 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\lib\uiConfig.ts                 | TypeScript     |         11 |          1 |          2 |         14 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\main.tsx                        | TypeScript JSX |         16 |          0 |          3 |         19 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\pages\FailedConnectionsPage.tsx | TypeScript JSX |        215 |          1 |         11 |        227 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\pages\RulesPage.tsx             | TypeScript JSX |        378 |          2 |         24 |        404 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\pages\SettingsPage.tsx          | TypeScript JSX |        309 |          1 |         21 |        331 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\pages\StatusPage.tsx            | TypeScript JSX |        280 |          1 |         13 |        294 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\tsconfig.json                       | JSON           |         15 |          0 |          1 |         16 |
+| c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\vite.config.ts                      | TypeScript     |         19 |          0 |          2 |         21 |
+| Total                                                                                              |                |     13,054 |        228 |        612 |     13,894 |
++----------------------------------------------------------------------------------------------------+----------------+------------+------------+------------+------------+

@@ -1,6 +1,9 @@
 /**
- * 界面侧的取值检测：规则必须与后端 src/ui-config.ts 的 uiConfigIssues() 完全一致。
- * tests/ui/ui-config-validation.test.ts 用同一批用例对拍两端结果。
+ * 界面侧的取值检测——**备份用途，最终以后端为准**。
+ * 主路径：预览/保存都以后端返回的 issues 为准；只有后端没给出明细（请求异常等）时，
+ * 才用这里的规则做一次兜底提示，不参与"是否合法"的最终判定。
+ * 规则与后端 src/ui-config.ts 的 uiConfigIssues() 保持一致，由
+ * tests/ui/ui-config-validation.test.ts 对拍。
  */
 
 export interface UiConfigIssue {

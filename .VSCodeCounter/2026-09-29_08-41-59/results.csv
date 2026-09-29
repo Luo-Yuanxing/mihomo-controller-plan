@@ -1,0 +1,60 @@
+"filename", "language", "JavaScript", "JSON", "TypeScript", "TypeScript JSX", "PostCSS", "HTML", "YAML", "Markdown", "Ignore", "comment", "blank", "total"
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\.prettierignore", "Ignore", 0, 0, 0, 0, 0, 0, 0, 0, 9, 1, 1, 11
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\.prettierrc.json", "JSON", 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 1, 9
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\AGENTS.md", "Markdown", 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 2
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\Additional requirements.md", "Markdown", 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 2
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\README.md", "Markdown", 0, 0, 0, 0, 0, 0, 0, 21, 0, 0, 8, 29
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\electron-builder.yml", "YAML", 0, 0, 0, 0, 0, 0, 31, 0, 0, 2, 6, 39
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\electron\dev-launcher.mjs", "JavaScript", 26, 0, 0, 0, 0, 0, 0, 0, 0, 2, 6, 34
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\electron\dev-server.mjs", "JavaScript", 18, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 23
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\electron\main.js", "JavaScript", 168, 0, 0, 0, 0, 0, 0, 0, 0, 18, 25, 211
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\eslint.config.js", "JavaScript", 25, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 28
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\mihomo-controller-plan.md", "Markdown", 0, 0, 0, 0, 0, 0, 0, 398, 0, 0, 114, 512
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\package-lock.json", "JSON", 0, 8338, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8339
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\package.json", "JSON", 0, 58, 0, 0, 0, 0, 0, 0, 0, 0, 1, 59
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\resources\data-skeleton\settings.json", "JSON", 0, 19, 0, 0, 0, 0, 0, 0, 0, 0, 1, 20
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\resources\data-skeleton\ui-config.json", "JSON", 0, 18, 0, 0, 0, 0, 0, 0, 0, 0, 1, 19
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\config\template.ts", "TypeScript", 0, 0, 65, 0, 0, 0, 0, 0, 0, 10, 8, 83
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\context.ts", "TypeScript", 0, 0, 50, 0, 0, 0, 0, 0, 0, 11, 3, 64
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\core\api.ts", "TypeScript", 0, 0, 60, 0, 0, 0, 0, 0, 0, 9, 5, 74
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\core\geodata.ts", "TypeScript", 0, 0, 16, 0, 0, 0, 0, 0, 0, 4, 5, 25
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\core\manager.ts", "TypeScript", 0, 0, 186, 0, 0, 0, 0, 0, 0, 9, 24, 219
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\core\validate.ts", "TypeScript", 0, 0, 25, 0, 0, 0, 0, 0, 0, 5, 4, 34
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\logs\failed-connections.ts", "TypeScript", 0, 0, 63, 0, 0, 0, 0, 0, 0, 1, 14, 78
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\proxy\guard.ts", "TypeScript", 0, 0, 166, 0, 0, 0, 0, 0, 0, 6, 21, 193
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\routes.ts", "TypeScript", 0, 0, 310, 0, 0, 0, 0, 0, 0, 10, 39, 359
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\rules\db.ts", "TypeScript", 0, 0, 28, 0, 0, 0, 0, 0, 0, 4, 4, 36
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\rules\render.ts", "TypeScript", 0, 0, 37, 0, 0, 0, 0, 0, 0, 6, 8, 51
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\rules\repo.ts", "TypeScript", 0, 0, 128, 0, 0, 0, 0, 0, 0, 4, 13, 145
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\rules\sync.ts", "TypeScript", 0, 0, 33, 0, 0, 0, 0, 0, 0, 5, 5, 43
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\server.ts", "TypeScript", 0, 0, 296, 0, 0, 0, 0, 0, 0, 13, 32, 341
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\settings.ts", "TypeScript", 0, 0, 59, 0, 0, 0, 0, 0, 0, 6, 8, 73
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\sub\download.ts", "TypeScript", 0, 0, 66, 0, 0, 0, 0, 0, 0, 13, 11, 90
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\ui-config-store.ts", "TypeScript", 0, 0, 137, 0, 0, 0, 0, 0, 0, 13, 17, 167
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\ui-config.ts", "TypeScript", 0, 0, 50, 0, 0, 0, 0, 0, 0, 12, 11, 73
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\util\atomic.ts", "TypeScript", 0, 0, 16, 0, 0, 0, 0, 0, 0, 4, 3, 23
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\util\lock.ts", "TypeScript", 0, 0, 53, 0, 0, 0, 0, 0, 0, 9, 8, 70
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\util\logger.ts", "TypeScript", 0, 0, 60, 0, 0, 0, 0, 0, 0, 6, 8, 74
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\src\util\paths.ts", "TypeScript", 0, 0, 63, 0, 0, 0, 0, 0, 0, 12, 9, 84
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\config\template.test.ts", "TypeScript", 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 6, 36
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\logs\failed-connections.test.ts", "TypeScript", 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 7, 55
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\routes\ui-config.test.ts", "TypeScript", 0, 0, 159, 0, 0, 0, 0, 0, 0, 4, 22, 185
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\sub\download.test.ts", "TypeScript", 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 4, 29
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\ui\ui-config-store.test.ts", "TypeScript", 0, 0, 66, 0, 0, 0, 0, 0, 0, 3, 17, 86
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tests\ui\ui-config.test.ts", "TypeScript", 0, 0, 41, 0, 0, 0, 0, 0, 0, 0, 6, 47
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\tsconfig.json", "JSON", 0, 21, 0, 0, 0, 0, 0, 0, 0, 0, 1, 22
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\index.html", "HTML", 0, 0, 0, 0, 0, 16, 0, 0, 0, 1, 1, 18
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\App.tsx", "TypeScript JSX", 0, 0, 0, 63, 0, 0, 0, 0, 0, 4, 6, 73
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\components\Notice.tsx", "TypeScript JSX", 0, 0, 0, 7, 0, 0, 0, 0, 0, 1, 1, 9
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\index.css", "PostCSS", 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 2
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\lib\api.ts", "TypeScript", 0, 0, 99, 0, 0, 0, 0, 0, 0, 2, 12, 113
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\lib\types.ts", "TypeScript", 0, 0, 129, 0, 0, 0, 0, 0, 0, 10, 18, 157
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\lib\uiConfig.ts", "TypeScript", 0, 0, 11, 0, 0, 0, 0, 0, 0, 1, 2, 14
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\main.tsx", "TypeScript JSX", 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 3, 19
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\pages\FailedConnectionsPage.tsx", "TypeScript JSX", 0, 0, 0, 215, 0, 0, 0, 0, 0, 1, 11, 227
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\pages\RulesPage.tsx", "TypeScript JSX", 0, 0, 0, 378, 0, 0, 0, 0, 0, 2, 24, 404
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\pages\SettingsPage.tsx", "TypeScript JSX", 0, 0, 0, 309, 0, 0, 0, 0, 0, 1, 21, 331
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\src\pages\StatusPage.tsx", "TypeScript JSX", 0, 0, 0, 280, 0, 0, 0, 0, 0, 1, 13, 294
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\tsconfig.json", "JSON", 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 1, 16
+"c:\Users\34696\Desktop\Program\codex\mihomo-controller-plan\ui\vite.config.ts", "TypeScript", 0, 0, 19, 0, 0, 0, 0, 0, 0, 0, 2, 21
+"Total", "-", 237, 8477, 2594, 1268, 1, 16, 31, 421, 9, 228, 612, 13894
