@@ -8,8 +8,10 @@ import {
   DEFAULT_UI_CONFIG,
   parseUiConfig,
   resolveConfigFile,
+  readUiConfigDocument,
   readUiConfigFile,
   setActiveUiConfig,
+  type RuleEntry,
   type UiConfig,
 } from './ui-config.js';
 
@@ -80,12 +82,23 @@ export interface UiConfigDiffItem {
   same: boolean;
 }
 
+/** 一次加载的结果：界面常量系统值 + 文件里带的规则（null = 文件没有 rules 段）。 */
+export interface UiConfigLoadResult {
+  state: StoredUiConfig;
+  rules: RuleEntry[] | null;
+}
+
 /** 界面常量的系统值服务：server 与测试共用同一份编排逻辑。 */
 export interface UiConfigService {
   state(): StoredUiConfig;
-  forceLoad(file?: string): StoredUiConfig;
-  preview(file?: string): { file: string; config: UiConfig; diff: UiConfigDiffItem[] };
-  apply(input: { file?: string; config: unknown }): StoredUiConfig;
+  forceLoad(file?: string): UiConfigLoadResult;
+  preview(file?: string): {
+    file: string;
+    config: UiConfig;
+    diff: UiConfigDiffItem[];
+    rules: RuleEntry[] | null;
+  };
+  apply(input: { file?: string; config: unknown }): UiConfigLoadResult;
 }
 
 export function createUiConfigService(
@@ -108,24 +121,44 @@ export function createUiConfigService(
     forceLoad: (file?: string) => {
       // 严格：路径必须合法且文件存在
       const target = resolveConfigFile(file ?? state.file);
-      return commit(target, readUiConfigFile(target), '界面常量已按配置文件强制覆盖系统值');
+      const loaded = readUiConfigDocument(target);
+      return {
+        state: commit(target, loaded.config, '界面常量已按配置文件强制覆盖系统值'),
+        rules: loaded.rules,
+      };
     },
     preview: (file?: string) => {
       const target = resolveConfigFile(file ?? state.file);
-      const config = readUiConfigFile(target);
+      const loaded = readUiConfigDocument(target);
       return {
         file: target,
-        config,
-        diff: diffUiConfig(state.file, state.config, target, config),
+        config: loaded.config,
+        diff: [
+          ...diffUiConfig(state.file, state.config, target, loaded.config),
+          item(
+            '自定义规则（条）',
+            String(countRules(db)),
+            String(loaded.rules?.length ?? countRules(db)),
+          ),
+        ],
+        rules: loaded.rules,
       };
     },
-    apply: (input: { file?: string; config: unknown }) =>
-      commit(
+    apply: (input: { file?: string; config: unknown }) => ({
+      state: commit(
         resolveConfigFile(input.file ?? state.file),
         parseUiConfig(input.config ?? DEFAULT_UI_CONFIG),
         '界面常量已从界面保存到系统',
       ),
+      // 界面提交的只有界面常量，规则不动
+      rules: null,
+    }),
   };
+}
+
+function countRules(db: RulesDatabase): number {
+  const row = db.prepare('SELECT COUNT(*) AS total FROM rules').get() as { total: number };
+  return row.total;
 }
 
 function item(label: string, current: string, incoming: string): UiConfigDiffItem {

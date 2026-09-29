@@ -15,8 +15,13 @@ import { readSubscriptionDns } from './sub/dns.js';
 import { planProxyGroups, readSubscriptionGroups } from './sub/groups.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
-import { UiConfigValidationError } from './ui-config.js';
-import { readFileIfExists } from './util/atomic.js';
+import {
+  renderUiConfigFile,
+  resolveExportTarget,
+  UiConfigValidationError,
+  type RuleEntry,
+} from './ui-config.js';
+import { readFileIfExists, writeFileAtomic } from './util/atomic.js';
 import { resolveBinaryPath } from './util/paths.js';
 import { logPaths, tailLines } from './util/logger.js';
 import type { RuleInput } from './rules/repo.js';
@@ -241,12 +246,44 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/ui-config', () => ctx.uiConfigState());
 
+  /** 配置文件里的 rules 段：整表覆盖库里的规则并热更新；没有 rules 段就完全不动规则。 */
+  const applyRulesFromConfig = async (
+    entries: RuleEntry[] | null,
+  ): Promise<{ count: number; changed: boolean } | null> => {
+    if (entries === null) return null;
+    ctx.repo.replaceAll(entries);
+    const result = await syncRules({
+      repo: ctx.repo,
+      api: ctx.api,
+      dataDir: ctx.dataDir,
+      providerName: ctx.ruleProvider,
+    });
+    return { count: entries.length, changed: result.changed };
+  };
+
   /** 强制按配置文件加载：直接覆盖系统值。 */
   app.post('/api/ui-config/load-force', async (request, reply) => {
     const parsed = uiConfigFileSchema.safeParse(request.body ?? {});
     if (!parsed.success) return invalid(reply, parsed.error);
     try {
-      return await ctx.forceLoadUiConfig(parsed.data.file);
+      const loaded = await ctx.forceLoadUiConfig(parsed.data.file);
+      return { ...loaded.state, rules: await applyRulesFromConfig(loaded.rules) };
+    } catch (error) {
+      return uiConfigFailure(reply, error);
+    }
+  });
+
+  /** 导出配置：界面常量 + 自定义规则写成一个 config.json。 */
+  app.post('/api/ui-config/export', async (request, reply) => {
+    const parsed = uiConfigFileSchema.safeParse(request.body ?? {});
+    if (!parsed.success) return invalid(reply, parsed.error);
+    try {
+      const state = ctx.uiConfigState();
+      const target = resolveExportTarget(parsed.data.file ?? state.file);
+      const json = renderUiConfigFile(state.config, ctx.repo.list());
+      await writeFileAtomic(target, json);
+      ctx.log.info({ file: target }, '配置已导出');
+      return { file: target, rules: ctx.repo.list().length, bytes: Buffer.byteLength(json) };
     } catch (error) {
       return uiConfigFailure(reply, error);
     }
@@ -258,7 +295,11 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     if (!parsed.success) return invalid(reply, parsed.error);
     try {
       const preview = await ctx.previewUiConfig(parsed.data.file);
-      return { ...preview, same: preview.diff.every((item) => item.same) };
+      return {
+        ...preview,
+        same: preview.diff.every((item) => item.same),
+        rules: preview.rules === null ? null : preview.rules.length,
+      };
     } catch (error) {
       return uiConfigFailure(reply, error);
     }

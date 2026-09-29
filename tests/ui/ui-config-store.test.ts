@@ -115,6 +115,31 @@ describe.skipIf(!canLoadSqlite)('界面常量持久化', () => {
     const file = uiConfigPath(dataDir);
     writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
     const applied = service.apply({ config: DEFAULT_UI_CONFIG });
-    expect(applied.file).toBe(file);
+    expect(applied.state.file).toBe(file);
+    // 界面提交的只有界面常量，规则不动
+    expect(applied.rules).toBeNull();
+  });
+
+  it('配置文件里的 rules 段随加载一起返回，预览 diff 标出规则条数', () => {
+    const dataDir = tempDataDir();
+    const db = open(dataDir);
+    const service = createUiConfigService(db, uiConfigPath(dataDir));
+    const file = uiConfigPath(dataDir);
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...DEFAULT_UI_CONFIG,
+        rules: [{ type: 'DOMAIN-SUFFIX', value: 'a.com', policy: 'PROXY' }],
+      }),
+      'utf8',
+    );
+
+    const loaded = service.forceLoad();
+    expect(loaded.rules).toHaveLength(1);
+    expect(loaded.rules?.[0]?.value).toBe('a.com');
+
+    const preview = service.preview();
+    expect(preview.rules).toHaveLength(1);
+    expect(preview.diff.map((item) => item.label)).toContain('自定义规则（条）');
   });
 });

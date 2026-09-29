@@ -345,6 +345,11 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | PUT | `/api/rules/{id}` | 修改 |
 | DELETE | `/api/rules/{id}` | 删除 |
 | POST | `/api/rules/sync` | 落盘 + 热更新 |
+| GET | `/api/ui-config` | 界面常量的系统值（存库，与文件解耦） |
+| POST | `/api/ui-config/preview` | 按配置文件预览对比，不生效 |
+| POST | `/api/ui-config/load-force` | 按配置文件覆盖系统值；文件里带 `rules` 段时整表覆盖规则并热更新 |
+| POST | `/api/ui-config/apply` | 把界面上的界面常量保存到系统 |
+| POST | `/api/ui-config/export` | 导出界面常量 + 自定义规则为一份 config.json |
 | GET | `/api/proxy` | 系统代理期望值 / 实际值 / 是否一致 |
 | POST | `/api/proxy/enable` | 开启并纳入守护 |
 | POST | `/api/proxy/disable` | 关闭并交还控制权 |

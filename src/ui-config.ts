@@ -23,6 +23,22 @@ export const uiConfigSchema = z.object({
 
 export type UiConfig = z.infer<typeof uiConfigSchema>;
 
+/** config.json 里可以带的自定义规则（和规则页提交的结构一致，不含 id/position）。 */
+export const ruleEntrySchema = z.object({
+  enabled: z.boolean().default(true),
+  type: z.string().min(1),
+  value: z.string().min(1),
+  policy: z.string().min(1),
+  noResolve: z.boolean().default(true),
+});
+
+export type RuleEntry = z.infer<typeof ruleEntrySchema>;
+
+export const uiConfigFileSchema = uiConfigSchema.extend({
+  /** 导出时一并写出的规则；加载时会整表覆盖库里的规则。 */
+  rules: z.array(ruleEntrySchema).optional(),
+});
+
 export interface UiConfigIssue {
   path: string;
   message: string;
@@ -208,6 +224,70 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   settings: { logsRefetchIntervalMs: 5000 },
 };
 
+/** 文件级校验：界面常量 + 可选的 rules 段（类型要在 ruleTypes 白名单里）。 */
+export function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
+  const issues = uiConfigIssues(raw);
+  if (!isRecord(raw)) return issues;
+
+  const rules = raw['rules'];
+  if (rules === undefined) return issues;
+  if (!Array.isArray(rules)) {
+    issues.push({ path: 'rules', message: '必须是数组' });
+    return issues;
+  }
+
+  const ruleTypes = Array.isArray(raw['ruleTypes'])
+    ? raw['ruleTypes'].filter((value): value is string => typeof value === 'string')
+    : [];
+
+  rules.forEach((entry, index) => {
+    const path = `rules[${String(index)}]`;
+    if (!isRecord(entry)) {
+      issues.push({ path, message: '必须是对象' });
+      return;
+    }
+    const type = entry['type'];
+    if (typeof type !== 'string' || !ruleTypes.includes(type)) {
+      issues.push({ path: `${path}.type`, message: `不在规则类型列表里：${String(type)}` });
+    }
+    for (const key of ['value', 'policy'] as const) {
+      const text = entry[key];
+      if (typeof text !== 'string' || text.trim() === '') {
+        issues.push({ path: `${path}.${key}`, message: '不能为空' });
+      }
+    }
+  });
+
+  return issues;
+}
+
+/** 解析配置文件：拆成界面常量与规则两段；没有 rules 段时 rules 为 null。 */
+export function parseUiConfigFile(raw: unknown): { config: UiConfig; rules: RuleEntry[] | null } {
+  const issues = uiConfigFileIssues(raw);
+  if (issues.length > 0) throw new UiConfigValidationError(issues);
+  const { rules, ...rest } = uiConfigFileSchema.parse(raw);
+  return { config: uiConfigSchema.parse(rest), rules: rules ?? null };
+}
+
+/** 生成导出内容：界面常量原样 + 自定义规则。 */
+export function renderUiConfigFile(config: UiConfig, rules: RuleEntry[]): string {
+  return `${JSON.stringify(uiConfigFileSchema.parse({ ...config, rules }), null, 2)}\n`;
+}
+
+/** 导出目标：非空 + .json，允许文件不存在（导出就是新建），父目录自动建。 */
+export function resolveExportTarget(file: string): string {
+  const raw = file.trim();
+  if (raw === '') {
+    throw new UiConfigValidationError([{ path: 'file', message: '导出路径不能为空' }]);
+  }
+  if (path.extname(raw).toLowerCase() !== '.json') {
+    throw new UiConfigValidationError([{ path: 'file', message: '导出文件必须以 .json 结尾' }]);
+  }
+  const resolved = path.resolve(raw);
+  fs.mkdirSync(path.dirname(resolved), { recursive: true });
+  return resolved;
+}
+
 export function uiConfigPath(dataDir: string): string {
   return path.join(dataDir, 'config.json');
 }
@@ -293,6 +373,14 @@ export function parseUiConfig(raw: unknown): UiConfig {
  * 由调用方决定回退策略——所以空文件不会被当成"全空配置"加载。
  */
 export function readUiConfigFile(file: string): UiConfig {
+  return readUiConfigDocument(file).config;
+}
+
+/** 读配置文件全文：界面常量 + 可选的 rules 段。 */
+export function readUiConfigDocument(file: string): {
+  config: UiConfig;
+  rules: RuleEntry[] | null;
+} {
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -313,7 +401,7 @@ export function readUiConfigFile(file: string): UiConfig {
   }
 
   try {
-    return parseUiConfig(raw);
+    return parseUiConfigFile(raw);
   } catch (error) {
     if (error instanceof UiConfigValidationError) {
       throw new UiConfigValidationError(error.issues, `配置文件字段不合法：${file}`);

@@ -7,7 +7,11 @@ import {
   ensureUiConfigFile,
   getRuleTypes,
   parseUiConfig,
+  parseUiConfigFile,
+  renderUiConfigFile,
+  readUiConfigDocument,
   readUiConfigFile,
+  resolveExportTarget,
   setActiveUiConfig,
   uiConfigPath,
 } from '../../src/ui-config.js';
@@ -40,6 +44,56 @@ describe('readUiConfigFile', () => {
     expect(() => readUiConfigFile(tempFile('   '))).toThrow('配置文件是空文件');
     expect(() => readUiConfigFile(tempFile('不是 json'))).toThrow('配置文件不是合法 JSON');
     expect(() => readUiConfigFile(tempFile('{"ruleTypes": []}'))).toThrow('配置文件字段不合法');
+  });
+});
+
+describe('config.json 里的规则', () => {
+  const rule = { type: 'DOMAIN', value: 'chatgpt.com', policy: 'PROXY' };
+
+  it('解析出规则，缺省字段按默认值补齐', () => {
+    const file = tempFile(JSON.stringify({ ...withRuleTypes(['DOMAIN']), rules: [rule] }));
+    const parsed = readUiConfigDocument(file);
+
+    expect(parsed.config.ruleTypes).toEqual(['DOMAIN']);
+    expect(parsed.rules).toEqual([
+      { enabled: true, type: 'DOMAIN', value: 'chatgpt.com', policy: 'PROXY', noResolve: true },
+    ]);
+  });
+
+  it('没有 rules 段时 rules 为 null（加载时不碰库里的规则）', () => {
+    const file = tempFile(JSON.stringify(withRuleTypes(['DOMAIN'])));
+    expect(readUiConfigDocument(file).rules).toBeNull();
+  });
+
+  it('规则类型必须在 ruleTypes 白名单里，值不能为空', () => {
+    const bad = tempFile(
+      JSON.stringify({
+        ...withRuleTypes(['DOMAIN']),
+        rules: [{ type: 'IP-CIDR', value: '', policy: 'PROXY' }],
+      }),
+    );
+    expect(() => readUiConfigDocument(bad)).toThrow('配置文件字段不合法');
+    expect(() => readUiConfigDocument(bad)).toThrow('不在规则类型列表里：IP-CIDR');
+  });
+
+  it('导出内容含界面常量与规则，能被自己解析回来', () => {
+    const json = renderUiConfigFile(withRuleTypes(['DOMAIN']), [
+      { enabled: false, type: 'DOMAIN', value: 'a.com', policy: 'DIRECT', noResolve: false },
+    ]);
+    const parsed = parseUiConfigFile(JSON.parse(json));
+
+    expect(parsed.config.ruleTypes).toEqual(['DOMAIN']);
+    expect(parsed.rules).toEqual([
+      { enabled: false, type: 'DOMAIN', value: 'a.com', policy: 'DIRECT', noResolve: false },
+    ]);
+  });
+
+  it('导出目标允许文件不存在，但必须 .json', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'mcp-export-'));
+    const target = resolveExportTarget(path.join(dir, '备份.json'));
+    expect(target).toBe(path.join(dir, '备份.json'));
+    expect(() => resolveExportTarget('  ')).toThrow('导出路径不能为空');
+    expect(() => resolveExportTarget(path.join(dir, '备份.yaml'))).toThrow('必须以 .json 结尾');
   });
 });
 
