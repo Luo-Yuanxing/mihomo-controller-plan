@@ -1,11 +1,9 @@
-import fs, { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_UI_CONFIG,
-  DEFAULT_UI_CONFIG_FILE,
-  ensureUiConfigFile,
   getRuleTypes,
   parseUiConfig,
   parseUiConfigFile,
@@ -134,37 +132,5 @@ describe('系统值', () => {
 
   it('parseUiConfig 会拒绝缺字段的对象', () => {
     expect(() => parseUiConfig({ ruleTypes: ['DOMAIN'] })).toThrow();
-  });
-});
-
-describe('ensureUiConfigFile', () => {
-  it('在 app 启动路径预生成默认配置文件', () => {
-    const appDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-app-'));
-    const dataDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-data-'));
-
-    const file = ensureUiConfigFile(appDir, dataDir);
-
-    expect(file).toBe(path.join(appDir, 'config.json'));
-    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual(DEFAULT_UI_CONFIG_FILE);
-  });
-
-  it('已存在的文件不被覆盖', () => {
-    const appDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-app-'));
-    const dataDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-data-'));
-    const existing = withRuleTypes(['DOMAIN']);
-    writeFileSync(path.join(appDir, 'config.json'), JSON.stringify(existing), 'utf8');
-
-    expect(readUiConfigFile(ensureUiConfigFile(appDir, dataDir)).ruleTypes).toEqual(['DOMAIN']);
-  });
-
-  it('app 目录不可写时退回 data 目录', () => {
-    const dataDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-data-'));
-    const blocker = path.join(dataDir, 'blocker');
-    writeFileSync(blocker, 'not a dir', 'utf8');
-
-    const file = ensureUiConfigFile(blocker, dataDir);
-
-    expect(file).toBe(uiConfigPath(dataDir));
-    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual(DEFAULT_UI_CONFIG_FILE);
   });
 });

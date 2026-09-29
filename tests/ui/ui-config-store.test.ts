@@ -1,52 +1,28 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import { openRulesDatabase, type RulesDatabase } from '../../src/rules/db.js';
+import { describe, expect, it } from 'vitest';
+import { readAppConfig } from '../../src/app-config.js';
+import { DEFAULT_SETTINGS } from '../../src/settings.js';
 import { DEFAULT_UI_CONFIG, getRuleTypes, uiConfigPath } from '../../src/ui-config.js';
-import {
-  createUiConfigService,
-  diffUiConfig,
-  loadStoredUiConfig,
-  readSetting,
-  saveStoredUiConfig,
-  UI_CONFIG_KEY,
-} from '../../src/ui-config-store.js';
-
-// better-sqlite3 的原生绑定在低版本 Node 的 vitest 环境里解析不到（项目本身要求 Node >= 22），
-// 用 Electron 内置 Node 跑测试时会正常执行。
-const canLoadSqlite = Number(process.versions.node.split('.')[0] ?? 0) >= 20;
-
-const databases: RulesDatabase[] = [];
+import { createUiConfigService, diffUiConfig } from '../../src/ui-config-store.js';
 
 function tempDataDir(): string {
   return mkdtempSync(path.join(os.tmpdir(), 'mcp-ui-store-'));
 }
 
-function open(dataDir: string): RulesDatabase {
-  const db = openRulesDatabase(dataDir);
-  databases.push(db);
-  return db;
-}
-
-afterEach(() => {
-  while (databases.length > 0) databases.pop()?.close();
-});
-
-describe.skipIf(!canLoadSqlite)('界面常量持久化', () => {
-  it('首次启动：文件不可用时用默认值建库记录', () => {
+describe('界面常量生效值（统一配置文件）', () => {
+  it('文件不可用时用默认值，规则类型白名单立即就绪', () => {
     const dataDir = tempDataDir();
-    const db = open(dataDir);
 
-    const state = loadStoredUiConfig(db, uiConfigPath(dataDir));
+    const service = createUiConfigService(uiConfigPath(dataDir));
 
-    expect(state.config).toEqual(DEFAULT_UI_CONFIG);
-    expect(state.updatedAt).not.toBeNull();
-    expect(readSetting(db, UI_CONFIG_KEY)).not.toBeNull();
+    expect(service.state().config).toEqual(DEFAULT_UI_CONFIG);
+    expect(service.state().updatedAt).toBeNull();
     expect(getRuleTypes()).toEqual(DEFAULT_UI_CONFIG.ruleTypes);
   });
 
-  it('首次启动：用现有配置文件初始化系统值', () => {
+  it('已有配置文件按内容生效', () => {
     const dataDir = tempDataDir();
     const file = uiConfigPath(dataDir);
     writeFileSync(
@@ -58,27 +34,29 @@ describe.skipIf(!canLoadSqlite)('界面常量持久化', () => {
       }),
       'utf8',
     );
-    const db = open(dataDir);
 
-    const state = loadStoredUiConfig(db, file);
+    const service = createUiConfigService(file);
 
-    expect(state.config.ruleTypes).toEqual(['DOMAIN']);
+    expect(service.state().config.ruleTypes).toEqual(['DOMAIN']);
+    expect(service.state().updatedAt).not.toBeNull();
     expect(getRuleTypes()).toEqual(['DOMAIN']);
   });
 
-  it('保存后重启（新连接）仍读到系统值，与文件无关', () => {
+  it('保存后重启仍读到文件里的值', async () => {
     const dataDir = tempDataDir();
-    const db = open(dataDir);
-    loadStoredUiConfig(db, uiConfigPath(dataDir));
-    const custom = { ...DEFAULT_UI_CONFIG, defaults: { ruleType: 'DOMAIN', policy: 'DIRECT' } };
-    saveStoredUiConfig(db, 'D:/anywhere/mine.json', custom);
+    const file = uiConfigPath(dataDir);
+    writeFileSync(file, JSON.stringify({ ...DEFAULT_UI_CONFIG, core: { mixedPort: 7899 } }), 'utf8');
+    const service = createUiConfigService(file);
+    await service.apply({
+      config: { ...DEFAULT_UI_CONFIG, defaults: { ruleType: 'DOMAIN', policy: 'DIRECT' } },
+    });
 
-    // 新连接模拟重启：文件仍是不存在的默认路径，但系统值应保持
-    const reopened = open(dataDir);
-    const state = loadStoredUiConfig(reopened, uiConfigPath(dataDir));
+    // 新实例模拟重启：直接读文件
+    const restarted = createUiConfigService(file);
 
-    expect(state.file).toBe('D:/anywhere/mine.json');
-    expect(state.config.defaults).toEqual({ ruleType: 'DOMAIN', policy: 'DIRECT' });
+    expect(restarted.state().config.defaults).toEqual({ ruleType: 'DOMAIN', policy: 'DIRECT' });
+    // 保存界面常量不会碰同一文件里的应用设置段
+    expect(readAppConfig(file).settings.core.mixedPort).toBe(7899);
   });
 
   it('diffUiConfig 标出不一致项', () => {
@@ -100,31 +78,29 @@ describe.skipIf(!canLoadSqlite)('界面常量持久化', () => {
     ]);
   });
 
-  it('严格路径：forceLoad / apply 都要求 .json 且文件存在', () => {
+  it('严格路径：forceLoad / apply 都要求 .json 且文件存在', async () => {
     const dataDir = tempDataDir();
-    const db = open(dataDir);
-    const service = createUiConfigService(db, uiConfigPath(dataDir));
+    const service = createUiConfigService(uiConfigPath(dataDir));
 
-    expect(() => service.forceLoad('not-json')).toThrow('必须以 .json 结尾');
+    await expect(service.forceLoad('not-json')).rejects.toThrow('必须以 .json 结尾');
     expect(() => service.preview(path.join(dataDir, 'missing.json'))).toThrow('不存在或不可读');
-    expect(() => service.apply({ file: 'aaa', config: DEFAULT_UI_CONFIG })).toThrow(
+    await expect(service.apply({ file: 'aaa', config: DEFAULT_UI_CONFIG })).rejects.toThrow(
       '必须以 .json 结尾',
     );
 
-    // 合法路径：写入并落库为绝对路径
+    // 合法路径：写入统一配置文件
     const file = uiConfigPath(dataDir);
     writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
-    const applied = service.apply({ config: DEFAULT_UI_CONFIG });
+    const applied = await service.apply({ config: DEFAULT_UI_CONFIG });
     expect(applied.state.file).toBe(file);
     // 界面提交的只有界面常量，规则不动
     expect(applied.rules).toBeNull();
   });
 
-  it('配置文件里的 rules 段随加载一起返回，预览 diff 标出规则条数', () => {
+  it('配置文件里的 rules 段随加载一起返回，预览 diff 标出规则条数', async () => {
     const dataDir = tempDataDir();
-    const db = open(dataDir);
-    const service = createUiConfigService(db, uiConfigPath(dataDir));
     const file = uiConfigPath(dataDir);
+    const service = createUiConfigService(file);
     writeFileSync(
       file,
       JSON.stringify({
@@ -134,12 +110,41 @@ describe.skipIf(!canLoadSqlite)('界面常量持久化', () => {
       'utf8',
     );
 
-    const loaded = service.forceLoad();
+    const loaded = await service.forceLoad();
     expect(loaded.rules).toHaveLength(1);
     expect(loaded.rules?.[0]?.value).toBe('a.com');
 
     const preview = service.preview();
     expect(preview.rules).toHaveLength(1);
     expect(preview.diff.map((item) => item.label)).toContain('自定义规则（条）');
+  });
+
+  it('从外部文件加载时，内容同步写回统一配置文件', async () => {
+    const dataDir = tempDataDir();
+    const file = uiConfigPath(dataDir);
+    writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
+    const service = createUiConfigService(file);
+    const external = path.join(dataDir, 'mine.json');
+    writeFileSync(
+      external,
+      JSON.stringify({
+        ...DEFAULT_UI_CONFIG,
+        ruleTypes: ['DOMAIN'],
+        defaults: { ...DEFAULT_UI_CONFIG.defaults, ruleType: 'DOMAIN' },
+        core: { mixedPort: 7899 },
+      }),
+      'utf8',
+    );
+
+    const loaded = await service.forceLoad(external);
+
+    expect(loaded.state.file).toBe(external);
+    // 界面常量落回统一文件；应用设置段由 /api/settings 那条路管，加载界面常量不碰它
+    const unified = JSON.parse(readFileSync(file, 'utf8')) as {
+      ruleTypes: string[];
+      core?: { mixedPort?: number };
+    };
+    expect(unified.ruleTypes).toEqual(['DOMAIN']);
+    expect(unified.core?.mixedPort).toBe(DEFAULT_SETTINGS.core.mixedPort);
   });
 });

@@ -1,11 +1,10 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import pino from 'pino';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { AppContext } from '../../src/context.js';
-import { openRulesDatabase, type RulesDatabase } from '../../src/rules/db.js';
 import type { Rule, RuleInput, RuleRepo } from '../../src/rules/repo.js';
 import { DEFAULT_SETTINGS } from '../../src/settings.js';
 import { DEFAULT_UI_CONFIG, getUiConfig, uiConfigPath } from '../../src/ui-config.js';
@@ -43,8 +42,6 @@ function fakeRepo(): RuleRepo {
   };
 }
 
-const databases: RulesDatabase[] = [];
-
 async function createBuilder(): Promise<BuildApp> {
   const [{ default: Fastify }, { registerRoutes }] = await Promise.all([
     import('fastify'),
@@ -53,9 +50,10 @@ async function createBuilder(): Promise<BuildApp> {
 
   return (dataDir: string): FastifyInstance => {
     const log = pino({ level: 'silent' });
-    const db = openRulesDatabase(dataDir);
-    databases.push(db);
-    const uiConfigService = createUiConfigService(db, uiConfigPath(dataDir));
+    const file = uiConfigPath(dataDir);
+    // 统一配置文件是唯一真相源：没有就先落下默认内容
+    if (!existsSync(file)) writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
+    const uiConfigService = createUiConfigService(file);
     const context = {
       appVersion: 'test',
       appDir: dataDir,
@@ -104,11 +102,7 @@ describe.skipIf(!canLoadFastify)('/api/ui-config', () => {
     dataDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-routes-'));
   });
 
-  afterEach(() => {
-    while (databases.length > 0) databases.pop()?.close();
-  });
-
-  it('GET 返回系统值（含库里的落盘时间）', async () => {
+  it('GET 返回生效值（含配置文件修改时间）', async () => {
     const app = buildApp(dataDir);
     const response = await app.inject({ method: 'GET', url: '/api/ui-config' });
 
