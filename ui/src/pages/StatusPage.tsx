@@ -28,18 +28,17 @@ function useAction<T>(
   });
 }
 
-function proxyRow(label: string, desired: ProxyValues, actual: ProxyValues | null) {
-  const render = (values: ProxyValues | null): string =>
-    values === null
-      ? '读不到'
-      : `enable=${String(values.enable)} server=${values.server} override=${values.override}`;
-  return (
-    <tr key={label} className="border-t border-slate-200">
-      <td className="px-2 py-1 text-slate-500">{label}</td>
-      <td className="px-2 py-1 font-mono text-xs">{render(desired)}</td>
-      <td className="px-2 py-1 font-mono text-xs">{render(actual)}</td>
-    </tr>
-  );
+/** 注册表三项逐条对比；enable 显示 1/0，与注册表里的值一致。 */
+const PROXY_ROWS: { label: string; key: keyof ProxyValues }[] = [
+  { label: 'ProxyEnable', key: 'enable' },
+  { label: 'ProxyServer', key: 'server' },
+  { label: 'ProxyOverride', key: 'override' },
+];
+
+function proxyValue(values: ProxyValues | null, key: keyof ProxyValues): string {
+  if (values === null) return '读不到';
+  const value = values[key];
+  return typeof value === 'boolean' ? (value ? '1' : '0') : value;
 }
 
 export default function StatusPage() {
@@ -276,7 +275,17 @@ export default function StatusPage() {
             </tr>
           </thead>
           <tbody>
-            {data !== undefined && proxyRow('三项', data.proxy.desired, data.proxy.actual)}
+            {PROXY_ROWS.map((row) => (
+              <tr key={row.key} className="border-t border-slate-200">
+                <td className="px-2 py-1 text-slate-500">{row.label}</td>
+                <td className="px-2 py-1 font-mono text-xs">
+                  {proxyValue(data?.proxy.desired ?? null, row.key)}
+                </td>
+                <td className="px-2 py-1 font-mono text-xs">
+                  {proxyValue(data?.proxy.actual ?? null, row.key)}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
         {data !== undefined && !data.proxy.match && (
