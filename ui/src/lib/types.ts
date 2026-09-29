@@ -16,6 +16,12 @@ export const RULE_TYPES = [
 
 export type RuleType = (typeof RULE_TYPES)[number];
 
+/** 目标策略只开放直连/代理两项，PROXY 为默认首选。 */
+export const POLICY_OPTIONS = [
+  { value: 'PROXY', label: '代理' },
+  { value: 'DIRECT', label: '直连' },
+] as const;
+
 export interface Rule {
   id: number;
   position: number;

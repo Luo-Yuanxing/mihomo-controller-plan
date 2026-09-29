@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
-import type { FailedConnection, RuleInput } from '../lib/types';
+import { POLICY_OPTIONS, type FailedConnection, type RuleInput } from '../lib/types';
 
 const DOMAIN_RULE_TYPES = ['DOMAIN-SUFFIX', 'DOMAIN', 'DOMAIN-KEYWORD'] as const;
 type DomainRuleType = (typeof DOMAIN_RULE_TYPES)[number];
@@ -129,11 +129,17 @@ export default function FailedConnectionsPage() {
         </label>
         <label className="flex items-center gap-1 text-sm text-slate-500">
           目标策略
-          <input
-            className="w-28 rounded border border-slate-300 px-2 py-1 font-mono text-slate-900"
+          <select
+            className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
             value={policy}
             onChange={(event) => setPolicy(event.target.value)}
-          />
+          >
+            {POLICY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </label>
         <button
           type="button"

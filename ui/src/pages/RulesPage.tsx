@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
-import { RULE_TYPES, type Rule, type RuleInput } from '../lib/types';
+import { POLICY_OPTIONS, RULE_TYPES, type Rule, type RuleInput } from '../lib/types';
 
 interface EditableRule extends RuleInput {
   id: number | null;
@@ -225,11 +225,20 @@ export default function RulesPage() {
                   />
                 </td>
                 <td className="px-2 py-1">
-                  <input
-                    className="w-40 rounded border border-slate-300 px-2 py-1 font-mono"
+                  <select
+                    className="w-24 rounded border border-slate-300 px-1 py-1"
                     value={row.policy}
                     onChange={(event) => patchRow(row.key, { policy: event.target.value })}
-                  />
+                  >
+                    {!POLICY_OPTIONS.some((option) => option.value === row.policy) && (
+                      <option value={row.policy}>{row.policy}</option>
+                    )}
+                    {POLICY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 <td className="px-2 py-1 text-center">
                   <input
