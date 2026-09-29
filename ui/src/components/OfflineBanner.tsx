@@ -50,22 +50,17 @@ export default function OfflineBanner() {
     setNote(null);
     try {
       const bridge = offlineBridge();
-      let fallback: string[] | null = null;
       if (bridge !== undefined) {
-        const result = await bridge.action(action);
-        const details = (result as { fallback?: unknown } | null)?.fallback;
-        fallback = Array.isArray(details) ? details.map((step) => String(step)) : null;
+        await bridge.action(action);
       } else if (action === 'shutdown') {
         await api.offlineShutdown();
       } else {
         await api.offlineRestart();
       }
       setNote(
-        fallback === null
-          ? action === 'shutdown'
-            ? '已发起：关闭系统代理并停止内核'
-            : '已发起：写入系统代理期望值并重启内核'
-          : `后端调不动，已走最后手段：${fallback.join('；')}`,
+        action === 'shutdown'
+          ? '已发起：关闭系统代理并停止内核'
+          : '已发起：写入系统代理期望值并重启内核',
       );
     } catch (error) {
       setNote(error instanceof Error ? error.message : String(error));
