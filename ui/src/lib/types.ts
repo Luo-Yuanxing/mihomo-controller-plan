@@ -2,17 +2,8 @@
  * 与后端 REST 返回结构一一对应的类型（来源：src/routes.ts）。
  * 后端改了字段，这里要同步改。
  */
-export const RULE_TYPES = [
-  'DOMAIN',
-  'DOMAIN-SUFFIX',
-  'DOMAIN-KEYWORD',
-  'IP-CIDR',
-  'IP-CIDR6',
-  'GEOIP',
-  'RULE-SET',
-  'PROCESS-NAME',
-  'MATCH',
-] as const;
+/** 只保留域名类规则，与后端 src/rules/render.ts 保持一致。 */
+export const RULE_TYPES = ['DOMAIN-SUFFIX', 'DOMAIN'] as const;
 
 export type RuleType = (typeof RULE_TYPES)[number];
 

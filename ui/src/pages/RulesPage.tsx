@@ -331,8 +331,7 @@ export default function RulesPage() {
                   <input
                     className="w-full rounded border border-slate-300 px-2 py-1 font-mono"
                     value={row.value}
-                    placeholder={row.type === 'MATCH' ? '（MATCH 不需要）' : 'example.com'}
-                    disabled={row.type === 'MATCH'}
+                    placeholder="example.com"
                     onChange={(event) => patchRow(row.key, { value: event.target.value })}
                   />
                 </td>

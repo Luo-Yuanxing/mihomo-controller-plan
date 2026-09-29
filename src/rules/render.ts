@@ -4,17 +4,8 @@
  */
 import type { Rule } from './repo.js';
 
-export const RULE_TYPES = [
-  'DOMAIN',
-  'DOMAIN-SUFFIX',
-  'DOMAIN-KEYWORD',
-  'IP-CIDR',
-  'IP-CIDR6',
-  'GEOIP',
-  'RULE-SET',
-  'PROCESS-NAME',
-  'MATCH',
-] as const;
+/** 只保留域名类规则，其余类型不开放。 */
+export const RULE_TYPES = ['DOMAIN-SUFFIX', 'DOMAIN'] as const;
 
 export type RuleType = (typeof RULE_TYPES)[number];
 
@@ -35,7 +26,7 @@ function emitScalar(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-/** 单条规则的 mihomo rule 文本；MATCH 不带匹配值。 */
+/** 单条规则的 mihomo rule 文本。 */
 export function renderRuleLine(rule: Rule): string {
   if (!(RULE_TYPES as readonly string[]).includes(rule.type)) {
     throw new RuleValidationError(`未知类型 ${rule.type}`, rule.id);
@@ -43,13 +34,11 @@ export function renderRuleLine(rule: Rule): string {
   if (rule.policy.trim() === '') {
     throw new RuleValidationError('目标策略为空', rule.id);
   }
-  if (rule.type !== 'MATCH' && rule.value.trim() === '') {
+  if (rule.value.trim() === '') {
     throw new RuleValidationError('匹配值为空', rule.id);
   }
 
-  const parts = [rule.type];
-  if (rule.type !== 'MATCH') parts.push(rule.value);
-  parts.push(rule.policy);
+  const parts = [rule.type, rule.value, rule.policy];
   if (rule.noResolve) parts.push('no-resolve');
   return parts.map(emitScalar).join(',');
 }

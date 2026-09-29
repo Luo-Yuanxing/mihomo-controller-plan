@@ -3,10 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
-import { POLICY_OPTIONS, type FailedConnection, type RuleInput } from '../lib/types';
-
-const DOMAIN_RULE_TYPES = ['DOMAIN-SUFFIX', 'DOMAIN', 'DOMAIN-KEYWORD'] as const;
-type DomainRuleType = (typeof DOMAIN_RULE_TYPES)[number];
+import {
+  POLICY_OPTIONS,
+  RULE_TYPES,
+  type FailedConnection,
+  type RuleInput,
+  type RuleType,
+} from '../lib/types';
 
 function displayTime(value: string): string {
   const timestamp = Date.parse(value);
@@ -25,7 +28,7 @@ export default function FailedConnectionsPage() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [hostQuery, setHostQuery] = useState('');
-  const [ruleType, setRuleType] = useState<DomainRuleType>('DOMAIN-SUFFIX');
+  const [ruleType, setRuleType] = useState<RuleType>('DOMAIN-SUFFIX');
   const [policy, setPolicy] = useState('PROXY');
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
@@ -118,9 +121,9 @@ export default function FailedConnectionsPage() {
           <select
             className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
             value={ruleType}
-            onChange={(event) => setRuleType(event.target.value as DomainRuleType)}
+            onChange={(event) => setRuleType(event.target.value as RuleType)}
           >
-            {DOMAIN_RULE_TYPES.map((type) => (
+            {RULE_TYPES.map((type) => (
               <option key={type} value={type}>
                 {type}
               </option>
