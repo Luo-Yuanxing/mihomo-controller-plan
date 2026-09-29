@@ -88,6 +88,13 @@ export const ZH = {
   'uiConfig.fileMissing': '配置文件不存在或不可读：{file}',
   'uiConfig.fileEmpty': '配置文件是空文件（需要至少含 ruleTypes 等字段）：{file}',
   'uiConfig.fileNotJson': '配置文件不是合法 JSON：{file}（{reason}）',
+  'uiConfig.mustBeBoolean': '必须是 true 或 false',
+
+  // 失败连接黑名单（logs/blacklist.ts）：主机按域名排重，一条一种写法
+  'blacklist.notStringArray': '黑名单主机必须是字符串数组',
+  'blacklist.badHost': '黑名单主机不合法：{host}',
+  'blacklist.tooMany': '黑名单最多 {max} 个主机',
+  'blacklist.hostsDuplicate': '黑名单主机重复：{value}',
 
   // 配置分享串（ui-config-share.ts）
   'share.empty': '导入串不能为空',
@@ -100,6 +107,7 @@ export const ZH = {
   'routes.ruleTypeNotAllowed': '类型不在白名单：{types}',
   'routes.invalidParams': '请求参数不合法：{detail}',
   'routes.badId': 'id 不合法',
+  'routes.blacklistNothingToDo': '没有要改的黑名单主机（hosts / add / remove 至少给一个）',
   'routes.recover.configRewritten': '已按当前设置重写 config.yaml',
   'routes.recover.configFailed': '重写配置失败：{error}',
   'routes.recover.kernelRunning': '内核已在运行',
@@ -189,6 +197,12 @@ export const EN: Record<MessageKey, string> = {
   'uiConfig.fileMissing': 'Config file missing or unreadable: {file}',
   'uiConfig.fileEmpty': 'Config file is empty (it needs at least ruleTypes): {file}',
   'uiConfig.fileNotJson': 'Config file is not valid JSON: {file} ({reason})',
+  'uiConfig.mustBeBoolean': 'must be true or false',
+
+  'blacklist.notStringArray': 'Blacklist hosts must be an array of strings',
+  'blacklist.badHost': 'Invalid blacklist host: {host}',
+  'blacklist.tooMany': 'The blacklist holds at most {max} hosts',
+  'blacklist.hostsDuplicate': 'duplicate blacklist host: {value}',
 
   'share.empty': 'The pasted string must not be empty',
   'share.notBase64Url': 'not a valid Base64URL string',
@@ -199,6 +213,7 @@ export const EN: Record<MessageKey, string> = {
   'routes.ruleTypeNotAllowed': 'type is not in the allow list: {types}',
   'routes.invalidParams': 'Invalid request parameters: {detail}',
   'routes.badId': 'invalid id',
+  'routes.blacklistNothingToDo': 'Nothing to change (pass at least one of hosts / add / remove)',
   'routes.recover.configRewritten': 'config.yaml rewritten from the current settings',
   'routes.recover.configFailed': 'Rewriting the config failed: {error}',
   'routes.recover.kernelRunning': 'the kernel is already running',

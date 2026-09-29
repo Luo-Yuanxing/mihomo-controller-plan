@@ -10,6 +10,7 @@ import type { AppContext } from './context.js';
 import { CoreApiError, DELAY_TEST_URL, proxyGroups } from './core/api.js';
 import { t } from './i18n.js';
 import type { ConnectionFinding } from './logs/connection-sampler.js';
+import { applyBlacklistChanges, createHostMatcher, parseBlacklistHosts } from './logs/blacklist.js';
 import { parseFailedConnections, type FailedConnection } from './logs/failed-connections.js';
 import { RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { readSubscription } from './sub/subscription.js';
@@ -152,6 +153,19 @@ function createFailureMerger(
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * 黑名单匹配器按主机数组缓存：配置是整体替换的同一份引用，
+ * 命中判定在失败连接列表的最后一道过滤里，不必每个目标重建一次。
+ */
+let cachedBlacklist: { hosts: readonly string[]; match: (host: string) => boolean } | null = null;
+
+function matchBlacklist(host: string, hosts: readonly string[]): boolean {
+  if (cachedBlacklist === null || cachedBlacklist.hosts !== hosts) {
+    cachedBlacklist = { hosts, match: createHostMatcher(hosts) };
+  }
+  return cachedBlacklist.match(host);
 }
 
 export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -356,19 +370,102 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     }
   });
 
+  /** 列表命中黑名单最多回显这么多条；真实隐藏条数由 hiddenCount 给出。 */
+  const blacklistMatchedLimit = z.coerce.number().int().min(1).max(2000).catch(200);
+
+  /**
+   * 失败连接列表：skip=1 时不做黑名单筛选（对应界面上关掉的黑名单开关）。
+   * 黑名单与规则一样在最后一道过滤：命中主机的目标直接从列表里剔除。
+   */
   app.get('/api/failed-connections', async (request) => {
-    const lines = Number((request.query as { lines?: string }).lines ?? 5000);
+    const query = request.query as { lines?: string; skip?: string; blacklistLimit?: string };
+    const lines = Number(query.lines ?? 5000);
+    const skipBlacklist = query.skip === '1';
     const maxLines = Number.isInteger(lines) && lines > 0 && lines <= 20_000 ? lines : 5000;
     const file = logPaths(ctx.dataDir).core;
     const scanned = tailLines(file, maxLines);
     const now = Date.now();
     const fromLog = parseFailedConnections(scanned, now);
+    const merged = await merger(fromLog, now);
+
+    const blacklist = ctx.uiConfig.blacklist;
+    const matches = skipBlacklist
+      ? []
+      : merged.filter((item) => matchBlacklist(item.host, blacklist.hosts));
     return {
       file,
       scannedLines: scanned.length,
       /** 日志里的 dial 失败 + 连接快照里的零回程，两种失败一起给界面。 */
-      connections: await merger(fromLog, now),
+      connections: merged.filter((item) => !matches.includes(item)),
+      /** 黑名单：开关关闭时 matched 为空、hiddenCount 为 0，界面据此提示"已隐藏几个"。 */
+      blacklist: {
+        enabled: blacklist.enabled,
+        hosts: blacklist.hosts,
+        matched: matches
+          .slice(0, blacklistMatchedLimit.parse(query.blacklistLimit))
+          .map((item) => ({
+            host: item.host,
+            port: item.port,
+            network: item.network,
+          })),
+        hiddenCount: matches.length,
+      },
     };
+  });
+
+  /** 黑名单快照：只读，供界面显示当前条数与开关的默认位置。 */
+  app.get('/api/blacklist', () => {
+    const blacklist = ctx.uiConfig.blacklist;
+    return { enabled: blacklist.enabled, hosts: blacklist.hosts };
+  });
+
+  /** 写黑名单：落 config.json 并刷新内存生效值，顺手把本次计数回给界面。 */
+  /**
+   * 加/移黑名单：一次请求就把多选结果整体写进 config.json（多选一键加入）。
+   * 已有、没有的主机只计数不报错；主机写法不合法整批拒绝，什么都不改。
+   */
+  app.put('/api/blacklist', async (request, reply) => {
+    const parsed = z
+      .object({
+        hosts: z.array(z.string()).optional(),
+        add: z.array(z.string()).optional(),
+        remove: z.array(z.string()).optional(),
+      })
+      .safeParse(request.body ?? {});
+    if (!parsed.success) return invalid(reply, parsed.error);
+    if (
+      parsed.data.hosts === undefined &&
+      parsed.data.add === undefined &&
+      parsed.data.remove === undefined
+    ) {
+      return reply.status(400).send({ error: t('routes.blacklistNothingToDo') });
+    }
+
+    try {
+      const current = ctx.uiConfig.blacklist.hosts;
+      // hosts 是整表替换（只用于清空），add/remove 是逐条增量
+      const changes = {
+        add: parsed.data.hosts ?? parseBlacklistHosts(parsed.data.add ?? []),
+        remove:
+          parsed.data.hosts === undefined ? parseBlacklistHosts(parsed.data.remove ?? []) : current,
+      };
+      const result = applyBlacklistChanges(current, changes);
+      const saved = await ctx.saveBlacklist(result.hosts);
+      ctx.log.info(
+        { count: saved.blacklist.hosts.length, added: result.added, removed: result.removed },
+        '黑名单已更新',
+      );
+      return {
+        enabled: saved.blacklist.enabled,
+        hosts: saved.blacklist.hosts,
+        added: result.added,
+        removed: result.removed,
+        missing: result.missing,
+        skipped: result.skipped,
+      };
+    } catch (error) {
+      return reply.status(400).send({ error: errorText(error) });
+    }
   });
 
   app.get('/api/rules', () => ({ rules: ctx.repo.list(), provider: ctx.ruleProvider }));

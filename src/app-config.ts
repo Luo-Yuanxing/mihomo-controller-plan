@@ -123,6 +123,14 @@ export async function saveUiConfig(file: string, ui: UiConfig, initialized = fal
   await writeAppConfig(file, { ...readAppConfig(file), ui, initialized });
 }
 
+/** 只改黑名单主机：界面常量其余字段、应用设置与规则段都保持文件原样。 */
+export async function saveBlacklistHosts(file: string, hosts: string[]): Promise<UiConfig> {
+  const current = readAppConfig(file);
+  const ui: UiConfig = { ...current.ui, blacklist: { ...current.ui.blacklist, hosts } };
+  await writeAppConfig(file, { ...current, ui });
+  return ui;
+}
+
 /** 只改初始化标记：立即初始化就是把它落成 false，其余内容不动。 */
 export async function markInitialized(file: string): Promise<void> {
   await writeAppConfig(file, { ...readAppConfig(file), initialized: false });

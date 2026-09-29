@@ -9,6 +9,7 @@ import {
   markInitialized,
   markInitializedSync,
   readAppConfig,
+  saveBlacklistHosts,
   saveUiConfig,
   writeAppConfig,
 } from './app-config.js';
@@ -42,6 +43,8 @@ export interface UiConfigService {
   apply(config: unknown): Promise<StoredUiConfig>;
   /** 立即初始化：把标记落成 false，内容不动（正常情况下加载时就已经是 false）。 */
   initialize(): Promise<StoredUiConfig>;
+  /** 只改失败连接黑名单的主机列表：落盘并刷新内存里的生效值。 */
+  saveBlacklist(hosts: string[]): Promise<UiConfig>;
   /** 生成分享串（含规则与内核/代理设置，剔除订阅与 secret）。 */
   share(rules: RuleEntry[], app: ShareableApp): string;
   /** 解析分享串：只解析不落盘，字段不合法直接抛错。 */
@@ -103,6 +106,14 @@ export function createUiConfigService(defaultFile: string, log?: Logger): UiConf
       await markInitialized(file);
       log?.info({ file }, '已把初始化标记落成 false');
       return next(state.config, false);
+    },
+    async saveBlacklist(hosts) {
+      const ui = await saveBlacklistHosts(file, hosts);
+      // 生效值跟着文件走：页面上的筛选读的就是这里，改完不用重启
+      setActiveUiConfig(ui);
+      state = { ...state, config: ui, updatedAt: modifiedAt(file) };
+      log?.info({ count: hosts.length }, '黑名单已保存');
+      return ui;
     },
     share(rules, app) {
       return encodeSharedConfig({ config: state.config, rules, app });

@@ -220,6 +220,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     uiConfigState: () => uiConfigService.state(),
     applyUiConfig: async (config: unknown) => uiConfigService.apply(config),
     initializeUiConfig: async () => uiConfigService.initialize(),
+    saveBlacklist: async (hosts: string[]) => uiConfigService.saveBlacklist(hosts),
     renderUiConfigShare: () =>
       uiConfigService.share(repo.list(), {
         core: { binaryPath: settings.core.binaryPath, mixedPort: settings.core.mixedPort },

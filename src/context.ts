@@ -48,6 +48,8 @@ export interface AppContext {
   applyUiConfig(config: unknown): Promise<StoredUiConfig>;
   /** 立即初始化：把 config.json 的初始化标记改成 false，内容不动。 */
   initializeUiConfig(): Promise<StoredUiConfig>;
+  /** 只改失败连接黑名单的主机列表（落 config.json），其余设置原样保留。 */
+  saveBlacklist(hosts: string[]): Promise<UiConfig>;
   /** 生成配置分享串（界面常量 + 规则 + 内核/代理设置，剔除订阅与 secret）。 */
   renderUiConfigShare(): string;
   /** 只解析分享串、不动任何状态；不合法直接抛带明细的错。 */

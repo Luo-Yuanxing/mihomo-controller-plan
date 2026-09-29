@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { isLanguage, setLanguage, t } from './i18n.js';
+import { canonicalHost, MAX_BLACKLIST_HOSTS, parseBlacklistHosts } from './logs/blacklist.js';
 
 export const uiConfigSchema = z.object({
   /** 界面语言：只有中文与英语两套，默认中文。 */
@@ -23,6 +24,16 @@ export const uiConfigSchema = z.object({
       lines: z.number().int().min(1),
     })
     .default({ lines: 5000 }),
+  /**
+   * 失败连接黑名单：命中主机不进列表。
+   * enabled 是"开关的默认位置"，界面上的即时开关只影响本次筛选、不回写文件（见 routes.ts）。
+   */
+  blacklist: z
+    .object({
+      enabled: z.boolean().default(true),
+      hosts: z.array(z.string().min(1)).default([]),
+    })
+    .default({ enabled: true, hosts: [] }),
   settings: z
     .object({
       /** 日志面板每次取多少行（/api/logs 的取值范围同步为 1..2000）；刷新节奏不落配置，写在界面代码里。 */
@@ -127,6 +138,45 @@ function checkInterval(
       message: t('uiConfig.outOfRange', { min: range.min, max: range.max }),
     });
   }
+}
+
+/** 黑名单主机逐条检查：写法、上限、归一化后是否重复；缺席（undefined）表示这一项由默认值补齐。 */
+function blacklistHostIssues(value: unknown): UiConfigIssue[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    return [{ path: 'blacklist.hosts', message: t('uiConfig.mustBeStringArray') }];
+  }
+
+  const issues: UiConfigIssue[] = [];
+  if (value.length > MAX_BLACKLIST_HOSTS) {
+    issues.push({
+      path: 'blacklist.hosts',
+      message: t('uiConfig.tooManyItems', { max: MAX_BLACKLIST_HOSTS }),
+    });
+  }
+
+  const seen = new Set<string>();
+  value.forEach((item, index) => {
+    const path = `blacklist.hosts[${String(index)}]`;
+    if (typeof item !== 'string' || item.trim() === '') {
+      issues.push({ path, message: t('uiConfig.notEmptyString') });
+      return;
+    }
+    try {
+      parseBlacklistHosts([item]);
+    } catch (error) {
+      issues.push({ path, message: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+    const host = canonicalHost(item);
+    if (seen.has(host)) {
+      issues.push({ path, message: t('blacklist.hostsDuplicate', { value: host }) });
+      return;
+    }
+    seen.add(host);
+  });
+
+  return issues;
 }
 
 /** 逐项检查配置文件/界面提交的值（结构 + 跨字段一致性 + 取值范围），错误带可读字段名。 */
@@ -249,6 +299,16 @@ export function uiConfigIssues(raw: unknown): UiConfigIssue[] {
     checkInterval(issues, 'failedConnections.lines', failed['lines'], UI_CONFIG_LIMITS.failedLines);
   }
 
+  const blacklist = raw['blacklist'];
+  if (blacklist !== undefined && !isRecord(blacklist)) {
+    issues.push({ path: 'blacklist', message: t('uiConfig.mustBeObject') });
+  } else if (isRecord(blacklist)) {
+    if (blacklist['enabled'] !== undefined && typeof blacklist['enabled'] !== 'boolean') {
+      issues.push({ path: 'blacklist.enabled', message: t('uiConfig.mustBeBoolean') });
+    }
+    issues.push(...blacklistHostIssues(blacklist['hosts']));
+  }
+
   const settings = raw['settings'];
   if (!isRecord(settings)) {
     issues.push({ path: 'settings', message: t('uiConfig.mustBeObject') });
@@ -268,6 +328,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   ],
   defaults: { ruleType: 'DOMAIN', policy: 'PROXY' },
   failedConnections: { lines: 5000 },
+  blacklist: { enabled: true, hosts: [] },
   settings: { logsLines: 500 },
 };
 
