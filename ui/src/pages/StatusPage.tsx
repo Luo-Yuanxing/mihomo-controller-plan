@@ -93,6 +93,17 @@ export default function StatusPage() {
     () => '系统代理已关闭',
   );
   const applyProxy = useAction(queryClient, notices.push, api.applyProxy, () => '系统代理写入成功');
+  const recover = useAction(
+    queryClient,
+    notices.push,
+    api.recover,
+    (result) => `一键修复：${result.steps.join('；')}`,
+  );
+
+  /** 界面跑在 Electron 里时由壳执行安全关闭（先关代理、停内核，再退出）；浏览器里没有这个能力。 */
+  const quitSafely = (window as unknown as { mcpApp?: { quitSafely(): Promise<boolean> } }).mcpApp
+    ?.quitSafely;
+  const [quitting, setQuitting] = useState(false);
 
   const data = statusQuery.data;
   // 数据目录提示：悬停在数据目录行上时显示，10 s 后自动消失
@@ -109,7 +120,8 @@ export default function StatusPage() {
     refresh.isPending ||
     removeSubscription.isPending ||
     enableProxy.isPending ||
-    disableProxy.isPending;
+    disableProxy.isPending ||
+    recover.isPending;
   const kernelState = data?.kernel.state ?? 'stopped';
   const kernelUp = kernelState === 'running' || kernelState === 'adopted';
 
@@ -132,6 +144,15 @@ export default function StatusPage() {
             {data === undefined ? '读取中…' : (STATE_TEXT[data.kernel.state] ?? data.kernel.state)}
           </span>
           <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              className="rounded border border-amber-400 bg-amber-50 px-2 py-1 text-sm text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+              disabled={busy}
+              onClick={() => recover.mutate()}
+              title="重写配置 → 内核没起来就启动 → 内核就绪才写系统代理，起不来就关掉代理保证不断网"
+            >
+              一键修复
+            </button>
             <button
               type="button"
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
@@ -253,7 +274,7 @@ export default function StatusPage() {
               disabled={busy}
               onClick={() => enableProxy.mutate()}
             >
-              开启守护模式
+              一键打开代理
             </button>
             <button
               type="button"
@@ -269,7 +290,7 @@ export default function StatusPage() {
               disabled={busy}
               onClick={() => disableProxy.mutate()}
             >
-              关闭系统代理
+              一键关闭代理
             </button>
           </div>
         </div>
@@ -303,6 +324,41 @@ export default function StatusPage() {
         {data?.proxy.error != null && (
           <p className="mt-1 text-xs text-rose-700">{data.proxy.error}</p>
         )}
+      </section>
+
+      <section className="rounded border border-slate-300 bg-white p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <h2 className="text-base font-semibold">退出应用</h2>
+          <div className="ml-auto">
+            <button
+              type="button"
+              className="rounded border border-rose-300 px-2 py-1 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+              disabled={quitting}
+              onClick={() => {
+                if (quitSafely === undefined) {
+                  notices.push(
+                    'warn',
+                    '当前不在应用内运行，无法从界面退出；请用托盘菜单的「安全退出」。',
+                  );
+                  return;
+                }
+                if (!window.confirm('退出前会先关闭系统代理并停止内核，确定退出？')) return;
+                setQuitting(true);
+                void quitSafely().catch((error: unknown) => {
+                  setQuitting(false);
+                  notices.push('error', String(error));
+                });
+              }}
+            >
+              {quitting ? '正在安全关闭…' : '安全关闭应用'}
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500">
+          退出请只用这个按钮或托盘菜单的「安全退出」：顺序是先关闭系统代理、再停止内核。
+          从任务管理器结束进程、或在终端按 Ctrl+C 会跳过这一步（Windows 强杀无法被捕获），
+          系统代理会残留指向已经停掉的内核端口。真遇到了就点「一键关闭代理」或「一键修复」恢复。
+        </p>
       </section>
 
       <p
