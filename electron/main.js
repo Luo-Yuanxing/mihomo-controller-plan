@@ -3,8 +3,12 @@
  * 计划 §4.1 进程模型、§4.4 单实例、FR-12 托盘常驻与退出保护、§8 托盘菜单三项。
  */
 import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, session } from 'electron';
+import { execFile, promisify } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const execFileAsync = promisify(execFile);
+const IE_SETTINGS_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings';
 
 /** 开发期由 Vite dev server 提供界面，打包后加载内置后端（同一进程）。 */
 const devServerUrl = process.env['MCP_DEV_SERVER_URL'] ?? '';
@@ -63,8 +67,51 @@ ipcMain.handle('mcp:offline-action', async (_event, name) => {
   const run = OFFLINE_ACTIONS[name];
   if (run === undefined) throw new Error(`未知的离线动作：${String(name)}`);
   const httpPath = name === 'shutdown' ? '/api/offline/shutdown' : '/api/offline/restart';
-  return callBackend(httpPath, run);
+  try {
+    return await callBackend(httpPath, run);
+  } catch (error) {
+    // 后端已经调不动了（HTTP 也发不出去）时的最后手段：只对"完全关闭代理"兜底
+    if (name !== 'shutdown') {
+      throw new Error(
+        `调用后端失败：${String(error)}${runningServer === null ? '（开发期后端是独立进程，请重启 npm run dev）' : ''}`,
+      );
+    }
+    const steps = await forceShutdownFallback();
+    runningServer?.context.log.warn({ steps }, '后端不可用，已直接改注册表并结束内核进程');
+    return { fallback: steps, error: String(error) };
+  }
 });
+
+/**
+ * 后端进程整个不响应时的最后手段（只用于"完全关闭代理"）：
+ * 直接关掉系统代理，并按进程名结束随包分发的内核。任何一步失败都记进结果里，交给界面显示。
+ */
+async function forceShutdownFallback() {
+  const steps = [];
+  try {
+    await execFileAsync('reg', [
+      'add',
+      IE_SETTINGS_KEY,
+      '/v',
+      'ProxyEnable',
+      '/t',
+      'REG_DWORD',
+      '/d',
+      '0',
+      '/f',
+    ]);
+    steps.push('已直接关闭系统代理（ProxyEnable=0）');
+  } catch (error) {
+    steps.push(`关闭系统代理失败：${String(error)}`);
+  }
+  try {
+    await execFileAsync('taskkill', ['/IM', 'mihomo.exe', '/F']);
+    steps.push('已结束内核进程 mihomo.exe');
+  } catch (error) {
+    steps.push(`结束内核进程失败：${String(error)}`);
+  }
+  return steps;
+}
 
 function showWindow() {
   if (win === null || win.isDestroyed()) {
