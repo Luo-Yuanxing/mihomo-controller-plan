@@ -98,7 +98,11 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
               aria-label="代理出口节点"
               className="w-72 rounded border border-slate-300 px-1 py-1"
               value={value}
-              onChange={(event) => setNode(event.target.value)}
+              disabled={select.isPending}
+              onChange={(event) => {
+                setNode(event.target.value);
+                select.mutate(event.target.value);
+              }}
             >
               {!group.all.includes(value) && <option value={value}>{value}</option>}
               {group.all.map((name) => (
@@ -107,15 +111,8 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
                 </option>
               ))}
             </select>
-            <button
-              type="button"
-              className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
-              disabled={select.isPending || value === group.now}
-              onClick={() => select.mutate(value)}
-            >
-              切换
-            </button>
             <span className="text-xs text-slate-500">当前：{group.now || '—'}</span>
+            <span className="text-xs text-slate-400">选完即生效，内核会记住</span>
           </>
         ) : (
           <span className="text-slate-500">
