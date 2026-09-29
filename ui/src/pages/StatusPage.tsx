@@ -1,6 +1,5 @@
 /** 状态页：内核状态、端口、订阅信息、系统代理三项状态、重启内核。计划 §8。 */
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
 import NoticeStack from '../components/NoticeStack';
 import { api } from '../lib/api';
 import type { ProxyValues } from '../lib/types';
@@ -40,84 +39,6 @@ function proxyRow(label: string, desired: ProxyValues, actual: ProxyValues | nul
       <td className="px-2 py-1 font-mono text-xs">{render(desired)}</td>
       <td className="px-2 py-1 font-mono text-xs">{render(actual)}</td>
     </tr>
-  );
-}
-
-/** 目标策略里的"代理"统一走这些组，具体出口由用户选；选择由内核存在 cache.db。 */
-function ProxyOutlets({ enabled }: { enabled: boolean }) {
-  const queryClient = useQueryClient();
-  const notices = useNotices();
-  const groupsQuery = useQuery({
-    queryKey: ['proxyGroups'],
-    queryFn: api.proxyGroups,
-    enabled,
-    refetchInterval: enabled ? 5000 : false,
-  });
-  const [pending, setPending] = useState<Record<string, string>>({});
-
-  const select = useMutation({
-    mutationFn: (input: { group: string; name: string }) =>
-      api.selectProxy(input.group, input.name),
-    onSuccess: async (result) => {
-      notices.push('ok', `${result.group} 已切到 ${result.now}，新连接立即生效`);
-      setPending({});
-      await queryClient.invalidateQueries({ queryKey: ['proxyGroups'] });
-    },
-    onError: (error: Error) => notices.push('error', error.message),
-  });
-
-  const groups = groupsQuery.data?.groups ?? [];
-
-  return (
-    <section className="rounded border border-slate-300 bg-white p-3">
-      <div className="mb-2 flex items-center gap-2">
-        <h2 className="text-base font-semibold">代理出口</h2>
-        <span className="text-xs text-slate-500">
-          目标策略为"代理"的规则统一走这里，已建立的连接不受影响
-        </span>
-      </div>
-      <NoticeStack notices={notices.items} onDismiss={notices.dismiss} />
-      {!enabled && <p className="text-sm text-slate-500">内核未运行。</p>}
-      {enabled && groups.length === 0 && (
-        <p className="text-sm text-slate-500">
-          {groupsQuery.isError ? String(groupsQuery.error) : '没有可选的代理组（先配置订阅）。'}
-        </p>
-      )}
-      {groups.map((group) => {
-        const value = pending[group.name] ?? group.now;
-        return (
-          <div key={group.name} className="flex items-center gap-2 py-1 text-sm">
-            <span className="w-32 truncate font-mono text-xs" title={group.name}>
-              {group.name}
-            </span>
-            <select
-              aria-label={`${group.name} 的出口节点`}
-              className="w-72 rounded border border-slate-300 px-1 py-1"
-              value={value}
-              onChange={(event) =>
-                setPending((current) => ({ ...current, [group.name]: event.target.value }))
-              }
-            >
-              {!group.all.includes(value) && <option value={value}>{value}</option>}
-              {group.all.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
-              disabled={select.isPending || value === group.now}
-              onClick={() => select.mutate({ group: group.name, name: value })}
-            >
-              切换
-            </button>
-            <span className="text-xs text-slate-500">当前：{group.now || '—'}</span>
-          </div>
-        );
-      })}
-    </section>
   );
 }
 
@@ -316,8 +237,6 @@ export default function StatusPage() {
           )}
         </dl>
       </section>
-
-      <ProxyOutlets enabled={kernelUp} />
 
       <section className="rounded border border-slate-300 bg-white p-3">
         <div className="mb-2 flex items-center gap-2">

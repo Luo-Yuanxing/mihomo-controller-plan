@@ -6,6 +6,7 @@ import type { Rule, RuleInput, UiConfig } from '../lib/types';
 import { useUiConfig } from '../lib/uiConfig';
 import { useNotices } from '../lib/useNotices';
 import NoticeStack from '../components/NoticeStack';
+import ProxyOutlets from '../components/ProxyOutlets';
 
 interface EditableRule extends RuleInput {
   id: number | null;
@@ -205,6 +206,8 @@ export default function RulesPage() {
         ]}
         onDismiss={notices.dismiss}
       />
+
+      <ProxyOutlets />
 
       <div className="overflow-auto rounded border border-slate-300 bg-white">
         <table className="w-full text-sm">

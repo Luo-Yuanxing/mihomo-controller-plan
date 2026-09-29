@@ -117,7 +117,7 @@ export const api = {
   subscriptionGroups: () => request<SubscriptionGroupsResponse>('/api/subscription/groups'),
 
   proxy: () => request<ProxyState>('/api/proxy'),
-  proxyGroups: () => request<{ groups: ProxyGroupSummary[] }>('/api/proxies'),
+  proxyGroups: () => request<{ target: string; groups: ProxyGroupSummary[] }>('/api/proxies'),
   selectProxy: (group: string, name: string) =>
     request<{ group: string; now: string; all: string[] }>(
       `/api/proxies/${encodeURIComponent(group)}`,
