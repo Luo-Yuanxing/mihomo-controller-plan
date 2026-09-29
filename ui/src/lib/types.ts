@@ -107,6 +107,16 @@ export interface SubscriptionConfig {
   interval: number;
   useProxy: boolean;
   userAgent: string;
+  /** PROXY 策略指代订阅里的哪个组；空串 = 订阅全部节点。 */
+  proxyGroup: string;
+}
+
+/** 订阅文件里的代理组（GET /api/subscription/groups）。 */
+export interface SubscriptionGroupsResponse {
+  file: string;
+  exists: boolean;
+  selected: string;
+  groups: { name: string; type: string; members: number }[];
 }
 
 export interface SubscriptionState extends SubscriptionConfig {

@@ -239,12 +239,13 @@ mihomo-controller-plan/
 
 | 项 | 设计 |
 | --- | --- |
-| 配置 | `settings.json` 中 `subscription: { url, interval, useProxy, userAgent }` |
+| 配置 | `settings.json` 中 `subscription: { url, interval, useProxy, userAgent, proxyGroup }` |
 | 下载 | `fetch` GET，默认 20 s 超时，默认 UA `clash-verge/v3`（可覆盖），可选走本机 mixed 端口或系统代理 |
 | 校验 | 状态码 2xx；剥 BOM；YAML 可解析；含 `proxies` 或 `proxy-providers` |
 | 落盘 | 写 `subscription.yaml.tmp` → `rename` 覆盖，再 `PUT /providers/proxies/sub-main` |
 | 失败 | 保留旧文件并返回错误；首次启动时失败则直接停止 |
 | 自动刷新 | 按 `interval`（默认 24 h）定时执行同一流程 |
+| PROXY 指代 | `proxyGroup` 空 = `PROXY` 组用订阅全部节点；非空 = 按订阅里同名组复刻（类型、url 等原样带过，节点仍由 provider 提供，组引用递归生成）。找不到该组就回退成全部节点 |
 
 内核侧配置成文件 provider，避免"访问订阅域名本身需要代理"的自举问题：
 
@@ -337,6 +338,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | GET | `/api/subscription` | 当前订阅配置与最近一次下载结果 |
 | PUT | `/api/subscription` | 修改订阅 URL / 刷新间隔 / 是否走代理下载 |
 | POST | `/api/subscription/refresh` | 立即下载并生效 |
+| GET | `/api/subscription/groups` | 订阅文件里的代理组，用于选 `PROXY` 指代哪个组 |
 | GET | `/api/rules` | 规则列表 |
 | POST | `/api/rules` | 新增（支持数组批量） |
 | PUT | `/api/rules/{id}` | 修改 |
@@ -388,6 +390,10 @@ proxy-groups:
     type: select
     use: [sub-main]
 
+# proxyGroup 非空时改为复刻所选订阅组，例如选 Proxy：
+#   - { name: PROXY, type: select, use: [sub-main], proxies: [failover] }
+#   - { name: failover, type: fallback, use: [sub-main], url: ..., interval: 300 }
+
 rules:
   - RULE-SET,custom,PROXY
   - GEOIP,CN,DIRECT
@@ -415,7 +421,7 @@ payload:
 | --- | --- |
 | 规则 | 规则表格（增删改、启停、拖拽排序）+ 原始 yaml 文本框 + 保存并热更新 |
 | 状态 | 内核状态与版本、端口、订阅信息与刷新订阅、代理出口选择、系统代理三项状态、重启内核按钮 |
-| 设置 | 内核路径、端口、订阅 URL 与刷新间隔、系统代理开关、日志查看 |
+| 设置 | 内核路径、端口、订阅 URL 与刷新间隔、`PROXY` 指代哪个订阅组、系统代理开关、日志查看 |
 
 保存反馈：显示本次 PUT 的 provider 与耗时，失败直接展示内核原始错误。
 

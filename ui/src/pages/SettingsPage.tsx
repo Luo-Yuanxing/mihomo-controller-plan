@@ -23,6 +23,10 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: api.settings });
   const uiConfigQuery = useQuery({ queryKey: ['ui-config'], queryFn: api.uiConfig });
+  const groupsQuery = useQuery({
+    queryKey: ['subscription-groups'],
+    queryFn: api.subscriptionGroups,
+  });
   const logsQuery = useQuery({
     queryKey: ['logs'],
     queryFn: () => api.logs(200),
@@ -73,10 +77,13 @@ export default function SettingsPage() {
     onSuccess: async (result) => {
       notices.push(
         'ok',
-        result.needsRestart ? '设置已保存；端口或 secret 变了，需要重启内核才生效' : '设置已保存',
+        result.needsRestart
+          ? '设置已保存；端口、secret 或代理组变了，需要重启内核才生效'
+          : '设置已保存',
       );
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       await queryClient.invalidateQueries({ queryKey: ['status'] });
+      await queryClient.invalidateQueries({ queryKey: ['subscription-groups'] });
     },
     onError: (error: Error) => notices.push('error', error.message),
   });
@@ -220,6 +227,35 @@ export default function SettingsPage() {
             }
           />
         </Field>
+        <Field label="PROXY 指代哪个组" hint="改完需要重启内核">
+          <select
+            className={inputClass}
+            value={draft.subscription.proxyGroup}
+            onChange={(event) =>
+              patch({ subscription: { ...draft.subscription, proxyGroup: event.target.value } })
+            }
+          >
+            <option value="">订阅全部节点</option>
+            {draft.subscription.proxyGroup !== '' &&
+              !(groupsQuery.data?.groups ?? []).some(
+                (group) => group.name === draft.subscription.proxyGroup,
+              ) && (
+                <option value={draft.subscription.proxyGroup}>
+                  {draft.subscription.proxyGroup}
+                </option>
+              )}
+            {groupsQuery.data?.groups.map((group) => (
+              <option key={group.name} value={group.name}>
+                {group.name}（{group.type} · {group.members} 个成员）
+              </option>
+            ))}
+          </select>
+        </Field>
+        {groupsQuery.data !== undefined && groupsQuery.data.groups.length === 0 && (
+          <p className="text-xs text-slate-500">
+            订阅文件里没有 proxy-groups，只有"订阅全部节点"可用。
+          </p>
+        )}
       </section>
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">

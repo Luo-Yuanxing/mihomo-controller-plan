@@ -10,6 +10,7 @@ import type {
   Settings,
   StatusResponse,
   SubscriptionConfig,
+  SubscriptionGroupsResponse,
   SubscriptionState,
   SyncResult,
   UiConfig,
@@ -113,6 +114,7 @@ export const api = {
       { method: 'DELETE' },
     ),
   refreshSubscription: () => post<SubscriptionState>('/api/subscription/refresh'),
+  subscriptionGroups: () => request<SubscriptionGroupsResponse>('/api/subscription/groups'),
 
   proxy: () => request<ProxyState>('/api/proxy'),
   proxyGroups: () => request<{ groups: ProxyGroupSummary[] }>('/api/proxies'),
