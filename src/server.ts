@@ -12,7 +12,7 @@ import type { AppContext, SubscriptionState } from './context.js';
 import { createCoreApi } from './core/api.js';
 import { ensureGeodata } from './core/geodata.js';
 import { createCoreManager, type CoreStatus } from './core/manager.js';
-import { createProxyGuard } from './proxy/guard.js';
+import { createProxyGuard, ensureLocalBypass } from './proxy/guard.js';
 import { registerRoutes } from './routes.js';
 import { openRulesDatabase } from './rules/db.js';
 import { RuleValidationError } from './rules/render.js';
@@ -203,11 +203,15 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     applyUiConfig: async (input: { file?: string; config: unknown }) =>
       uiConfigService.apply(input),
     async saveSettings(next: Settings) {
-      settings = next;
-      context.settings = next;
-      await persistSettings(dataDir, next);
+      // ProxyOverride 存下来时就补全本机绕过项，界面看到的与实际写注册表的一致
+      settings = {
+        ...next,
+        proxy: { ...next.proxy, override: ensureLocalBypass(next.proxy.override) },
+      };
+      context.settings = settings;
+      await persistSettings(dataDir, settings);
       log.info('设置已保存');
-      return next;
+      return settings;
     },
     writeConfig,
     async refreshSubscription() {
