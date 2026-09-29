@@ -25,6 +25,28 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   settings: { logsRefetchIntervalMs: 5000 },
 };
 
+/** 系统值快照（GET /api/ui-config）。 */
+export interface UiConfigState {
+  file: string;
+  config: UiConfig;
+  updatedAt: string | null;
+}
+
+/** 预览对比的逐项差异。 */
+export interface UiConfigDiffItem {
+  label: string;
+  current: string;
+  incoming: string;
+  same: boolean;
+}
+
+export interface UiConfigPreview {
+  file: string;
+  config: UiConfig;
+  diff: UiConfigDiffItem[];
+  same: boolean;
+}
+
 export interface Rule {
   id: number;
   position: number;

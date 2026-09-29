@@ -12,6 +12,8 @@ import type {
   SubscriptionState,
   SyncResult,
   UiConfig,
+  UiConfigPreview,
+  UiConfigState,
 } from './types';
 
 const token = (window as unknown as { mcpApiToken?: string }).mcpApiToken ?? '';
@@ -66,8 +68,13 @@ export const api = {
 
   settings: () => request<Settings>('/api/settings'),
 
-  uiConfig: () => request<{ file: string; config: UiConfig }>('/api/ui-config'),
-  reloadUiConfig: () => post<{ file: string; config: UiConfig }>('/api/ui-config/reload'),
+  uiConfig: () => request<UiConfigState>('/api/ui-config'),
+  forceLoadUiConfig: (file?: string) =>
+    post<UiConfigState>('/api/ui-config/load-force', file === undefined ? {} : { file }),
+  previewUiConfig: (file?: string) =>
+    post<UiConfigPreview>('/api/ui-config/preview', file === undefined ? {} : { file }),
+  applyUiConfig: (input: { file?: string; config: UiConfig }) =>
+    post<UiConfigState>('/api/ui-config/apply', input),
 
   saveSettings: (settings: Settings) =>
     request<{ settings: Settings; needsRestart: boolean }>('/api/settings', {

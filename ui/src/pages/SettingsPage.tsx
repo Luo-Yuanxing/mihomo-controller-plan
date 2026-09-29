@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
-import type { Settings } from '../lib/types';
+import type { Settings, UiConfigPreview } from '../lib/types';
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
@@ -28,11 +28,17 @@ export default function SettingsPage() {
   });
 
   const [draft, setDraft] = useState<Settings | null>(null);
+  const [configFile, setConfigFile] = useState('');
+  const [preview, setPreview] = useState<UiConfigPreview | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (settingsQuery.data !== undefined) setDraft(settingsQuery.data);
   }, [settingsQuery.data]);
+
+  useEffect(() => {
+    if (uiConfigQuery.data !== undefined) setConfigFile(uiConfigQuery.data.file);
+  }, [uiConfigQuery.data]);
 
   const saveMutation = useMutation({
     mutationFn: (settings: Settings) => api.saveSettings(settings),
@@ -49,10 +55,40 @@ export default function SettingsPage() {
     onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
   });
 
-  const reloadUiConfig = useMutation({
-    mutationFn: api.reloadUiConfig,
+  const forceLoad = useMutation({
+    mutationFn: () => api.forceLoadUiConfig(configFile.trim()),
     onSuccess: async (result) => {
-      setNotice({ kind: 'ok', text: `界面常量已重载：${result.file}` });
+      setPreview(null);
+      setNotice({ kind: 'ok', text: `已按配置文件强制覆盖系统值：${result.file}` });
+      await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
+    },
+    onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
+  });
+
+  const previewLoad = useMutation({
+    mutationFn: () => api.previewUiConfig(configFile.trim()),
+    onSuccess: (result) => {
+      setPreview(result);
+      setNotice(
+        result.same
+          ? { kind: 'ok', text: '配置文件与系统值一致，无需保存' }
+          : { kind: 'ok', text: '配置文件与系统值不一致（红色项），确认后可一键保存到系统' },
+      );
+    },
+    onError: (error: Error) => {
+      setPreview(null);
+      setNotice({ kind: 'error', text: error.message });
+    },
+  });
+
+  const applyUiConfig = useMutation({
+    mutationFn: () => {
+      if (preview === null) throw new Error('先执行预览');
+      return api.applyUiConfig({ file: preview.file, config: preview.config });
+    },
+    onSuccess: async (result) => {
+      setPreview(null);
+      setNotice({ kind: 'ok', text: `已从界面保存到系统：${result.file}` });
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
     onError: (error: Error) => setNotice({ kind: 'error', text: error.message }),
@@ -173,26 +209,94 @@ export default function SettingsPage() {
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
         <h2 className="text-base font-semibold">界面常量（ui-config.json）</h2>
-        <p className="break-all font-mono text-xs text-slate-500">
-          {uiConfigQuery.data?.file ?? '读取中…'}
-        </p>
         <p className="text-xs text-slate-500">
-          规则类型 {uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—'}；目标策略{' '}
-          {uiConfigQuery.data?.config.policies.map((option) => option.label).join(' / ') ?? '—'}
+          系统值（存库）：规则类型 {uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—'}
+          ；目标策略{' '}
+          {uiConfigQuery.data?.config.policies.map((option) => option.label).join(' / ') ?? '—'}；
+          失败连接 {uiConfigQuery.data?.config.failedConnections.refetchIntervalMs ?? '—'}ms /{' '}
+          {uiConfigQuery.data?.config.failedConnections.lines ?? '—'} 行
         </p>
-        <div>
+        <Field label="配置文件路径" hint="可放到任意位置">
+          <input
+            className={inputClass}
+            value={configFile}
+            onChange={(event) => {
+              setConfigFile(event.target.value);
+              setPreview(null);
+            }}
+          />
+        </Field>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
-            disabled={reloadUiConfig.isPending}
+            disabled={previewLoad.isPending || configFile.trim() === ''}
             onClick={() => {
               setNotice(null);
-              reloadUiConfig.mutate();
+              previewLoad.mutate();
             }}
           >
-            {reloadUiConfig.isPending ? '重载中…' : '重载常量'}
+            {previewLoad.isPending ? '读取中…' : '预览加载（只对比）'}
           </button>
+          <button
+            type="button"
+            className="rounded bg-slate-900 px-3 py-1 text-sm text-white disabled:opacity-50"
+            disabled={forceLoad.isPending || configFile.trim() === ''}
+            onClick={() => {
+              setNotice(null);
+              forceLoad.mutate();
+            }}
+          >
+            {forceLoad.isPending ? '覆盖中…' : '强制按配置文件加载（覆盖系统值）'}
+          </button>
+          {preview !== null && !preview.same && (
+            <button
+              type="button"
+              className="rounded bg-emerald-600 px-3 py-1 text-sm text-white disabled:opacity-50"
+              disabled={applyUiConfig.isPending}
+              onClick={() => {
+                setNotice(null);
+                applyUiConfig.mutate();
+              }}
+            >
+              {applyUiConfig.isPending ? '保存中…' : '确认保存到系统'}
+            </button>
+          )}
         </div>
+
+        {preview !== null && (
+          <table className="w-full text-xs">
+            <thead className="bg-slate-50 text-left uppercase text-slate-500">
+              <tr>
+                <th className="px-2 py-1">字段</th>
+                <th className="px-2 py-1">系统值</th>
+                <th className="px-2 py-1">配置文件</th>
+              </tr>
+            </thead>
+            <tbody>
+              {preview.diff.map((item) => (
+                <tr
+                  key={item.label}
+                  className={
+                    item.same ? 'border-t border-slate-100' : 'border-t border-rose-200 bg-rose-50'
+                  }
+                >
+                  <td className="px-2 py-1 text-slate-500">{item.label}</td>
+                  <td
+                    className={`px-2 py-1 font-mono ${item.same ? 'text-slate-500' : 'text-rose-700'}`}
+                  >
+                    {item.current}
+                  </td>
+                  <td
+                    className={`px-2 py-1 font-mono ${item.same ? 'text-slate-500' : 'text-rose-700'}`}
+                  >
+                    {item.incoming}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
 
       <div>
