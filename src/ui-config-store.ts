@@ -37,7 +37,7 @@ export function readSetting(db: RulesDatabase, key: string): Row | null {
   return row ?? null;
 }
 
-export function writeSetting(db: RulesDatabase, key: string, value: unknown): string {
+function writeSetting(db: RulesDatabase, key: string, value: unknown): string {
   const updatedAt = new Date().toISOString();
   db.prepare(
     `INSERT INTO settings_kv (key, value, updated_at) VALUES (?, ?, ?)

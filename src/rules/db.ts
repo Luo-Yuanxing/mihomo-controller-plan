@@ -7,7 +7,7 @@ import Database from 'better-sqlite3';
 
 export type RulesDatabase = Database.Database;
 
-export const SCHEMA = `
+const SCHEMA = `
 CREATE TABLE IF NOT EXISTS rules (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   position    INTEGER NOT NULL,

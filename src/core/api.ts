@@ -75,7 +75,7 @@ export class CoreApiError extends Error {
 
 /** 测延迟的探针地址与单节点超时，和 proxy-provider 的健康检查保持一致。 */
 export const DELAY_TEST_URL = 'http://www.gstatic.com/generate_204';
-export const DELAY_TEST_TIMEOUT_MS = 3000;
+const DELAY_TEST_TIMEOUT_MS = 3000;
 
 export function createCoreApi(options: CoreApiOptions): CoreApi {
   const base = `http://${options.controller}`;

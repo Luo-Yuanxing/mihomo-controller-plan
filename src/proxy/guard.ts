@@ -15,7 +15,7 @@ const POLL_INTERVAL_MS = 60_000;
  * 本机回落必须绕过系统代理：否则应用自身的请求会被送进自己的 mixed 端口，
  * 变成"自己代理自己"。这两项由程序兜底，界面改不掉。
  */
-export const REQUIRED_BYPASS = ['localhost', '127.*'] as const;
+const REQUIRED_BYPASS = ['localhost', '127.*'] as const;
 
 /** 把必需项并入 ProxyOverride：去空项、按小写去重、保序，缺的补在末尾。 */
 export function ensureLocalBypass(override: string): string {

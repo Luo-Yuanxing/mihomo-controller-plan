@@ -248,7 +248,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
 export const DEFAULT_UI_CONFIG_FILE = { ...DEFAULT_UI_CONFIG, rules: [] };
 
 /** 文件级校验：界面常量 + 可选的 rules 段（类型要在 ruleTypes 白名单里）。 */
-export function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
+function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
   const issues = uiConfigIssues(raw);
   if (!isRecord(raw)) return issues;
 
