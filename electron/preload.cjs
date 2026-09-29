@@ -9,3 +9,8 @@ contextBridge.exposeInMainWorld('mcpDialog', {
   /** 传入默认完整路径；返回用户选的绝对路径，取消返回 null。 */
   saveJson: (defaultPath) => ipcRenderer.invoke('mcp:save-json', defaultPath),
 });
+
+contextBridge.exposeInMainWorld('mcpOffline', {
+  /** 离线兜底按钮：'shutdown' 完全关闭代理、'restart' 立即重启内核。 */
+  action: (name) => ipcRenderer.invoke('mcp:offline-action', name),
+});

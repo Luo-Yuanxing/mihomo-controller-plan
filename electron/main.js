@@ -43,6 +43,29 @@ ipcMain.handle('mcp:save-json', async (_event, defaultPath) => {
   return result.canceled || result.filePath === '' ? null : result.filePath;
 });
 
+/** 离线兜底动作：关代理 + 停内核 / 写期望值 + 重启内核。 */
+const OFFLINE_ACTIONS = {
+  shutdown: async (context) => {
+    await context.kernel.stop();
+    return { proxy: await context.guard.disable() };
+  },
+  restart: async (context) => {
+    const proxy = await context.guard.apply();
+    await context.writeConfig();
+    return { proxy, kernel: await context.restartKernel() };
+  },
+};
+
+/**
+ * 界面离线时点的那两个按钮走进程间调用：主进程直接调后端对象（开发期后端在独立进程，退回 HTTP）。
+ */
+ipcMain.handle('mcp:offline-action', async (_event, name) => {
+  const run = OFFLINE_ACTIONS[name];
+  if (run === undefined) throw new Error(`未知的离线动作：${String(name)}`);
+  const httpPath = name === 'shutdown' ? '/api/offline/shutdown' : '/api/offline/restart';
+  return callBackend(httpPath, run);
+});
+
 function showWindow() {
   if (win === null || win.isDestroyed()) {
     createWindow();
