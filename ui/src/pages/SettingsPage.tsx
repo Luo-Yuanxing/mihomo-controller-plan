@@ -19,6 +19,20 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const inputClass = 'w-full rounded border border-slate-300 px-2 py-1 font-mono text-sm';
 
+/**
+ * 选导出目标路径：Electron 里弹 Windows 保存对话框，默认文件名与目录沿用当前配置文件；
+ * 纯浏览器（无 preload）时退回输入框里填的路径。
+ */
+async function pickExportPath(configFile: string): Promise<string | null> {
+  const dialogApi = (
+    window as unknown as { mcpDialog?: { saveJson(path: string): Promise<string | null> } }
+  ).mcpDialog;
+  if (dialogApi === undefined) return configFile;
+
+  const dir = configFile.replace(/[\\/][^\\/]*$/, '');
+  return dialogApi.saveJson(dir === '' ? 'config.json' : `${dir}\\config.json`);
+}
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: api.settings });
@@ -136,10 +150,17 @@ export default function SettingsPage() {
     },
   });
 
-  /** 导出：界面常量 + 自定义规则写成一份 config.json，默认写到上面填的路径。 */
+  /**
+   * 导出：先弹 Windows 保存对话框（默认落在配置文件所在文件夹），
+   * 再把界面常量 + 自定义规则写成一份 config.json。取消对话框就什么都不做。
+   */
   const exportConfig = useMutation({
-    mutationFn: () => api.exportUiConfig(configFile.trim()),
+    mutationFn: async () => {
+      const target = await pickExportPath(configFile.trim());
+      return target === null ? null : api.exportUiConfig(target);
+    },
     onSuccess: (result) => {
+      if (result === null) return;
       notices.push('ok', `已导出到 ${result.file}（含 ${String(result.rules)} 条规则）`);
     },
     onError: (error: Error) => notices.push('error', error.message),
@@ -288,17 +309,6 @@ export default function SettingsPage() {
               {applyUiConfig.isPending ? '保存中…' : '确认保存到系统'}
             </button>
           )}
-          <button
-            type="button"
-            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
-            disabled={exportConfig.isPending || pathIssue !== null}
-            onClick={() => {
-              notices.clear();
-              exportConfig.mutate();
-            }}
-          >
-            {exportConfig.isPending ? '导出中…' : '导出到该路径（含规则）'}
-          </button>
         </div>
 
         {valueIssues.length > 0 && (
@@ -366,7 +376,7 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <div>
+      <div className="flex gap-2">
         <button
           type="button"
           className="rounded bg-slate-900 px-3 py-1 text-sm text-white disabled:opacity-50"
@@ -374,6 +384,17 @@ export default function SettingsPage() {
           onClick={() => saveMutation.mutate(draft)}
         >
           {saveMutation.isPending ? '保存中…' : '保存设置'}
+        </button>
+        <button
+          type="button"
+          className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+          disabled={exportConfig.isPending}
+          onClick={() => {
+            notices.clear();
+            exportConfig.mutate();
+          }}
+        >
+          {exportConfig.isPending ? '导出中…' : '导出到该路径（含规则）'}
         </button>
       </div>
 
