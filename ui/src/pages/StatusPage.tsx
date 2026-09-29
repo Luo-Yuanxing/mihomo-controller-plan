@@ -158,6 +158,7 @@ export default function StatusPage() {
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
               disabled={busy || kernelUp}
               onClick={() => startKernel.mutate()}
+              title="启动成功后自动把系统代理指向内核（反向不成立：开关系统代理不会启停内核）"
             >
               启动内核
             </button>
@@ -166,6 +167,7 @@ export default function StatusPage() {
               className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
               disabled={busy || !kernelUp}
               onClick={() => stopKernel.mutate()}
+              title="停止内核会同时关闭系统代理，免得流量指向没人监听的端口"
             >
               停止内核
             </button>
