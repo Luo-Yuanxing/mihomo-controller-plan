@@ -48,8 +48,7 @@ export async function downloadSubscription(
 
   const text = (await response.text()).replace(/^\uFEFF/, '');
   const parsed = parseSubscription(text);
-  const hasProviders =
-    parsed.document !== null && isRecord(parsed.document['proxy-providers']);
+  const hasProviders = parsed.document !== null && isRecord(parsed.document['proxy-providers']);
   if (parsed.document === null) {
     throw new Error(t('sub.notYaml'));
   }

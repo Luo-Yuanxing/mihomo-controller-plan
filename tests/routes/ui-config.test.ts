@@ -8,7 +8,7 @@ import { readAppConfig, saveAppSettings } from '../../src/app-config.js';
 import type { AppContext } from '../../src/context.js';
 import type { Rule, RuleInput, RuleRepo } from '../../src/rules/repo.js';
 import { DEFAULT_SETTINGS, type Settings } from '../../src/settings.js';
-import { DEFAULT_UI_CONFIG, getUiConfig, uiConfigPath } from '../../src/ui-config.js';
+import { DEFAULT_UI_CONFIG, getUiConfig, setActiveUiConfig, uiConfigPath } from '../../src/ui-config.js';
 import { encodeSharedConfig } from '../../src/ui-config-share.js';
 import { createUiConfigService } from '../../src/ui-config-store.js';
 import { dataPaths } from '../../src/util/paths.js';
@@ -256,5 +256,27 @@ describe.skipIf(!canLoadFastify)('/api/ui-config', () => {
     expect(response.json<{ initialized: boolean }>().initialized).toBe(false);
     expect(readAppConfig(uiConfigPath(dataDir)).initialized).toBe(false);
     await app.close();
+  });
+
+  it('配置里的 language 决定后端返回的消息语言', async () => {
+    const app = buildApp(dataDir);
+    const saved = await app.inject({
+      method: 'POST',
+      url: '/api/ui-config/apply',
+      payload: { config: { ...DEFAULT_UI_CONFIG, language: 'en' } },
+    });
+    expect(saved.statusCode).toBe(200);
+
+    const bad = await app.inject({
+      method: 'POST',
+      url: '/api/ui-config/import',
+      payload: { payload: '这不是base64!!' },
+    });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json<{ error: string }>().error).toContain('not a valid Base64URL string');
+
+    await app.close();
+    // 语言是进程内全局状态，用完恢复默认，免得多米诺影响别的用例
+    setActiveUiConfig(DEFAULT_UI_CONFIG);
   });
 });

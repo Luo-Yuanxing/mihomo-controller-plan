@@ -20,9 +20,10 @@ function normalizeHost(value: string): string {
 
 function normalizeError(value: string): string {
   const normalized = value.replace(/\\n/g, ' | ').replace(/\s+/g, ' ').trim();
-  const detail = /(?:^|\|\s*)(?:connect failed:\s*)?dial\s+(tcp|udp)\s+(\[[^\]]+\]|[^:\s]+):(\d+):\s*([^|]+)/i.exec(
-    normalized,
-  );
+  const detail =
+    /(?:^|\|\s*)(?:connect failed:\s*)?dial\s+(tcp|udp)\s+(\[[^\]]+\]|[^:\s]+):(\d+):\s*([^|]+)/i.exec(
+      normalized,
+    );
   if (detail === null) return normalized;
 
   const [, protocol, host, port, reason] = detail;

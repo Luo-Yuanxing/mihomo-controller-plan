@@ -77,7 +77,10 @@ export class UiConfigValidationError extends Error {
     const root = t('uiConfig.root');
     const detail = issues
       .map((issue) =>
-        t('uiConfig.issue', { path: issue.path === '' ? root : issue.path, message: issue.message }),
+        t('uiConfig.issue', {
+          path: issue.path === '' ? root : issue.path,
+          message: issue.message,
+        }),
       )
       .join(t('uiConfig.issueSeparator'));
     super(context === undefined ? detail : t('uiConfig.issue', { path: context, message: detail }));
@@ -289,7 +292,10 @@ function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
         mixedPort < 1 ||
         mixedPort > 65535)
     ) {
-      issues.push({ path: 'core.mixedPort', message: t('uiConfig.outOfRange', { min: 1, max: 65535 }) });
+      issues.push({
+        path: 'core.mixedPort',
+        message: t('uiConfig.outOfRange', { min: 1, max: 65535 }),
+      });
     }
   } else if (core !== undefined) {
     issues.push({ path: 'core', message: t('uiConfig.mustBeObject') });

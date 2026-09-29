@@ -119,9 +119,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     const kernelUp = kernel.state === 'running' || kernel.state === 'adopted';
     // 联动只往一个方向走：内核在跑就把系统代理指向它，没跑就关掉（反向不动内核）
     const proxy = kernelUp ? await ctx.guard.enable() : await ctx.guard.disable();
-    steps.push(
-      kernelUp ? t('routes.recover.proxyPointed') : t('routes.recover.proxyDisabled'),
-    );
+    steps.push(kernelUp ? t('routes.recover.proxyPointed') : t('routes.recover.proxyDisabled'));
     ctx.log.warn({ steps }, '一键修复完成');
     return { steps, kernel, proxy };
   });

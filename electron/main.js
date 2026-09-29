@@ -164,10 +164,7 @@ async function shutdownSafely() {
   } catch (error) {
     const choice = dialog.showMessageBoxSync({
       type: 'warning',
-      buttons: [
-        t(language, 'quitDisabledProxyCancel'),
-        t(language, 'quitDisabledProxyConfirm'),
-      ],
+      buttons: [t(language, 'quitDisabledProxyCancel'), t(language, 'quitDisabledProxyConfirm')],
       defaultId: 1,
       cancelId: 0,
       noLink: true,
@@ -256,6 +253,8 @@ async function loadInitialLanguage() {
     }
     const response = await fetch(`${appUrl}/api/ui-config`, {
       headers: apiToken === '' ? {} : { 'x-api-token': apiToken },
+      // 后端还没起来也不能把窗口卡住：读不到就先用默认语言
+      signal: AbortSignal.timeout(2000),
     });
     const payload = await response.json();
     setLanguage(payload?.config?.language);
