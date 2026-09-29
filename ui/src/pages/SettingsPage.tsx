@@ -144,22 +144,31 @@ export default function SettingsPage() {
     setDraft((current) => (current === null ? current : { ...current, ...next }));
   }
 
+  // 浏览器碰不到文件系统，前端只能查格式；能不能读到文件由后端保存时判定
+  const binaryPath = draft.core.binaryPath.trim();
+  const binaryIssue =
+    binaryPath === ''
+      ? '内核路径不能为空'
+      : /[<>"|?*]/.test(binaryPath)
+        ? '内核路径含非法字符：< > " | ? *'
+        : binaryPath.toLowerCase().endsWith('.exe')
+          ? null
+          : '内核路径必须以 .exe 结尾';
+
   return (
     <div className="flex flex-col gap-3">
       <NoticeStack notices={notices.items} onDismiss={notices.dismiss} />
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
         <h2 className="text-base font-semibold">内核</h2>
-        <Field label="内核路径" hint="保存后落成绝对路径">
+        <Field label="内核路径">
           <input
             className={inputClass}
             value={draft.core.binaryPath}
             onChange={(event) => patch({ core: { ...draft.core, binaryPath: event.target.value } })}
           />
         </Field>
-        {draft.core.binaryPath.trim() === '' && (
-          <p className="text-xs text-rose-600">内核路径不能为空</p>
-        )}
+        {binaryIssue !== null && <p className="text-xs text-rose-600">{binaryIssue}</p>}
         <Field label="混合端口">
           <input
             type="number"
