@@ -24,7 +24,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
     { value: 'DIRECT', label: '直连' },
   ],
   defaults: { ruleType: 'DOMAIN', policy: 'PROXY' },
-  failedConnections: { refetchIntervalMs: 5000, lines: 5000 },
+  failedConnections: { refetchIntervalMs: 60000, lines: 5000 },
   settings: { logsRefetchIntervalMs: 5000, logsLines: 500 },
 };
 
@@ -156,6 +156,8 @@ export interface FailedConnection {
   host: string;
   port: number;
   count: number;
+  /** 首次失败时刻：列表按它升序，新目标只往末尾追加。 */
+  firstSeen: string;
   lastSeen: string;
   error: string;
 }

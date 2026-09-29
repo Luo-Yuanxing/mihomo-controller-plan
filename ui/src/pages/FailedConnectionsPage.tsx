@@ -20,6 +20,11 @@ export default function FailedConnectionsPage() {
   const t = useT();
   const queryClient = useQueryClient();
   const uiConfig = useUiConfig();
+  /**
+   * 列表口径是"上榜即稳"：一次失败就留 10 分钟，新目标只往末尾追加，位置不会乱跳。
+   * 因此不要频繁轮询（默认 60 s 兜底），要立刻看最新状态用页面上的"刷新列表"；
+   * 新增规则后会主动失效重取，不需要靠短间隔刷新来反映变化。
+   */
   const failedQuery = useQuery({
     queryKey: ['failedConnections'],
     queryFn: () => api.failedConnections(uiConfig.failedConnections.lines),
@@ -71,21 +76,25 @@ export default function FailedConnectionsPage() {
       const created = await api.createRules(rules);
       try {
         const sync = await api.syncRules();
-        return { count: created.created.length, syncError: null, sync };
+        return { count: created.created.length, skipped: created.skipped, syncError: null, sync };
       } catch (error) {
         return {
           count: created.created.length,
+          skipped: created.skipped,
           syncError: error instanceof Error ? error.message : String(error),
           sync: null,
         };
       }
     },
     onSuccess: async (result) => {
+      const params = { count: result.count, skipped: result.skipped };
       notices.push(
         result.syncError === null ? 'ok' : 'error',
         result.syncError === null
-          ? t('failed.added', { count: result.count, ms: result.sync?.elapsedMs ?? 0 })
-          : t('failed.addedSyncFailed', { count: result.count, error: result.syncError }),
+          ? t('failed.added', { ...params, ms: result.sync?.elapsedMs ?? 0 }) +
+              (result.skipped > 0 ? t('failed.skipped', { count: result.skipped }) : '')
+          : t('failed.addedSyncFailed', { ...params, error: result.syncError }) +
+              (result.skipped > 0 ? t('failed.skipped', { count: result.skipped }) : ''),
       );
       setSelected(new Set());
       await Promise.all([
@@ -110,6 +119,16 @@ export default function FailedConnectionsPage() {
             {t('failed.matched', { count: visibleConnections.length })}
           </span>
         )}
+        <button
+          type="button"
+          className="rounded border border-slate-300 bg-white px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+          disabled={failedQuery.isFetching}
+          onClick={() => {
+            void failedQuery.refetch();
+          }}
+        >
+          {t('failed.refresh')}
+        </button>
         <label className="ml-auto flex items-center gap-1 text-sm text-slate-500">
           {t('failed.filterHost')}
           <input

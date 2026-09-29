@@ -70,7 +70,9 @@ export const api = {
   rules: () => request<{ rules: Rule[]; provider: string }>('/api/rules'),
   ruleProvider: () =>
     request<{ file: string; exists: boolean; yaml: string }>('/api/rules/provider'),
-  createRules: (rules: RuleInput[]) => post<{ created: Rule[] }>('/api/rules', { rules }),
+  /** 规则入库有去重：同类型同取值只留一条，skipped 是被跳过的重复条数。 */
+  createRules: (rules: RuleInput[]) =>
+    post<{ created: Rule[]; skipped: number }>('/api/rules', { rules }),
   updateRule: (id: number, patch: Partial<RuleInput>) =>
     request<{ rule: Rule }>(`/api/rules/${String(id)}`, {
       method: 'PUT',
