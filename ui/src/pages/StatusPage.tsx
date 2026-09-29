@@ -90,9 +90,7 @@ export default function StatusPage() {
     api.disableProxy,
     () => '系统代理已关闭',
   );
-  const applyProxy = useAction(queryClient, notices.push, api.applyProxy, (state) =>
-    state.match ? '三项与期望值一致' : '已回写期望值',
-  );
+  const applyProxy = useAction(queryClient, notices.push, api.applyProxy, () => '系统代理写入成功');
 
   const data = statusQuery.data;
   const busy =
