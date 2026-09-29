@@ -477,3 +477,76 @@ describe.skipIf(!canLoadFastify)('POST /api/ui-config/export', () => {
     await app.close();
   });
 });
+
+describe.skipIf(!canLoadFastify)('离线兜底', () => {
+  let buildApp: BuildApp;
+
+  beforeAll(async () => {
+    buildApp = await createBuilder();
+  });
+
+  const proxyState = {
+    desired: { enable: false, server: '127.0.0.1:7890', override: '' },
+    actual: null,
+    match: false,
+    guarding: false,
+    supported: true,
+    error: null,
+  };
+
+  it('GET /api/ping 返回 ok', async () => {
+    const app = buildApp(fakeApi());
+    const response = await app.inject({ method: 'GET', url: '/api/ping' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+    await app.close();
+  });
+
+  it('完全关闭代理：先停内核再关系统代理', async () => {
+    const calls: string[] = [];
+    const app = buildApp(fakeApi(), {
+      kernel: {
+        stop: async () => {
+          calls.push('kernel.stop');
+        },
+        status: () => ({ state: 'stopped' }),
+      },
+      guard: {
+        disable: async () => {
+          calls.push('guard.disable');
+          return proxyState;
+        },
+      },
+    });
+    const response = await app.inject({ method: 'POST', url: '/api/offline/shutdown' });
+
+    expect(response.statusCode).toBe(200);
+    expect(calls).toEqual(['kernel.stop', 'guard.disable']);
+    await app.close();
+  });
+
+  it('立即重启内核：写期望值 → 重写配置 → 重启', async () => {
+    const calls: string[] = [];
+    const app = buildApp(fakeApi(), {
+      guard: {
+        apply: async () => {
+          calls.push('guard.apply');
+          return proxyState;
+        },
+      },
+      writeConfig: async () => {
+        calls.push('writeConfig');
+      },
+      restartKernel: async () => {
+        calls.push('restartKernel');
+        return { state: 'running' };
+      },
+    });
+    const response = await app.inject({ method: 'POST', url: '/api/offline/restart' });
+
+    expect(response.statusCode).toBe(200);
+    expect(calls).toEqual(['guard.apply', 'writeConfig', 'restartKernel']);
+    await app.close();
+  });
+});

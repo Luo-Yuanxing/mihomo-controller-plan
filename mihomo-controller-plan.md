@@ -358,6 +358,9 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | PUT | `/api/proxies/{group}` | 切换该组的出口节点 |
 | GET | `/api/proxies/{group}/delay` | 并发测组内各节点时延（毫秒） |
 | GET | `/api/logs` | 最近 N 行日志 |
+| GET | `/api/ping` | 最轻的问候请求，界面离线时每秒探一次 |
+| POST | `/api/offline/shutdown` | 离线兜底：关系统代理 + 停内核 |
+| POST | `/api/offline/restart` | 离线兜底：无条件写系统代理期望值 + 重写配置 + 重启内核 |
 
 ---
 
@@ -429,6 +432,8 @@ payload:
 | 设置 | 内核路径、端口、订阅 URL、系统代理开关、日志查看 |
 
 保存反馈：显示本次 PUT 的 provider 与耗时，失败直接展示内核原始错误。
+
+离线兜底：任何请求返回 5xx 或直接失败 → 界面立刻进离线状态、自动跳到状态页、整页底色转红；离线期间每秒静默 `GET /api/ping`，通了自动解除。离线条上两个显眼按钮走 `electron/preload.cjs` 的 `mcpOffline.action`（进程间调用；浏览器里退回同名 HTTP 接口）："完全关闭代理"= 停内核 + 关系统代理，"立即重启内核"= 无条件写系统代理期望值 + 重写 config.yaml + 重启内核。
 
 托盘菜单只有三项：显示窗口、立即写入系统代理、退出（退出需二次确认，并提示"退出后代理将停止"）。
 

@@ -79,6 +79,26 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     proxy: await ctx.guard.state(),
   }));
 
+  /** 离线探测：界面进入离线状态后每秒问候一次，通了就解除。 */
+  app.get('/api/ping', () => ({ ok: true }));
+
+  /** 离线兜底一：完全关闭代理 = 停内核 + 关系统代理。 */
+  app.post('/api/offline/shutdown', async () => {
+    await ctx.kernel.stop();
+    const proxy = await ctx.guard.disable();
+    ctx.log.warn('离线兜底：已关闭系统代理并停止内核');
+    return { kernel: ctx.kernel.status(), proxy };
+  });
+
+  /** 离线兜底二：无条件写一遍系统代理期望值，重写配置后重启内核。 */
+  app.post('/api/offline/restart', async () => {
+    const proxy = await ctx.guard.apply();
+    await ctx.writeConfig();
+    const kernel = await ctx.restartKernel();
+    ctx.log.warn({ state: kernel.state }, '离线兜底：已重启内核');
+    return { kernel, proxy };
+  });
+
   app.get('/api/settings', async () => ctx.settings);
 
   /** 保存设置后已经落盘、但后续动作失败：带状态码交给调用方回。 */
