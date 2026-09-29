@@ -142,6 +142,10 @@ export default function App() {
           <span className={kernelState === 'running' ? 'animate-pulse' : ''}>{stateMark.icon}</span>
           {kernelStateLabel(kernelState, status.data?.kernel.error ?? null)}
         </span>
+        {/* 版本号放在角落：核对装的是哪个包时不用翻设置页或关于对话框 */}
+        <span className="font-mono text-xs text-slate-400" title={t('app.version')}>
+          {status.data === undefined ? '' : `v${status.data.app.version}`}
+        </span>
       </header>
       <main key={resetKey} className="flex-1 overflow-auto p-4">
         {current.render()}

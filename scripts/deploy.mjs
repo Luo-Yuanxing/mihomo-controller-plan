@@ -44,6 +44,8 @@ const source = path.join(root, 'release', 'win-unpacked');
 const target = path.join(resolveBaseDir(), `${product}-${version}`);
 const exeName = `${product}-${version}.exe`;
 const exePath = path.join(target, exeName);
+/** 桌面快捷方式固定用不带版本号的名字：升级换代时名字不变，不会出现"还写着旧版本号"的错觉。 */
+const linkName = `${product}.lnk`;
 
 function fail(message) {
   process.stderr.write(`${message}\n`);
@@ -179,8 +181,12 @@ $s.Save()
 
 function updateShortcuts() {
   const links = desktopLinks();
-  const source = links.find((name) => readLink(path.join(desktopDir(), name)).target === exePath);
-  const template = path.join(desktopDir(), source ?? `${exeName} - 快捷方式.lnk`);
+  const preferred = path.join(desktopDir(), linkName);
+  // 已有不带版本号的快捷方式就以它为模板，其次才找指向当前版本的旧命名
+  const source =
+    links.find((name) => path.join(desktopDir(), name) === preferred) ??
+    links.find((name) => readLink(path.join(desktopDir(), name)).target === exePath);
+  const template = path.join(desktopDir(), source ?? linkName);
 
   for (const name of links) {
     const linkPath = path.join(desktopDir(), name);

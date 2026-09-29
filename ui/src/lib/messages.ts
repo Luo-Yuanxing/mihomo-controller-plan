@@ -21,6 +21,7 @@ export const ZH = {
 
   // 外壳（App.tsx）
   'app.title': '代理控制面板',
+  'app.version': '应用版本号（打包时取自 package.json）',
   'app.tabRules': '规则',
   'app.tabFailed': '失败连接',
   'app.tabStatus': '状态',
@@ -248,6 +249,7 @@ export const EN: Record<MessageKey, string> = {
   'common.listSeparator': '; ',
 
   'app.title': 'Proxy Control Panel',
+  'app.version': 'App version (taken from package.json at build time)',
   'app.tabRules': 'Rules',
   'app.tabFailed': 'Failed connections',
   'app.tabStatus': 'Status',
