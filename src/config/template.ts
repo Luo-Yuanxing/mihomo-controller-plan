@@ -7,7 +7,7 @@ import type { Settings } from '../settings.js';
 export interface TemplateOptions {
   settings: Settings;
   secret: string;
-  /** 为 null 时不引用订阅文件，代理组仅保留直连，保证无订阅时网络可用。 */
+  /** 为 null 时不引用订阅文件，代理组用 REJECT-DROP 占位：命中 PROXY 的流量直接丢弃并超时。 */
   subscriptionProvider: string | null;
   ruleProvider: string;
 }
@@ -63,7 +63,8 @@ export function renderConfig(options: TemplateOptions): string {
   );
 
   if (options.subscriptionProvider === null) {
-    lines.push('    proxies:', '      - DIRECT');
+    // 无订阅时不能用 DIRECT 兜底，否则命中 PROXY 的规则会静默变成直连（被墙且无提示）
+    lines.push('    proxies:', '      - REJECT-DROP');
   } else {
     lines.push('    use:', `      - ${options.subscriptionProvider}`);
   }

@@ -20,7 +20,7 @@ describe('renderConfig', () => {
     expect(yaml).toContain('    use:\n      - sub-main');
   });
 
-  it('无订阅文件时只使用 DIRECT，保证网络可用', () => {
+  it('无订阅文件时用 REJECT-DROP 占位，命中 PROXY 的流量丢弃超时', () => {
     const yaml = renderConfig({
       ...base,
       subscriptionProvider: null,
@@ -28,7 +28,8 @@ describe('renderConfig', () => {
 
     expect(yaml).not.toContain('proxy-providers:');
     expect(yaml).not.toContain('./subscription.yaml');
-    expect(yaml).toContain('    proxies:\n      - DIRECT');
+    expect(yaml).toContain('    proxies:\n      - REJECT-DROP');
+    expect(yaml).not.toContain('      - DIRECT');
     expect(yaml).toContain('MATCH,PROXY');
   });
 });
