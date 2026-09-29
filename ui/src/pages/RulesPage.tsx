@@ -226,10 +226,12 @@ export default function RulesPage() {
                   type="button"
                   disabled={rows.length === 0}
                   title={allEnabled ? '全部禁用' : '全部启用'}
-                  className="cursor-pointer uppercase hover:text-slate-900 hover:underline disabled:cursor-default disabled:opacity-50 disabled:hover:no-underline"
+                  className={`cursor-pointer uppercase hover:underline disabled:cursor-default disabled:opacity-50 disabled:hover:no-underline ${
+                    allEnabled ? 'text-emerald-600' : 'text-rose-600'
+                  }`}
                   onClick={toggleAll}
                 >
-                  启用
+                  {allEnabled ? '启用' : '禁用'}
                 </button>
               </th>
               <th className="px-2 py-2">顺序</th>
