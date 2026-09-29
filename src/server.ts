@@ -18,7 +18,8 @@ import { openRulesDatabase } from './rules/db.js';
 import { RuleValidationError } from './rules/render.js';
 import { createRuleRepo } from './rules/repo.js';
 import { loadSettings, saveSettings as persistSettings, type Settings } from './settings.js';
-import { getUiConfig, loadUiConfig } from './ui-config.js';
+import { getUiConfig, uiConfigPath } from './ui-config.js';
+import { createUiConfigService } from './ui-config-store.js';
 import { countSubscriptionProxies, downloadSubscription } from './sub/download.js';
 import { writeFileAtomic } from './util/atomic.js';
 import { acquireLock } from './util/lock.js';
@@ -97,8 +98,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const subscriptionProvider = 'sub-main';
   const ruleProvider = 'custom';
 
-  // 界面常量：启动时读一次，之后由 /api/ui-config/reload 重载
-  await loadUiConfig(dataDir, log);
+  // 界面常量：系统值来自 SQLite（首次用 data/ui-config.json 初始化），配置文件只是加载源
+  const uiConfigService = createUiConfigService(db, uiConfigPath(dataDir), log);
 
   /** 订阅文件存在且含节点才算可用；空订阅按无订阅处理，避免 PROXY 组静默直连。 */
   const hasUsableSubscription = (): boolean => countSubscriptionProxies(paths.subscription) > 0;
@@ -195,7 +196,11 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     get uiConfig() {
       return getUiConfig();
     },
-    reloadUiConfig: () => loadUiConfig(dataDir, log),
+    uiConfigState: () => uiConfigService.state(),
+    forceLoadUiConfig: async (file?: string) => uiConfigService.forceLoad(file),
+    previewUiConfig: async (file?: string) => uiConfigService.preview(file),
+    applyUiConfig: async (input: { file?: string; config: unknown }) =>
+      uiConfigService.apply(input),
     async saveSettings(next: Settings) {
       settings = next;
       context.settings = next;

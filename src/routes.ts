@@ -12,7 +12,6 @@ import { RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { countSubscriptionProxies } from './sub/download.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
-import { uiConfigPath } from './ui-config.js';
 import { readFileIfExists } from './util/atomic.js';
 import { logPaths, tailLines } from './util/logger.js';
 import type { RuleInput } from './rules/repo.js';
@@ -180,17 +179,51 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/rules', () => ({ rules: ctx.repo.list(), provider: ctx.ruleProvider }));
 
-  app.get('/api/ui-config', () => ({
-    file: uiConfigPath(ctx.dataDir),
-    config: ctx.uiConfig,
-  }));
+  const uiConfigFileSchema = z.object({ file: z.string().min(1).optional() });
 
-  app.post('/api/ui-config/reload', async (_request, reply) => {
-    const state = await ctx.reloadUiConfig();
-    if (state.error !== null) {
-      return reply.status(400).send({ error: `界面常量不合法，已回退默认值：${state.error}` });
+  app.get('/api/ui-config', () => ctx.uiConfigState());
+
+  /** 强制按配置文件加载：直接覆盖系统值。 */
+  app.post('/api/ui-config/load-force', async (request, reply) => {
+    const parsed = uiConfigFileSchema.safeParse(request.body ?? {});
+    if (!parsed.success) return invalid(reply, parsed.error);
+    try {
+      return await ctx.forceLoadUiConfig(parsed.data.file);
+    } catch (error) {
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) });
     }
-    return { file: state.file, config: state.config };
+  });
+
+  /** 预览加载：只对比不生效，返回逐项 diff 供界面标红。 */
+  app.post('/api/ui-config/preview', async (request, reply) => {
+    const parsed = uiConfigFileSchema.safeParse(request.body ?? {});
+    if (!parsed.success) return invalid(reply, parsed.error);
+    try {
+      const preview = await ctx.previewUiConfig(parsed.data.file);
+      return { ...preview, same: preview.diff.every((item) => item.same) };
+    } catch (error) {
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  /** 从界面保存到系统：校验后持久化并立即生效。 */
+  app.post('/api/ui-config/apply', async (request, reply) => {
+    const parsed = uiConfigFileSchema.extend({ config: z.unknown() }).safeParse(request.body ?? {});
+    if (!parsed.success) return invalid(reply, parsed.error);
+    try {
+      return await ctx.applyUiConfig({
+        ...(parsed.data.file === undefined ? {} : { file: parsed.data.file }),
+        config: parsed.data.config,
+      });
+    } catch (error) {
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) });
+    }
   });
 
   app.get('/api/rules/provider', async () => {
@@ -316,9 +349,8 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
         renderConfig({
           settings: ctx.settings,
           secret: ctx.settings.core.secret,
-          subscriptionProvider: countSubscriptionProxies(ctx.paths.subscription) > 0
-            ? ctx.subscriptionProvider
-            : null,
+          subscriptionProvider:
+            countSubscriptionProxies(ctx.paths.subscription) > 0 ? ctx.subscriptionProvider : null,
           ruleProvider: ctx.ruleProvider,
         }),
     };
