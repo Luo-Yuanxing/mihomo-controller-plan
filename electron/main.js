@@ -21,6 +21,7 @@ let tray = null;
  * @type {{ url: string, close(): Promise<void>, context: {
  *   log: { info: Function, warn: Function },
  *   guard: { enable(): Promise<unknown>, disable(): Promise<unknown>, apply(): Promise<unknown> },
+ *   kernel: { stop(): Promise<unknown> },
  *   writeConfig(): Promise<void>,
  *   restartKernel(): Promise<unknown>,
  * } } | null}
@@ -56,6 +57,12 @@ ipcMain.handle('mcp:offline-action', async (_event, name) => {
     const hint = runningServer === null ? '（开发期后端是独立进程，请重启 npm run dev）' : '';
     throw new Error(`后端不可用，无法执行该动作：${String(error)}${hint}`);
   }
+});
+
+/** 界面的"安全关闭"按钮：与托盘退出走同一条路径，同样要先关代理再退出。 */
+ipcMain.handle('mcp:quit-safely', async () => {
+  await quitSafely();
+  return true;
 });
 
 function showWindow() {
@@ -155,6 +162,46 @@ async function restartKernelFromTray() {
   }
 }
 
+/**
+ * 安全关闭：先把系统代理交还、内核停掉，再退出。
+ * dev 下后端是独立进程（走 HTTP），打包下后端在本进程内（直接调对象）；两条路都要先关代理，
+ * 否则后端被 concurrently -k 连带强杀时没人执行清理（Windows 上 TerminateProcess 无法捕获）。
+ * 失败不静默退出：代理可能还指向没人监听的端口，必须让用户知道怎么善后。
+ */
+async function shutdownSafely() {
+  try {
+    await callBackend('/api/offline/shutdown', async (context) => {
+      await context.kernel.stop();
+      return { proxy: await context.guard.disable() };
+    });
+    runningServer?.context.log.info('安全关闭：系统代理已关闭、内核已停止');
+    return true;
+  } catch (error) {
+    const choice = dialog.showMessageBoxSync({
+      type: 'warning',
+      buttons: ['取消退出', '仍然退出'],
+      defaultId: 1,
+      cancelId: 0,
+      noLink: true,
+      title: '无法关闭系统代理',
+      message: '后端不可用，系统代理可能仍指向内核端口',
+      detail: `仍然退出后，请到「Windows 设置 → 网络和 Internet → 代理」手动关闭。\n\n原因：${String(error)}`,
+    });
+    return choice === 1;
+  }
+}
+
+/** 退出的统一入口：先安全关闭，成功才真正退出；用户取消则放弃退出。 */
+async function quitSafely() {
+  if (quitting) return;
+  quitting = true;
+  if (await shutdownSafely()) {
+    app.quit();
+    return;
+  }
+  quitting = false;
+}
+
 /** 退出必须二次确认，并提示"退出后代理将停止"（计划 §8）。 */
 function confirmQuit() {
   const options = {
@@ -173,13 +220,7 @@ function confirmQuit() {
       : dialog.showMessageBoxSync(options);
   if (choice !== 1) return;
 
-  quitting = true;
-  app.quit();
-}
-
-function quitFromTray() {
-  quitting = true;
-  app.quit();
+  void quitSafely();
 }
 
 function createTray(iconPath) {
@@ -198,7 +239,7 @@ function createTray(iconPath) {
       { label: '关闭系统代理', click: () => void setSystemProxyFromTray(false) },
       { label: '立即写入系统代理', click: () => void applySystemProxyFromTray() },
       { type: 'separator' },
-      { label: '退出', click: quitFromTray },
+      { label: '安全退出（先关闭系统代理）', click: () => void confirmQuit() },
     ]),
   );
   tray.on('click', showWindow);

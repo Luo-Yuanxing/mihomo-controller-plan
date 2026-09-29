@@ -14,3 +14,8 @@ contextBridge.exposeInMainWorld('mcpOffline', {
   /** 离线兜底按钮：'shutdown' 完全关闭代理、'restart' 立即重启内核。 */
   action: (name) => ipcRenderer.invoke('mcp:offline-action', name),
 });
+
+contextBridge.exposeInMainWorld('mcpApp', {
+  /** 安全关闭：先关闭系统代理并停内核，再退出应用。 */
+  quitSafely: () => ipcRenderer.invoke('mcp:quit-safely'),
+});
