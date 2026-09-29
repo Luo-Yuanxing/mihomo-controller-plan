@@ -15,6 +15,7 @@ import { ensureGeodata } from './core/geodata.js';
 import { createCoreManager, type CoreStatus } from './core/manager.js';
 import { createKernelProxyLink } from './core/proxy-link.js';
 import { t } from './i18n.js';
+import { createConnectionTracker } from './logs/connection-sampler.js';
 import { createProxyGuard, ensureLocalBypass } from './proxy/guard.js';
 import { registerRoutes } from './routes.js';
 import { openRulesDatabase } from './rules/db.js';
@@ -194,6 +195,9 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   /** 单向联动：内核在跑才让系统代理指向它，内核不在跑就关掉（反向不成立）。 */
   const proxyLink = createKernelProxyLink({ guard, log });
 
+  /** 连接采样只在面板请求时驱动（见 routes.ts），不占常驻定时器。 */
+  const failureTracker = createConnectionTracker();
+
   const context: AppContext = {
     appVersion: process.env['npm_package_version'] ?? '0.1.0',
     appDir,
@@ -204,6 +208,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     settings,
     repo,
     api,
+    failureTracker,
     kernel: core,
     guard,
     subscription,

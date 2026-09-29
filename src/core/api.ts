@@ -14,6 +14,24 @@ export interface ProxyEntry {
 
 export type ProxySnapshot = Record<string, ProxyEntry>;
 
+/**
+ * GET /connections 里用得上的字段。
+ * 内核返回整包 JSON 且没有单条查询（/connections/{id} 只支持 DELETE），
+ * 所以这里只声明需要的键，采样侧按需读取，不做额外请求。
+ */
+export interface ConnectionInfo {
+  id: string;
+  metadata?: {
+    network?: string;
+    host?: string;
+    destinationPort?: string;
+  };
+  upload?: number;
+  download?: number;
+  rule?: string;
+  chains?: string[];
+}
+
 /** 可选出口的代理组（目标策略里的"代理"最终落到这里）。 */
 export interface ProxyGroupSummary {
   name: string;
@@ -49,6 +67,8 @@ export interface CoreApi {
   reloadProxyProvider(name: string): Promise<void>;
   /** GET /proxies，读取代理组与节点（含当前出口 now）。 */
   proxies(): Promise<ProxySnapshot>;
+  /** GET /connections，连接快照（失败连接面板据此判断"连上了但零回程"）。 */
+  connections(): Promise<ConnectionInfo[]>;
   /** PUT /proxies/{name}，切换代理组的当前出口。 */
   selectProxy(name: string, choice: string): Promise<void>;
   /**
@@ -133,6 +153,11 @@ export function createCoreApi(options: CoreApiOptions): CoreApi {
       const response = await request('/proxies');
       const payload = (await response.json()) as { proxies?: ProxySnapshot };
       return payload.proxies ?? {};
+    },
+    async connections() {
+      const response = await request('/connections');
+      const payload = (await response.json()) as { connections?: ConnectionInfo[] };
+      return payload.connections ?? [];
     },
     async selectProxy(name: string, choice: string) {
       await request(`/proxies/${encodeURIComponent(name)}`, {

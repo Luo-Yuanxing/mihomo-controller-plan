@@ -9,7 +9,8 @@ import { PROXY_GROUP_NAME } from './config/template.js';
 import type { AppContext } from './context.js';
 import { CoreApiError, DELAY_TEST_URL, proxyGroups } from './core/api.js';
 import { t } from './i18n.js';
-import { parseFailedConnections } from './logs/failed-connections.js';
+import type { ConnectionFinding } from './logs/connection-sampler.js';
+import { parseFailedConnections, type FailedConnection } from './logs/failed-connections.js';
 import { RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { readSubscription } from './sub/subscription.js';
 import { syncRules } from './rules/sync.js';
@@ -48,11 +49,88 @@ function invalid(reply: FastifyReply, error: z.ZodError): FastifyReply {
 
 const selectProxySchema = z.object({ name: z.string().min(1) });
 
+/** 采样节拍下限：面板 5 s 一轮，这里 3 s 足够新，又不会被重复请求放大。 */
+const SAMPLE_INTERVAL_MS = 3000;
+
+/** 判定文案：面板 error 列直接显示，与后端其余消息一样走 i18n。 */
+function findingError(finding: ConnectionFinding): string {
+  return finding.kind === 'blocked' ? t('failed.blocked') : t('failed.stalled');
+}
+
+function findingToFailed(finding: ConnectionFinding): FailedConnection {
+  return {
+    id: `${finding.network.toLowerCase()}:${finding.host}:${String(finding.port)}`,
+    network: finding.network.toUpperCase(),
+    host: finding.host,
+    port: finding.port,
+    count: 1,
+    lastSeen: finding.lastSeen,
+    error: findingError(finding),
+  };
+}
+
+/**
+ * 两条来源的同一条连接取"更确定"的那条：
+ * dial 失败来自内核日志（已定论），零回程判定来自采样（观察中），后者不如前者精确。
+ */
+function preferFailure(left: FailedConnection, right: FailedConnection): FailedConnection {
+  const time = (value: FailedConnection): number => Date.parse(value.lastSeen);
+  return [
+    left,
+    right,
+    { ...left, count: left.count + right.count },
+    { ...right, count: left.count + right.count },
+  ].sort((a, b) => time(b) - time(a) || b.count - a.count)[0] as FailedConnection;
+}
+
+/**
+ * 合并日志与采样两条来源，按 协议:主机:端口 归一。
+ * 采样只在面板请求时发生，且受 SAMPLE_INTERVAL_MS 节流：没人看面板就没有任何采样开销。
+ */
+function createFailureMerger(
+  ctx: AppContext,
+): (fromLog: FailedConnection[], now: number) => Promise<FailedConnection[]> {
+  let lastSampleAt = 0;
+  let lastError: string | null = null;
+
+  return async (fromLog, now) => {
+    if (now - lastSampleAt >= SAMPLE_INTERVAL_MS) {
+      lastSampleAt = now;
+      try {
+        ctx.failureTracker.observe(await ctx.api.connections(), now);
+        lastError = null;
+      } catch (error) {
+        // 内核没起来或已退出：保留上次判定，日志来源照常返回
+        lastError = error instanceof Error ? error.message : String(error);
+      }
+    }
+
+    const merged = new Map<string, FailedConnection>();
+    for (const item of fromLog) merged.set(item.id, item);
+    for (const finding of ctx.failureTracker.findings(now)) {
+      const sampled = findingToFailed(finding);
+      const existing = merged.get(sampled.id);
+      // 同主机同端口可能同时挂着多条连接，靠 count 让面板显示"几次"，与日志来源口径一致
+      if (existing === undefined) {
+        merged.set(sampled.id, sampled);
+        continue;
+      }
+      merged.set(sampled.id, preferFailure(existing, { ...sampled, count: existing.count + 1 }));
+    }
+    if (lastError !== null) ctx.log.debug({ err: lastError }, '连接采样失败，仅返回日志来源');
+    return [...merged.values()].sort(
+      (left, right) => Date.parse(right.lastSeen) - Date.parse(left.lastSeen),
+    );
+  };
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
+  const merger = createFailureMerger(ctx);
+
   app.get('/api/status', async () => ({
     app: {
       version: ctx.appVersion,
@@ -252,15 +330,18 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     }
   });
 
-  app.get('/api/failed-connections', (request) => {
+  app.get('/api/failed-connections', async (request) => {
     const lines = Number((request.query as { lines?: string }).lines ?? 5000);
     const maxLines = Number.isInteger(lines) && lines > 0 && lines <= 20_000 ? lines : 5000;
     const file = logPaths(ctx.dataDir).core;
     const scanned = tailLines(file, maxLines);
+    const now = Date.now();
+    const fromLog = parseFailedConnections(scanned, now);
     return {
       file,
       scannedLines: scanned.length,
-      connections: parseFailedConnections(scanned),
+      /** 日志里的 dial 失败 + 连接快照里的零回程，两种失败一起给界面。 */
+      connections: await merger(fromLog, now),
     };
   });
 

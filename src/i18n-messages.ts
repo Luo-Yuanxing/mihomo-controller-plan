@@ -21,6 +21,10 @@ export const ZH = {
   'coreApi.unreachable': '连不上内核 {base}（{reason}）',
   'coreApi.httpError': '{method} {path} 返回 {status}{body}',
 
+  // 失败连接采样（logs/connection-sampler.ts）：内核日志里没有、只能由连接快照判定的两种失败
+  'failed.blocked': '连接被阻断（无数据回程）',
+  'failed.stalled': '连接无响应（建立后零回程）',
+
   // 规则（rules/render.ts、rules/repo.ts、rules/sync.ts）
   'rules.invalid': '规则 id={id} 不合法：{message}',
   'rules.unknownType': '未知类型 {type}',
@@ -125,6 +129,8 @@ export const EN: Record<MessageKey, string> = {
 
   'coreApi.unreachable': 'Cannot reach the kernel at {base} ({reason})',
   'coreApi.httpError': '{method} {path} returned {status}{body}',
+  'failed.blocked': 'Connection blocked (no data returned)',
+  'failed.stalled': 'Connection unresponsive (established, zero bytes back)',
 
   'rules.invalid': 'Rule id={id} is invalid: {message}',
   'rules.unknownType': 'unknown type {type}',

@@ -4,6 +4,7 @@
 import type { Logger } from 'pino';
 import type { CoreApi } from './core/api.js';
 import type { CoreManager, CoreStatus } from './core/manager.js';
+import type { ConnectionTracker } from './logs/connection-sampler.js';
 import type { ProxyGuard } from './proxy/guard.js';
 import type { RuleRepo } from './rules/repo.js';
 import type { Settings } from './settings.js';
@@ -32,6 +33,8 @@ export interface AppContext {
   settings: Settings;
   repo: RuleRepo;
   api: CoreApi;
+  /** 连接生命周期采样：补上内核日志里没有的"连上了但零回程"。 */
+  failureTracker: ConnectionTracker;
   kernel: CoreManager;
   guard: ProxyGuard;
   subscription: SubscriptionState;
