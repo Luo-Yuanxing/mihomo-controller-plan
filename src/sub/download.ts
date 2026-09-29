@@ -16,6 +16,7 @@ export interface DownloadResult {
 }
 
 import path from 'node:path';
+import fs from 'node:fs';
 import { fetch as undiciFetch, ProxyAgent } from 'undici';
 import { parse as parseYaml } from 'yaml';
 import { writeFileAtomic } from '../util/atomic.js';
@@ -65,4 +66,24 @@ export async function downloadSubscription(
   const target = path.join(dataDir, 'subscription.yaml');
   await writeFileAtomic(target, text);
   return { bytes: Buffer.byteLength(text), path: target, proxies };
+}
+
+/**
+ * 统计订阅文件里的可用节点数。
+ * 文件不存在、YAML 不合法、proxies 为空一律返回 0：空订阅不能当"有订阅"用，
+ * 否则 PROXY 组会退化成 mihomo 的 emptyFallback(COMPATIBLE)，即静默直连。
+ */
+export function countSubscriptionProxies(file: string): number {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return 0;
+  }
+  try {
+    const document = parseYaml(text) as Record<string, unknown> | null;
+    return Array.isArray(document?.['proxies']) ? document['proxies'].length : 0;
+  } catch {
+    return 0;
+  }
 }

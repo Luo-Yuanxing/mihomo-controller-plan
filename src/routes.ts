@@ -9,6 +9,7 @@ import { renderConfig } from './config/template.js';
 import type { AppContext } from './context.js';
 import { parseFailedConnections } from './logs/failed-connections.js';
 import { RULE_TYPES, RuleValidationError, renderRuleProvider } from './rules/render.js';
+import { countSubscriptionProxies } from './sub/download.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
 import { readFileIfExists } from './util/atomic.js';
@@ -296,7 +297,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
         renderConfig({
           settings: ctx.settings,
           secret: ctx.settings.core.secret,
-          subscriptionProvider: fs.existsSync(ctx.paths.subscription)
+          subscriptionProvider: countSubscriptionProxies(ctx.paths.subscription) > 0
             ? ctx.subscriptionProvider
             : null,
           ruleProvider: ctx.ruleProvider,

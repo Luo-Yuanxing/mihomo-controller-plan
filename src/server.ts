@@ -18,7 +18,7 @@ import { openRulesDatabase } from './rules/db.js';
 import { RuleValidationError } from './rules/render.js';
 import { createRuleRepo } from './rules/repo.js';
 import { loadSettings, saveSettings as persistSettings, type Settings } from './settings.js';
-import { downloadSubscription } from './sub/download.js';
+import { countSubscriptionProxies, downloadSubscription } from './sub/download.js';
 import { writeFileAtomic } from './util/atomic.js';
 import { acquireLock } from './util/lock.js';
 import { createLogger, logPaths } from './util/logger.js';
@@ -96,6 +96,9 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const subscriptionProvider = 'sub-main';
   const ruleProvider = 'custom';
 
+  /** 订阅文件存在且含节点才算可用；空订阅按无订阅处理，避免 PROXY 组静默直连。 */
+  const hasUsableSubscription = (): boolean => countSubscriptionProxies(paths.subscription) > 0;
+
   const subscription: SubscriptionState = {
     url: settings.subscription.url,
     interval: settings.subscription.interval,
@@ -125,7 +128,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     const yaml = renderConfig({
       settings,
       secret: settings.core.secret,
-      subscriptionProvider: fs.existsSync(paths.subscription) ? subscriptionProvider : null,
+      subscriptionProvider: hasUsableSubscription() ? subscriptionProvider : null,
       ruleProvider,
     });
     await writeFileAtomic(paths.config, yaml);
@@ -196,7 +199,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     async refreshSubscription() {
       context.subscription.refreshing = true;
       try {
-        const hadSubscription = fs.existsSync(paths.subscription);
+        const hadUsableSubscription = hasUsableSubscription();
         const result = await downloadSubscription(
           {
             url: settings.subscription.url,
@@ -208,13 +211,15 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
           settings.core.mixedPort,
         );
         await writeConfig();
+        const usableSubscription = hasUsableSubscription();
         context.subscription.lastOkAt = new Date().toISOString();
         context.subscription.lastError = null;
         context.subscription.bytes = result.bytes;
         log.info({ bytes: result.bytes, proxies: result.proxies }, '订阅已更新');
         const state = core.status().state;
         if (state === 'running' || state === 'adopted') {
-          if (hadSubscription) {
+          // 占位组与订阅组结构不同，只有前后都可用才能只刷 provider，否则整体重启
+          if (hadUsableSubscription && usableSubscription) {
             await api.reloadProxyProvider(subscriptionProvider);
           } else {
             const status = await core.restart();
