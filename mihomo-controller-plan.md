@@ -339,7 +339,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | POST | `/api/subscription/refresh` | 立即下载并生效 |
 | GET | `/api/subscription/groups` | 订阅文件里的代理组，用于选 `PROXY` 指代哪个组 |
 | GET | `/api/rules` | 规则列表 |
-| POST | `/api/rules` | 新增（支持数组批量） |
+| POST | `/api/rules` | 新增（批量，请求体 `{ rules: [...] }`） |
 | PUT | `/api/rules/{id}` | 修改 |
 | DELETE | `/api/rules/{id}` | 删除 |
 | POST | `/api/rules/sync` | 落盘 + 热更新 |

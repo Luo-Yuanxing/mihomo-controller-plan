@@ -198,7 +198,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const context: AppContext = {
     appVersion: process.env['npm_package_version'] ?? '0.1.0',
     appDir,
-    uiDir,
     dataDir,
     dataFallback: fallback,
     paths,

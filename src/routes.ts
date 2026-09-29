@@ -39,11 +39,7 @@ function ruleSchemas(ruleTypes: readonly string[]) {
   });
   return {
     rulePatchSchema: ruleInputSchema.partial(),
-    createRulesSchema: z.union([
-      ruleInputSchema,
-      z.array(ruleInputSchema),
-      z.object({ rules: z.array(ruleInputSchema) }),
-    ]),
+    createRulesSchema: z.object({ rules: z.array(ruleInputSchema) }),
   };
 }
 
@@ -377,12 +373,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     const parsed = ruleSchemas(ctx.uiConfig.ruleTypes).createRulesSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply, parsed.error);
 
-    const inputs = Array.isArray(parsed.data)
-      ? parsed.data
-      : 'rules' in parsed.data
-        ? parsed.data.rules
-        : [parsed.data];
-    const created = ctx.repo.create(inputs);
+    const created = ctx.repo.create(parsed.data.rules);
     ctx.log.info({ count: created.length }, '新增规则');
     return reply.status(201).send({ created });
   });
