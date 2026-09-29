@@ -25,6 +25,8 @@ export interface RuleInput {
 export interface RuleRepo {
   list(): Rule[];
   create(inputs: RuleInput[]): Rule[];
+  /** 整表覆盖：删掉现有规则，按给定顺序重建（导入配置用）。 */
+  replaceAll(inputs: RuleInput[]): Rule[];
   update(id: number, input: Partial<RuleInput>): Rule;
   remove(id: number): void;
   reorder(ids: number[]): void;
@@ -105,10 +107,31 @@ export function createRuleRepo(db: RulesDatabase): RuleRepo {
     [...requested, ...rest].forEach((id, index) => updatePosition.run(index + 1, id));
   });
 
+  const replaceMany = db.transaction((inputs: RuleInput[]): number[] => {
+    db.prepare('DELETE FROM rules').run();
+    const ids: number[] = [];
+    inputs.forEach((input, index) => {
+      const info = insert.run({
+        position: index + 1,
+        enabled: input.enabled === false ? 0 : 1,
+        type: input.type,
+        value: input.value,
+        policy: input.policy,
+        noResolve: input.noResolve === true ? 1 : 0,
+      });
+      ids.push(Number(info.lastInsertRowid));
+    });
+    return ids;
+  });
+
   return {
     list,
     create(inputs: RuleInput[]): Rule[] {
       const ids = insertMany(inputs);
+      return ids.map((id) => get(id)).filter((rule): rule is Rule => rule !== null);
+    },
+    replaceAll(inputs: RuleInput[]): Rule[] {
+      const ids = replaceMany(inputs);
       return ids.map((id) => get(id)).filter((rule): rule is Rule => rule !== null);
     },
     update(id: number, input: Partial<RuleInput>): Rule {
