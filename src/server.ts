@@ -108,12 +108,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const subscriptionProvider = 'sub-main';
   const ruleProvider = 'custom';
 
-  // 界面常量：生效值就住在统一配置文件里，文件是唯一真相源
-  const uiConfigService = createUiConfigService(appConfigFile, log, {
-    // 预览对比要用到当前设置（内核路径、端口、订阅、ProxyOverride）
-    currentSettings: () => settings,
-    countRules: () => repo.list().length,
-  });
+  // 界面常量：生效值就住在统一配置文件里，文件是唯一真相源，界面只做字符串导入/立即初始化
+  const uiConfigService = createUiConfigService(appConfigFile, log);
 
   /** 订阅文件存在且含节点才算可用；空订阅按无订阅处理，避免 PROXY 组静默直连。 */
   const readSubscriptionFile = (): SubscriptionFile => readSubscription(paths.subscription);
@@ -216,10 +212,15 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       return getUiConfig();
     },
     uiConfigState: () => uiConfigService.state(),
-    forceLoadUiConfig: async (file?: string) => uiConfigService.forceLoad(file),
-    previewUiConfig: async (file?: string) => uiConfigService.preview(file),
-    applyUiConfig: async (input: { file?: string; config: unknown }) =>
-      uiConfigService.apply(input),
+    applyUiConfig: async (config: unknown) => uiConfigService.apply(config),
+    initializeUiConfig: async () => uiConfigService.initialize(),
+    renderUiConfigShare: () =>
+      uiConfigService.share(repo.list(), {
+        core: { binaryPath: settings.core.binaryPath, mixedPort: settings.core.mixedPort },
+        proxy: { enabled: settings.proxy.enabled, override: settings.proxy.override },
+      }),
+    importUiConfigShare: async (payload: string) => uiConfigService.importShared(payload),
+    decodeUiConfigShare: (payload: string) => uiConfigService.decode(payload),
     async saveSettings(next: Settings) {
       // ProxyOverride 存下来时就补全本机绕过项，界面看到的与实际写注册表的一致
       settings = {

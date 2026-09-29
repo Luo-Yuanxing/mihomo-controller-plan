@@ -29,22 +29,25 @@ export interface AppConfig {
   settings: Settings;
   /** 规则段只在导入/导出时同步，null = 文件没带这一段。 */
   rules: RuleEntry[] | null;
-  /** 界面里"配置文件路径"那一栏的持久值（绝对路径）；null = 就用统一配置文件自己。 */
-  configFile: string | null;
+  /**
+   * 是不是还没配置过的初始化文件：true = 模板态，界面要引导用户导入一份配置；
+   * 任何一种导入（字符串导入 / 立即初始化）都会把它改成 false，之后启动直接按文件生效。
+   */
+  initialized: boolean;
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
   ui: DEFAULT_UI_CONFIG,
   settings: DEFAULT_SETTINGS,
   rules: [],
-  configFile: null,
+  initialized: true,
 };
 
-/** 文件正文：界面常量与设置平铺在同一层，规则段与配置文件路径可选。 */
+/** 文件正文：界面常量与设置平铺在同一层，规则段与初始化标记跟在后面。 */
 export function renderAppConfig(config: AppConfig): string {
-  const { ui, settings, rules, configFile } = config;
+  const { ui, settings, rules, initialized } = config;
   return `${JSON.stringify(
-    { ...ui, ...settings, ...(rules === null ? {} : { rules }), ...(configFile === null ? {} : { configFile }) },
+    { ...ui, ...settings, ...(rules === null ? {} : { rules }), initialized },
     null,
     2,
   )}\n`;
@@ -71,15 +74,14 @@ export function readAppConfig(file: string): AppConfig {
     proxy: record['proxy'],
   });
   const rules = z.array(ruleEntrySchema).safeParse(record['rules']);
-  const configFile = record['configFile'];
-  const configFileText =
-    typeof configFile === 'string' && configFile.trim() !== '' ? path.resolve(configFile.trim()) : null;
+  // 老文件没有这一项：说明它早就配置过了，按"已初始化"处理，免得老用户被拉去引导页
+  const initialized = typeof record['initialized'] === 'boolean' ? record['initialized'] : false;
 
   return {
     ui: ui.success ? ui.data : DEFAULT_UI_CONFIG,
     settings: mergeSettings(app.data),
     rules: rules.success ? rules.data : null,
-    configFile: configFileText,
+    initialized,
   };
 }
 
@@ -116,14 +118,14 @@ export async function saveAppSettings(file: string, settings: Settings): Promise
   await writeAppConfig(file, { ...readAppConfig(file), settings });
 }
 
-/** 只改界面常量段：应用设置与规则段保持文件原样。 */
-export async function saveUiConfig(file: string, ui: UiConfig, configFile?: string): Promise<void> {
-  const current = readAppConfig(file);
-  await writeAppConfig(file, {
-    ...current,
-    ui,
-    configFile: configFile === undefined ? current.configFile : path.resolve(configFile),
-  });
+/** 只改界面常量段：应用设置与规则段保持文件原样；存过一次就算配置好了。 */
+export async function saveUiConfig(file: string, ui: UiConfig, initialized = false): Promise<void> {
+  await writeAppConfig(file, { ...readAppConfig(file), ui, initialized });
+}
+
+/** 只改初始化标记：立即初始化就是把它从 true 改成 false，其余内容不动。 */
+export async function markInitialized(file: string): Promise<void> {
+  await writeAppConfig(file, { ...readAppConfig(file), initialized: false });
 }
 
 /** 统一配置文件名：工作目录下的 config.json。 */
@@ -158,20 +160,9 @@ export function ensureAppConfigFile(appDir: string, dataDir: string, log?: Logge
     try {
       if (!fs.existsSync(candidate)) {
         fs.mkdirSync(path.dirname(candidate), { recursive: true });
-        // "配置文件路径"这一项就是它自己，界面那一栏打开就有值
-        fs.writeFileSync(
-          candidate,
-          renderAppConfig({ ...DEFAULT_APP_CONFIG, configFile: candidate }),
-          'utf8',
-        );
-        log?.info({ file: candidate }, '已预生成统一配置文件 config.json');
-      } else {
-        // 老文件缺这一项就补上，免得界面上那一栏空着
-        const current = readAppConfig(candidate);
-        if (current.configFile === null) {
-          fs.writeFileSync(candidate, renderAppConfig({ ...current, configFile: candidate }), 'utf8');
-          log?.info({ file: candidate }, '统一配置文件已补上"配置文件路径"这一项');
-        }
+        // 预生成的是初始化文件（initialized: true），界面会引导用户导入一份配置
+        fs.writeFileSync(candidate, renderAppConfig(DEFAULT_APP_CONFIG), 'utf8');
+        log?.info({ file: candidate }, '已预生成初始化配置文件 config.json');
       }
       target = candidate;
       break;

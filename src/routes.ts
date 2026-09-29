@@ -14,13 +14,8 @@ import { readSubscription } from './sub/subscription.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
 import type { Settings } from './settings.js';
-import {
-  renderUiConfigFile,
-  resolveExportTarget,
-  UiConfigValidationError,
-  type RuleEntry,
-} from './ui-config.js';
-import { readFileIfExists, writeFileAtomic } from './util/atomic.js';
+import { UiConfigValidationError, type RuleEntry } from './ui-config.js';
+import { readFileIfExists } from './util/atomic.js';
 import { resolveBinaryPath } from './util/paths.js';
 import { logPaths, tailLines } from './util/logger.js';
 import type { RuleInput } from './rules/repo.js';
@@ -264,9 +259,6 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/rules', () => ({ rules: ctx.repo.list(), provider: ctx.ruleProvider }));
 
-  // 路径本身（非空、.json、存在且是文件）由 resolveConfigFile 严格校验
-  const uiConfigFileSchema = z.object({ file: z.string().trim().min(1).max(512).optional() });
-
   /** 取值不合法时返回 400 + 逐项明细，界面按字段展示。 */
   const uiConfigFailure = (reply: FastifyReply, error: unknown): FastifyReply => {
     const message = error instanceof Error ? error.message : String(error);
@@ -278,8 +270,8 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/ui-config', () => ctx.uiConfigState());
 
-  /** 配置文件里的 rules 段：整表覆盖库里的规则并热更新；没有 rules 段就完全不动规则。 */
-  const applyRulesFromConfig = async (
+  /** 导入串里的 rules 段：整表覆盖库里的规则并热更新；没有 rules 段就完全不动规则。 */
+  const applyRulesFromShare = async (
     entries: RuleEntry[] | null,
   ): Promise<{ count: number; changed: boolean } | null> => {
     if (entries === null) return null;
@@ -293,37 +285,57 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { count: entries.length, changed: result.changed };
   };
 
-  /** 强制按配置文件加载：直接覆盖生效值。 */
-  app.post('/api/ui-config/load-force', async (request, reply) => {
-    const parsed = uiConfigFileSchema.safeParse(request.body ?? {});
+  const sharePayloadSchema = z.object({
+    payload: z.string().trim().min(1).max(400_000),
+  });
+
+  /** 生成分享串：界面常量 + 规则 + 内核/代理设置；订阅与 secret 不出门。 */
+  app.get('/api/ui-config/share', () => {
+    const payload = ctx.renderUiConfigShare();
+    return { payload, bytes: Buffer.byteLength(payload) };
+  });
+
+  /**
+   * 字符串导入：解析就在动状态之前完成，字段不合法直接 400，什么都不会变。
+   * 订阅永远保持本机现状；内核路径在本机不存在时只提示、不覆盖本机值。
+   */
+  app.post('/api/ui-config/import', async (request, reply) => {
+    const parsed = sharePayloadSchema.safeParse(request.body ?? {});
     if (!parsed.success) return invalid(reply, parsed.error);
+
+    const warnings: string[] = [];
     try {
-      // 先只读一遍：应用设置要能在动任何状态之前就校验失败
-      const peek = await ctx.previewUiConfig(parsed.data.file);
-      if (peek.app !== null) {
+      const shared = ctx.decodeUiConfigShare(parsed.data.payload);
+      if (shared.app !== null) {
         const current = ctx.settings;
-        const app = peek.app;
-        // 文件里没带的字段保持现状（空串也是有意义的值，所以用 ?? 而不是 ||）
+        let binaryPath = shared.app.core?.binaryPath;
+        if (binaryPath !== undefined) {
+          try {
+            binaryPath = resolveBinaryPath(ctx.appDir, binaryPath);
+          } catch {
+            warnings.push(`分享串里的内核路径在本机不存在（${binaryPath}），已保留本机当前路径`);
+            binaryPath = undefined;
+          }
+        }
         await applySettings({
           core: {
-            binaryPath: app.core?.binaryPath ?? current.core.binaryPath,
-            mixedPort: app.core?.mixedPort ?? current.core.mixedPort,
+            binaryPath: binaryPath ?? current.core.binaryPath,
+            mixedPort: shared.app.core?.mixedPort ?? current.core.mixedPort,
             secret: current.core.secret,
           },
-          subscription: {
-            url: app.subscription?.url ?? current.subscription.url,
-            useProxy: app.subscription?.useProxy ?? current.subscription.useProxy,
-            userAgent: app.subscription?.userAgent ?? current.subscription.userAgent,
-            proxyGroup: app.subscription?.proxyGroup ?? current.subscription.proxyGroup,
-          },
+          // 订阅是私人凭据，分享串里没有，导入时一律保持本机现状
+          subscription: current.subscription,
           proxy: {
-            enabled: current.proxy.enabled,
-            override: app.proxy?.override ?? current.proxy.override,
+            enabled: shared.app.proxy?.enabled ?? current.proxy.enabled,
+            override: shared.app.proxy?.override ?? current.proxy.override,
           },
         });
       }
-      const loaded = await ctx.forceLoadUiConfig(peek.file);
-      return { ...loaded.state, rules: await applyRulesFromConfig(loaded.rules) };
+
+      const imported = await ctx.importUiConfigShare(parsed.data.payload);
+      const rules = await applyRulesFromShare(imported.rules);
+      ctx.log.info({ rules: imported.rules?.length ?? null }, '配置字符串已导入');
+      return { ...imported.state, rules, warnings };
     } catch (error) {
       if (error instanceof SettingsApplyError) {
         return reply.status(error.status).send({ error: errorText(error) });
@@ -332,61 +344,15 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     }
   });
 
-  /** 导出配置：界面常量 + 自定义规则写成一个 config.json。 */
-  app.post('/api/ui-config/export', async (request, reply) => {
-    const parsed = uiConfigFileSchema.safeParse(request.body ?? {});
-    if (!parsed.success) return invalid(reply, parsed.error);
-    try {
-      const state = ctx.uiConfigState();
-      const target = resolveExportTarget(parsed.data.file ?? state.file);
-      const json = renderUiConfigFile(state.config, ctx.repo.list(), {
-        core: {
-          binaryPath: ctx.settings.core.binaryPath,
-          mixedPort: ctx.settings.core.mixedPort,
-        },
-        subscription: {
-          url: ctx.settings.subscription.url,
-          useProxy: ctx.settings.subscription.useProxy,
-          userAgent: ctx.settings.subscription.userAgent,
-          proxyGroup: ctx.settings.subscription.proxyGroup,
-        },
-        proxy: { override: ctx.settings.proxy.override },
-      });
-      await writeFileAtomic(target, json);
-      ctx.log.info({ file: target }, '配置已导出');
-      return { file: target, rules: ctx.repo.list().length, bytes: Buffer.byteLength(json) };
-    } catch (error) {
-      return uiConfigFailure(reply, error);
-    }
-  });
+  /** 立即初始化：把 config.json 的初始化标记改成 false，内容不动。 */
+  app.post('/api/ui-config/initialize', async () => ctx.initializeUiConfig());
 
-  /** 预览加载：只对比不生效，返回逐项 diff 供界面标红。 */
-  app.post('/api/ui-config/preview', async (request, reply) => {
-    const parsed = uiConfigFileSchema.safeParse(request.body ?? {});
-    if (!parsed.success) return invalid(reply, parsed.error);
-    try {
-      const preview = await ctx.previewUiConfig(parsed.data.file);
-      return {
-        ...preview,
-        same: preview.diff.every((item) => item.same),
-        rules: preview.rules === null ? null : preview.rules.length,
-      };
-    } catch (error) {
-      return uiConfigFailure(reply, error);
-    }
-  });
-
-  /** 从界面保存到系统：校验后写回统一配置文件并立即生效。 */
+  /** 保存界面常量到 config.json：存过一次就算配置好了。 */
   app.post('/api/ui-config/apply', async (request, reply) => {
-    const parsed = uiConfigFileSchema.extend({ config: z.unknown() }).safeParse(request.body ?? {});
+    const parsed = z.object({ config: z.unknown() }).safeParse(request.body ?? {});
     if (!parsed.success) return invalid(reply, parsed.error);
     try {
-      const result = await ctx.applyUiConfig({
-        ...(parsed.data.file === undefined ? {} : { file: parsed.data.file }),
-        config: parsed.data.config,
-      });
-      // 和 load-force 一样返回生效值快照本身（界面直接读 file/config/updatedAt）
-      return { ...result.state, rules: result.rules };
+      return await ctx.applyUiConfig(parsed.data.config);
     } catch (error) {
       return uiConfigFailure(reply, error);
     }

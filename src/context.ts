@@ -8,8 +8,8 @@ import type { ProxyGuard } from './proxy/guard.js';
 import type { RuleRepo } from './rules/repo.js';
 import type { Settings } from './settings.js';
 import type { UiConfig } from './ui-config.js';
-import type { StoredUiConfig, UiConfigDiffItem, UiConfigLoadResult } from './ui-config-store.js';
-import type { RuleEntry } from './ui-config.js';
+import type { StoredUiConfig, UiConfigImportResult } from './ui-config-store.js';
+import type { SharedConfig } from './ui-config-share.js';
 import type { dataPaths } from './util/paths.js';
 
 export interface SubscriptionState {
@@ -37,22 +37,20 @@ export interface AppContext {
   subscription: SubscriptionState;
   subscriptionProvider: string;
   ruleProvider: string;
-  /** 当前生效的界面常量（统一配置文件 config.json 的界面常量段）。 */
+  /** 当前生效的界面常量（config.json 的界面常量段）。 */
   uiConfig: UiConfig;
-  /** 生效值快照：来源文件 + 生效值 + 文件修改时间。 */
+  /** 生效值快照：当前值 + 是否还是初始化文件 + 文件修改时间。 */
   uiConfigState(): StoredUiConfig;
-  /** 强制按配置文件加载：读文件直接覆盖生效值并写回统一配置文件。 */
-  forceLoadUiConfig(file?: string): Promise<UiConfigLoadResult>;
-  /** 预览方式加载：只读文件并与生效值逐项对比，不改任何状态。 */
-  previewUiConfig(file?: string): Promise<{
-    file: string;
-    config: UiConfig;
-    diff: UiConfigDiffItem[];
-    rules: RuleEntry[] | null;
-    app: import('./ui-config.js').AppSettingsFile | null;
-  }>;
-  /** 把界面上的值写进统一配置文件（立即生效）。 */
-  applyUiConfig(input: { file?: string; config: unknown }): Promise<UiConfigLoadResult>;
+  /** 保存界面常量到 config.json（存过一次就算配置好了）。 */
+  applyUiConfig(config: unknown): Promise<StoredUiConfig>;
+  /** 立即初始化：把 config.json 的初始化标记改成 false，内容不动。 */
+  initializeUiConfig(): Promise<StoredUiConfig>;
+  /** 生成配置分享串（界面常量 + 规则 + 内核/代理设置，剔除订阅与 secret）。 */
+  renderUiConfigShare(): string;
+  /** 只解析分享串、不动任何状态；不合法直接抛带明细的错。 */
+  decodeUiConfigShare(payload: string): SharedConfig;
+  /** 解析并导入配置分享串：界面常量与规则段落盘，应用设置段交给调用方。 */
+  importUiConfigShare(payload: string): Promise<UiConfigImportResult>;
   /** 写回统一配置文件并刷新内存中的设置。 */
   saveSettings(next: Settings): Promise<Settings>;
   /** 重新渲染 config.yaml；端口/secret 变化后需要重启内核才生效。 */

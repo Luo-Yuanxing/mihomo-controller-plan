@@ -317,58 +317,8 @@ export function parseUiConfigFile(raw: unknown): {
   return { config: uiConfigSchema.parse(rest), rules: rules ?? null, app: hasApp ? app : null };
 }
 
-/** 生成导出内容：界面常量 + 自定义规则 + 应用设置（内核/订阅/系统代理）。 */
-export function renderUiConfigFile(
-  config: UiConfig,
-  rules: RuleEntry[],
-  app: AppSettingsFile | null = null,
-): string {
-  return `${JSON.stringify(uiConfigFileSchema.extend(appSettingsFileSchema.shape).parse({ ...config, rules, ...app }), null, 2)}\n`;
-}
-
-/** 导出目标：非空 + .json，允许文件不存在（导出就是新建），父目录自动建。 */
-export function resolveExportTarget(file: string): string {
-  const raw = file.trim();
-  if (raw === '') {
-    throw new UiConfigValidationError([{ path: 'file', message: '导出路径不能为空' }]);
-  }
-  if (path.extname(raw).toLowerCase() !== '.json') {
-    throw new UiConfigValidationError([{ path: 'file', message: '导出文件必须以 .json 结尾' }]);
-  }
-  const resolved = path.resolve(raw);
-  fs.mkdirSync(path.dirname(resolved), { recursive: true });
-  return resolved;
-}
-
 export function uiConfigPath(dataDir: string): string {
   return path.join(dataDir, 'config.json');
-}
-
-/**
- * 严格解析配置文件路径：非空 + 以 .json 结尾 + 存在且是文件，返回绝对路径。
- * 只由用户触发的加载/预览/保存调用；启动恢复生效值不做这一步（旧路径失效不应挡住启动）。
- */
-export function resolveConfigFile(file: string): string {
-  const raw = file.trim();
-  if (raw === '') {
-    throw new UiConfigValidationError([{ path: 'file', message: '配置文件路径不能为空' }]);
-  }
-  if (path.extname(raw).toLowerCase() !== '.json') {
-    throw new UiConfigValidationError([{ path: 'file', message: '配置文件必须以 .json 结尾' }]);
-  }
-  const resolved = path.resolve(raw);
-  let stat: fs.Stats;
-  try {
-    stat = fs.statSync(resolved);
-  } catch {
-    throw new UiConfigValidationError([
-      { path: 'file', message: `配置文件不存在或不可读：${resolved}` },
-    ]);
-  }
-  if (!stat.isFile()) {
-    throw new UiConfigValidationError([{ path: 'file', message: `不是文件：${resolved}` }]);
-  }
-  return resolved;
 }
 
 let active: UiConfig = DEFAULT_UI_CONFIG;
