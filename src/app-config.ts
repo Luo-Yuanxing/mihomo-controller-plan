@@ -40,7 +40,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   ui: DEFAULT_UI_CONFIG,
   settings: DEFAULT_SETTINGS,
   rules: [],
-  initialized: true,
+  initialized: false,
 };
 
 /** 文件正文：界面常量与设置平铺在同一层，规则段与初始化标记跟在后面。 */
@@ -160,7 +160,7 @@ export function ensureAppConfigFile(appDir: string, dataDir: string, log?: Logge
     try {
       if (!fs.existsSync(candidate)) {
         fs.mkdirSync(path.dirname(candidate), { recursive: true });
-        // 预生成的是初始化文件（initialized: true），界面会引导用户导入一份配置
+        // 预生成的文件直接算已初始化（initialized: false），启动不加载引导
         fs.writeFileSync(candidate, renderAppConfig(DEFAULT_APP_CONFIG), 'utf8');
         log?.info({ file: candidate }, '已预生成初始化配置文件 config.json');
       }
