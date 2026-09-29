@@ -1,10 +1,10 @@
 /**
- * 订阅文件里的 `proxy-groups` 解析与复刻。
+ * 订阅文件（data/subscription.yaml）的唯一解析入口：节点数、proxy-groups、dns 段一次读出来。
  *
- * 为什么要复刻：file 类型 proxy-provider 只把 `proxies` 交给内核，订阅自带的组
- * 不会进内核。所以"PROXY 指代订阅里哪个组"只能由本程序按所选组的定义重新生成，
- * 节点成员一律由 `use: [provider]` 提供（内核不接受在 `proxies:` 里写 provider 节点名，
- * 见 mihomo 的 outboundgroup.getProxies）。
+ * 为什么要复刻组：file 类型 proxy-provider 只把 `proxies` 交给内核，订阅自带的组不会进内核。
+ * 所以"PROXY 指代订阅里哪个组"只能由本程序按所选组的定义重新生成，节点成员一律由
+ * `use: [provider]` 提供（内核不接受在 `proxies:` 里写 provider 节点名，见 mihomo 的
+ * outboundgroup.getProxies）。
  */
 import fs from 'node:fs';
 import { parse as parseYaml } from 'yaml';
@@ -31,10 +31,6 @@ export interface SubscriptionGroup {
   extra: { key: string; value: unknown }[];
 }
 
-export interface SubscriptionGroups {
-  groups: SubscriptionGroup[];
-}
-
 /** 生成配置里要写出的组：节点成员由 use 提供，这里只记组与组的引用关系。 */
 export interface RenderedGroup {
   name: string;
@@ -43,12 +39,17 @@ export interface RenderedGroup {
   extra: { key: string; value: unknown }[];
 }
 
-const EMPTY: SubscriptionGroups = { groups: [] };
+export interface SubscriptionFile {
+  /** 解析后的订阅根对象；不是映射（含文件缺失、非法 YAML）时为 null。 */
+  document: Record<string, unknown> | null;
+  /** proxies 数组长度；0 = 这份订阅不能当"有订阅"用，否则 PROXY 组会静默直连。 */
+  proxies: number;
+  groups: SubscriptionGroup[];
+  dns: Record<string, unknown> | null;
+}
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function asStrings(value: unknown): string[] {
@@ -75,49 +76,57 @@ function toGroup(name: unknown, mapping: Record<string, unknown>): SubscriptionG
   };
 }
 
-/** 读订阅文件里的组定义；文件缺失、非法、字段不全都返回空（按无组处理）。 */
-export function readSubscriptionGroups(file: string): SubscriptionGroups {
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch {
-    return EMPTY;
-  }
-
-  let document: unknown;
-  try {
-    document = parseYaml(text);
-  } catch {
-    return EMPTY;
-  }
-
-  const root = asRecord(document);
-  if (root === null) return EMPTY;
-
-  const rawGroups = root['proxy-groups'];
+function readGroups(rawGroups: unknown): SubscriptionGroup[] {
   const groups: SubscriptionGroup[] = [];
 
   if (Array.isArray(rawGroups)) {
     for (const item of rawGroups) {
-      const mapping = asRecord(item);
-      if (mapping === null) continue;
-      const group = toGroup(mapping['name'], mapping);
+      if (!isRecord(item)) continue;
+      const group = toGroup(item['name'], item);
       if (group !== null) groups.push(group);
     }
-  } else {
-    // 少数订阅用 name -> 定义 的映射写法
-    const mapping = asRecord(rawGroups);
-    if (mapping !== null) {
-      for (const [name, value] of Object.entries(mapping)) {
-        const definition = asRecord(value);
-        if (definition === null) continue;
-        const group = toGroup(name, definition);
-        if (group !== null) groups.push(group);
-      }
-    }
+    return groups;
   }
 
-  return { groups };
+  // 少数订阅用 name -> 定义 的映射写法
+  if (isRecord(rawGroups)) {
+    for (const [name, value] of Object.entries(rawGroups)) {
+      if (!isRecord(value)) continue;
+      const group = toGroup(name, value);
+      if (group !== null) groups.push(group);
+    }
+  }
+  return groups;
+}
+
+/** 解析订阅全文；非法 YAML 按空订阅处理（调用方只关心"能不能用"）。 */
+export function parseSubscription(text: string): SubscriptionFile {
+  let document: unknown;
+  try {
+    document = parseYaml(text);
+  } catch {
+    document = null;
+  }
+  const root = isRecord(document) ? document : null;
+  const proxies = root !== null && Array.isArray(root['proxies']) ? root['proxies'].length : 0;
+  const dns = root?.['dns'];
+  return {
+    document: root,
+    proxies,
+    groups: root === null ? [] : readGroups(root['proxy-groups']),
+    dns: isRecord(dns) ? dns : null,
+  };
+}
+
+/** 读订阅文件；文件缺失或读不到按空订阅处理。 */
+export function readSubscription(file: string): SubscriptionFile {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return { document: null, proxies: 0, groups: [], dns: null };
+  }
+  return parseSubscription(text);
 }
 
 /**
@@ -126,9 +135,9 @@ export function readSubscriptionGroups(file: string): SubscriptionGroups {
  */
 export function materializeProxyGroups(
   chosen: string,
-  source: SubscriptionGroups,
+  source: SubscriptionGroup[],
 ): RenderedGroup[] {
-  const byName = new Map(source.groups.map((group) => [group.name, group]));
+  const byName = new Map(source.map((group) => [group.name, group]));
   const root = byName.get(chosen);
   if (root === undefined) return [];
 
@@ -162,8 +171,11 @@ export function materializeProxyGroups(
 }
 
 /** 设置页与写配置共用的入口：chosen 为空或订阅里没有该组时返回 null。 */
-export function planProxyGroups(options: { file: string; chosen: string }): RenderedGroup[] | null {
-  if (options.chosen === '') return null;
-  const rendered = materializeProxyGroups(options.chosen, readSubscriptionGroups(options.file));
+export function planProxyGroups(
+  subscription: SubscriptionFile,
+  chosen: string,
+): RenderedGroup[] | null {
+  if (chosen === '') return null;
+  const rendered = materializeProxyGroups(chosen, subscription.groups);
   return rendered.length === 0 ? null : rendered;
 }

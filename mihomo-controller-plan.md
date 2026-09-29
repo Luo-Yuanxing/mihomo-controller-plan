@@ -156,6 +156,7 @@ mihomo-controller-plan/
 │  │  ├─ api.ts            内核 REST 客户端
 │  │  └─ validate.ts       mihomo -t 预检
 │  ├─ sub/download.ts      订阅下载与校验
+│  ├─ sub/subscription.ts  订阅文件解析：节点数 / 代理组 / dns
 │  ├─ rules/
 │  │  ├─ db.ts             SQLite 连接与建表
 │  │  ├─ repo.ts           规则增删改查
@@ -335,8 +336,6 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/status` | 内核状态、版本、端口、订阅状态、系统代理状态 |
-| GET | `/api/subscription` | 当前订阅配置与最近一次下载结果 |
-| PUT | `/api/subscription` | 修改订阅 URL / 是否走代理下载 |
 | POST | `/api/subscription/refresh` | 立即下载并生效 |
 | GET | `/api/subscription/groups` | 订阅文件里的代理组，用于选 `PROXY` 指代哪个组 |
 | GET | `/api/rules` | 规则列表 |

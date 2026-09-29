@@ -3,7 +3,7 @@
  * 计划 §7.1 生成的 config.yaml。
  */
 import { CONTROL_PORT, type Settings } from '../settings.js';
-import type { RenderedGroup } from '../sub/groups.js';
+import type { RenderedGroup } from '../sub/subscription.js';
 import { stringify } from 'yaml';
 
 /** 目标策略里的"代理"落在哪个组：规则策略值、生成配置的组名都用它。 */

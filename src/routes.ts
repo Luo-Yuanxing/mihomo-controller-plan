@@ -5,14 +5,12 @@
 import fs from 'node:fs';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { PROXY_GROUP_NAME, renderConfig } from './config/template.js';
+import { PROXY_GROUP_NAME } from './config/template.js';
 import type { AppContext } from './context.js';
 import { CoreApiError, DELAY_TEST_URL, proxyGroups } from './core/api.js';
 import { parseFailedConnections } from './logs/failed-connections.js';
 import { RuleValidationError, renderRuleProvider } from './rules/render.js';
-import { countSubscriptionProxies } from './sub/download.js';
-import { readSubscriptionDns } from './sub/dns.js';
-import { planProxyGroups, readSubscriptionGroups } from './sub/groups.js';
+import { readSubscription } from './sub/subscription.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
 import type { Settings } from './settings.js';
@@ -171,52 +169,18 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   /** 订阅文件里的代理组：设置页用它选"PROXY 指代哪个组"。 */
-  app.get('/api/subscription/groups', () => ({
-    file: ctx.paths.subscription,
-    exists: countSubscriptionProxies(ctx.paths.subscription) > 0,
-    selected: ctx.settings.subscription.proxyGroup,
-    groups: readSubscriptionGroups(ctx.paths.subscription).groups.map((group) => ({
-      name: group.name,
-      type: group.type,
-      members: group.members.length,
-    })),
-  }));
-
-  app.get('/api/subscription', () => ({
-    config: {
-      url: ctx.settings.subscription.url,
-      useProxy: ctx.settings.subscription.useProxy,
-      userAgent: ctx.settings.subscription.userAgent,
-      proxyGroup: ctx.settings.subscription.proxyGroup,
-    },
-    state: ctx.subscription,
-    file: ctx.paths.subscription,
-    fileExists: fs.existsSync(ctx.paths.subscription),
-  }));
-
-  app.put('/api/subscription', async (request, reply) => {
-    const schema = z.object({
-      url: z.string().optional(),
-      useProxy: z.boolean().optional(),
-      userAgent: z.string().min(1).optional(),
-      proxyGroup: z.string().optional(),
-    });
-    const parsed = schema.safeParse(request.body);
-    if (!parsed.success) return invalid(reply, parsed.error);
-
-    const current = ctx.settings.subscription;
-    const next = {
-      url: parsed.data.url ?? current.url,
-      useProxy: parsed.data.useProxy ?? current.useProxy,
-      userAgent: parsed.data.userAgent ?? current.userAgent,
-      proxyGroup: parsed.data.proxyGroup ?? current.proxyGroup,
+  app.get('/api/subscription/groups', () => {
+    const subscription = readSubscription(ctx.paths.subscription);
+    return {
+      file: ctx.paths.subscription,
+      exists: subscription.proxies > 0,
+      selected: ctx.settings.subscription.proxyGroup,
+      groups: subscription.groups.map((group) => ({
+        name: group.name,
+        type: group.type,
+        members: group.members.length,
+      })),
     };
-    await ctx.saveSettings({ ...ctx.settings, subscription: next });
-    ctx.subscription.url = next.url;
-    ctx.subscription.useProxy = next.useProxy;
-    ctx.subscription.userAgent = next.userAgent;
-    await ctx.writeConfig();
-    return { config: next };
   });
 
   app.delete('/api/subscription', async () => {
@@ -560,28 +524,9 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     return { app: tailLines(paths.app, max), core: tailLines(paths.core, max) };
   });
 
+  /** 生成物随时可重建：读之前先按当前设置重写一遍，保证内容与内存里的状态一致。 */
   app.get('/api/config', async () => {
-    const yaml = await readFileIfExists(ctx.paths.config);
-    const subscriptionProvider =
-      countSubscriptionProxies(ctx.paths.subscription) > 0 ? ctx.subscriptionProvider : null;
-    return {
-      file: ctx.paths.config,
-      yaml:
-        yaml ??
-        renderConfig({
-          settings: ctx.settings,
-          secret: ctx.settings.core.secret,
-          subscriptionProvider,
-          ruleProvider: ctx.ruleProvider,
-          subscriptionDns: readSubscriptionDns(ctx.paths.subscription),
-          proxyGroupPlan:
-            subscriptionProvider === null
-              ? null
-              : planProxyGroups({
-                  file: ctx.paths.subscription,
-                  chosen: ctx.settings.subscription.proxyGroup,
-                }),
-        }),
-    };
+    await ctx.writeConfig();
+    return { file: ctx.paths.config, yaml: (await readFileIfExists(ctx.paths.config)) ?? '' };
   });
 }
