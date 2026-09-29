@@ -16,6 +16,7 @@ export interface DownloadResult {
 
 import path from 'node:path';
 import { fetch as undiciFetch, ProxyAgent } from 'undici';
+import { t } from '../i18n.js';
 import { writeFileAtomic } from '../util/atomic.js';
 import { isRecord, parseSubscription } from './subscription.js';
 
@@ -31,7 +32,7 @@ export async function downloadSubscription(
   mixedPort: number,
 ): Promise<DownloadResult> {
   if (options.url.trim() === '') {
-    throw new Error('订阅 URL 未配置');
+    throw new Error(t('sub.urlMissing'));
   }
 
   const dispatcher = options.useProxy ? new ProxyAgent(`http://127.0.0.1:${mixedPort}`) : undefined;
@@ -42,7 +43,7 @@ export async function downloadSubscription(
   });
 
   if (!response.ok) {
-    throw new Error(`订阅下载失败：HTTP ${response.status}`);
+    throw new Error(t('sub.downloadFailed', { status: response.status }));
   }
 
   const text = (await response.text()).replace(/^\uFEFF/, '');
@@ -50,10 +51,10 @@ export async function downloadSubscription(
   const hasProviders =
     parsed.document !== null && isRecord(parsed.document['proxy-providers']);
   if (parsed.document === null) {
-    throw new Error('订阅不是合法 YAML');
+    throw new Error(t('sub.notYaml'));
   }
   if (parsed.proxies === 0 && !hasProviders) {
-    throw new Error('订阅内容缺少 proxies / proxy-providers 字段');
+    throw new Error(t('sub.noProxies'));
   }
 
   const target = path.join(dataDir, 'subscription.yaml');

@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import type { Logger } from 'pino';
 import { createCoreApi } from './api.js';
 import { validateConfig } from './validate.js';
+import { t } from '../i18n.js';
 import { tailLines } from '../util/logger.js';
 
 const execFileAsync = promisify(execFile);
@@ -116,13 +117,13 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
     if (await adopt()) return status();
 
     if (!fs.existsSync(binaryPath)) {
-      return fail(`未找到内核文件：${binaryPath}`);
+      return fail(t('core.binaryMissing', { path: binaryPath }));
     }
 
     // 应用前必须过 mihomo -t，配置错误直接报原始错误（计划 FR-05 / S4）
     const check = await validateConfig(binaryPath, options.configFile, options.dataDir);
     if (!check.ok) {
-      return fail(`配置预检未通过：\n${check.output}`);
+      return fail(t('core.precheckFailed', { output: check.output }));
     }
 
     const args = [
@@ -151,7 +152,7 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
       appendCoreLog(`\n[mcp] 内核进程退出，退出码 ${String(code)}\n`);
       if (state === 'running') {
         state = 'failed';
-        error = `内核进程意外退出，退出码 ${String(code)}`;
+        error = t('core.exitedUnexpectedly', { code: String(code) });
       }
     });
 
@@ -164,13 +165,16 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
         return status();
       }
       if (spawned.exitCode !== null) {
-        return fail(`内核启动后立即退出，退出码 ${String(spawned.exitCode)}`);
+        return fail(t('core.exitedImmediately', { code: String(spawned.exitCode) }));
       }
       await new Promise((resolve) => setTimeout(resolve, 300));
     }
     const tail = tailLines(options.coreLogFile, 20).join('\n');
     return fail(
-      `内核 ${readyTimeoutMs} ms 内未就绪。内核日志尾部：\n${tail === '' ? '（无输出）' : tail}`,
+      t('core.notReady', {
+        ms: readyTimeoutMs,
+        tail: tail === '' ? t('core.noOutput') : tail,
+      }),
     );
   }
 
@@ -201,7 +205,7 @@ export function createCoreManager(options: CoreManagerOptions): CoreManager {
     timer = setInterval(() => {
       if (state !== 'running') return;
       if (child !== null && child.exitCode !== null) {
-        const failed = fail(`内核进程已退出，退出码 ${String(child.exitCode)}`);
+        const failed = fail(t('core.watchExited', { code: String(child.exitCode) }));
         onExit(failed);
       }
     }, probeIntervalMs);

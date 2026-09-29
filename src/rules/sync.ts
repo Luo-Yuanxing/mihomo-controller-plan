@@ -4,6 +4,7 @@
  */
 import type { CoreApi } from '../core/api.js';
 import path from 'node:path';
+import { t } from '../i18n.js';
 import { readFileIfExists, writeFileAtomic } from '../util/atomic.js';
 import type { RuleRepo } from './repo.js';
 import { renderRuleProvider } from './render.js';
@@ -35,7 +36,7 @@ export async function syncRules(options: {
     await options.api.reloadRuleProvider(options.providerName);
   } catch (error) {
     throw new Error(
-      `规则已落盘但热更新失败：${error instanceof Error ? error.message : String(error)}`,
+      t('rules.syncFailed', { error: error instanceof Error ? error.message : String(error) }),
     );
   }
   return { changed: true, elapsedMs: Date.now() - startedAt };

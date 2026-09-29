@@ -5,8 +5,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { isLanguage, setLanguage, t } from './i18n.js';
 
 export const uiConfigSchema = z.object({
+  /** 界面语言：只有中文与英语两套，默认中文。 */
+  language: z.enum(['zh', 'en']).default('zh'),
   /** 规则类型下拉项，同时作为后端写入白名单。 */
   ruleTypes: z.array(z.string().min(1)).min(1),
   /** 目标策略下拉项。 */
@@ -71,10 +74,13 @@ export class UiConfigValidationError extends Error {
     readonly issues: UiConfigIssue[],
     context?: string,
   ) {
+    const root = t('uiConfig.root');
     const detail = issues
-      .map((issue) => `${issue.path === '' ? '配置' : issue.path}：${issue.message}`)
-      .join('；');
-    super(context === undefined ? detail : `${context}：${detail}`);
+      .map((issue) =>
+        t('uiConfig.issue', { path: issue.path === '' ? root : issue.path, message: issue.message }),
+      )
+      .join(t('uiConfig.issueSeparator'));
+    super(context === undefined ? detail : t('uiConfig.issue', { path: context, message: detail }));
     this.name = 'UiConfigValidationError';
   }
 }
@@ -100,49 +106,57 @@ function checkInterval(
   range: { min: number; max: number },
 ): void {
   if (typeof value !== 'number' || !Number.isInteger(value)) {
-    issues.push({ path, message: '必须是整数' });
+    issues.push({ path, message: t('uiConfig.mustBeInteger') });
     return;
   }
   if (value < range.min || value > range.max) {
-    issues.push({ path, message: `需在 ${String(range.min)}-${String(range.max)} 之间` });
+    issues.push({
+      path,
+      message: t('uiConfig.outOfRange', { min: range.min, max: range.max }),
+    });
   }
 }
 
 /** 逐项检查配置文件/界面提交的值（结构 + 跨字段一致性 + 取值范围），错误带可读字段名。 */
 export function uiConfigIssues(raw: unknown): UiConfigIssue[] {
   const issues: UiConfigIssue[] = [];
-  if (!isRecord(raw)) return [{ path: '', message: '必须是 JSON 对象' }];
+  if (!isRecord(raw)) return [{ path: '', message: t('uiConfig.mustBeJsonObject') }];
+
+  const language = raw['language'];
+  if (language !== undefined && !isLanguage(language)) {
+    issues.push({ path: 'language', message: t('uiConfig.languageUnsupported') });
+  }
 
   const ruleTypes = raw['ruleTypes'];
   const ruleTypeValues: string[] = [];
   if (!Array.isArray(ruleTypes)) {
-    issues.push({ path: 'ruleTypes', message: '必须是字符串数组' });
+    issues.push({ path: 'ruleTypes', message: t('uiConfig.mustBeStringArray') });
   } else {
-    if (ruleTypes.length === 0) issues.push({ path: 'ruleTypes', message: '不能为空' });
+    if (ruleTypes.length === 0) issues.push({ path: 'ruleTypes', message: t('uiConfig.notEmpty') });
     if (ruleTypes.length > UI_CONFIG_LIMITS.maxRuleTypes) {
       issues.push({
         path: 'ruleTypes',
-        message: `最多 ${String(UI_CONFIG_LIMITS.maxRuleTypes)} 项`,
+        message: t('uiConfig.tooManyItems', { max: UI_CONFIG_LIMITS.maxRuleTypes }),
       });
     }
     const seen = new Set<string>();
     ruleTypes.forEach((value, index) => {
       const path = `ruleTypes[${String(index)}]`;
       if (typeof value !== 'string') {
-        issues.push({ path, message: '必须是字符串' });
+        issues.push({ path, message: t('uiConfig.mustBeString') });
         return;
       }
       const text = value.trim();
       if (text === '') {
-        issues.push({ path, message: '不能为空字符串' });
+        issues.push({ path, message: t('uiConfig.notEmptyString') });
         return;
       }
       if (!RULE_TYPE_PATTERN.test(text)) {
-        issues.push({ path, message: '只能是大写字母、数字或连字符' });
+        issues.push({ path, message: t('uiConfig.ruleTypePattern') });
         return;
       }
       if (seen.has(text)) {
-        issues.push({ path, message: `重复项：${text}` });
+        issues.push({ path, message: t('uiConfig.duplicate', { value: text }) });
         return;
       }
       seen.add(text);
@@ -153,33 +167,39 @@ export function uiConfigIssues(raw: unknown): UiConfigIssue[] {
   const policies = raw['policies'];
   const policyValues: string[] = [];
   if (!Array.isArray(policies)) {
-    issues.push({ path: 'policies', message: '必须是数组' });
+    issues.push({ path: 'policies', message: t('uiConfig.mustBeArray') });
   } else {
-    if (policies.length === 0) issues.push({ path: 'policies', message: '不能为空' });
+    if (policies.length === 0) issues.push({ path: 'policies', message: t('uiConfig.notEmpty') });
     if (policies.length > UI_CONFIG_LIMITS.maxPolicies) {
-      issues.push({ path: 'policies', message: `最多 ${String(UI_CONFIG_LIMITS.maxPolicies)} 项` });
+      issues.push({
+        path: 'policies',
+        message: t('uiConfig.tooManyItems', { max: UI_CONFIG_LIMITS.maxPolicies }),
+      });
     }
     policies.forEach((value, index) => {
       const base = `policies[${String(index)}]`;
       if (!isRecord(value)) {
-        issues.push({ path: base, message: '必须是 { value, label } 对象' });
+        issues.push({ path: base, message: t('uiConfig.policyShape') });
         return;
       }
-      const items: [string, string][] = [
-        ['value', '策略值'],
-        ['label', '显示名'],
-      ];
-      for (const [key, label] of items) {
-        const text = value[key];
+      const items = [
+        { key: 'value', empty: 'uiConfig.policyValueEmpty' },
+        { key: 'label', empty: 'uiConfig.policyLabelEmpty' },
+      ] as const;
+      for (const item of items) {
+        const text = value[item.key];
         if (typeof text !== 'string' || text.trim() === '') {
-          issues.push({ path: `${base}.${key}`, message: `${label}不能为空` });
-        } else if (key === 'value' && text.includes(',')) {
-          issues.push({ path: `${base}.${key}`, message: `${label}不能包含逗号` });
+          issues.push({ path: `${base}.${item.key}`, message: t(item.empty) });
+        } else if (item.key === 'value' && text.includes(',')) {
+          issues.push({ path: `${base}.${item.key}`, message: t('uiConfig.policyValueComma') });
         }
       }
       const policyValue = typeof value['value'] === 'string' ? value['value'].trim() : '';
       if (policyValue !== '' && policyValues.includes(policyValue)) {
-        issues.push({ path: `${base}.value`, message: `重复项：${policyValue}` });
+        issues.push({
+          path: `${base}.value`,
+          message: t('uiConfig.duplicate', { value: policyValue }),
+        });
         return;
       }
       if (policyValue !== '') policyValues.push(policyValue);
@@ -188,25 +208,31 @@ export function uiConfigIssues(raw: unknown): UiConfigIssue[] {
 
   const defaults = raw['defaults'];
   if (!isRecord(defaults)) {
-    issues.push({ path: 'defaults', message: '必须是对象' });
+    issues.push({ path: 'defaults', message: t('uiConfig.mustBeObject') });
   } else {
     const ruleType = defaults['ruleType'];
     if (typeof ruleType !== 'string' || ruleType.trim() === '') {
-      issues.push({ path: 'defaults.ruleType', message: '默认规则类型不能为空' });
+      issues.push({ path: 'defaults.ruleType', message: t('uiConfig.defaultRuleTypeEmpty') });
     } else if (!ruleTypeValues.includes(ruleType.trim())) {
-      issues.push({ path: 'defaults.ruleType', message: `不在规则类型列表里：${ruleType.trim()}` });
+      issues.push({
+        path: 'defaults.ruleType',
+        message: t('uiConfig.notInRuleTypes', { value: ruleType.trim() }),
+      });
     }
     const policy = defaults['policy'];
     if (typeof policy !== 'string' || policy.trim() === '') {
-      issues.push({ path: 'defaults.policy', message: '默认目标策略不能为空' });
+      issues.push({ path: 'defaults.policy', message: t('uiConfig.defaultPolicyEmpty') });
     } else if (!policyValues.includes(policy.trim())) {
-      issues.push({ path: 'defaults.policy', message: `不在目标策略列表里：${policy.trim()}` });
+      issues.push({
+        path: 'defaults.policy',
+        message: t('uiConfig.notInPolicies', { value: policy.trim() }),
+      });
     }
   }
 
   const failed = raw['failedConnections'];
   if (!isRecord(failed)) {
-    issues.push({ path: 'failedConnections', message: '必须是对象' });
+    issues.push({ path: 'failedConnections', message: t('uiConfig.mustBeObject') });
   } else {
     checkInterval(
       issues,
@@ -219,7 +245,7 @@ export function uiConfigIssues(raw: unknown): UiConfigIssue[] {
 
   const settings = raw['settings'];
   if (!isRecord(settings)) {
-    issues.push({ path: 'settings', message: '必须是对象' });
+    issues.push({ path: 'settings', message: t('uiConfig.mustBeObject') });
   } else {
     checkInterval(
       issues,
@@ -233,6 +259,7 @@ export function uiConfigIssues(raw: unknown): UiConfigIssue[] {
 }
 
 export const DEFAULT_UI_CONFIG: UiConfig = {
+  language: 'zh',
   ruleTypes: ['DOMAIN', 'DOMAIN-SUFFIX'],
   policies: [
     { value: 'PROXY', label: '代理' },
@@ -252,7 +279,7 @@ function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
   if (isRecord(core)) {
     const binaryPath = core['binaryPath'];
     if (binaryPath !== undefined && (typeof binaryPath !== 'string' || binaryPath.trim() === '')) {
-      issues.push({ path: 'core.binaryPath', message: '不能为空' });
+      issues.push({ path: 'core.binaryPath', message: t('uiConfig.notEmpty') });
     }
     const mixedPort = core['mixedPort'];
     if (
@@ -262,16 +289,16 @@ function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
         mixedPort < 1 ||
         mixedPort > 65535)
     ) {
-      issues.push({ path: 'core.mixedPort', message: '需在 1-65535 之间' });
+      issues.push({ path: 'core.mixedPort', message: t('uiConfig.outOfRange', { min: 1, max: 65535 }) });
     }
   } else if (core !== undefined) {
-    issues.push({ path: 'core', message: '必须是对象' });
+    issues.push({ path: 'core', message: t('uiConfig.mustBeObject') });
   }
 
   const rules = raw['rules'];
   if (rules === undefined) return issues;
   if (!Array.isArray(rules)) {
-    issues.push({ path: 'rules', message: '必须是数组' });
+    issues.push({ path: 'rules', message: t('uiConfig.mustBeArray') });
     return issues;
   }
 
@@ -282,17 +309,20 @@ function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
   rules.forEach((entry, index) => {
     const path = `rules[${String(index)}]`;
     if (!isRecord(entry)) {
-      issues.push({ path, message: '必须是对象' });
+      issues.push({ path, message: t('uiConfig.mustBeObject') });
       return;
     }
     const type = entry['type'];
     if (typeof type !== 'string' || !ruleTypes.includes(type)) {
-      issues.push({ path: `${path}.type`, message: `不在规则类型列表里：${String(type)}` });
+      issues.push({
+        path: `${path}.type`,
+        message: t('uiConfig.notInRuleTypes', { value: String(type) }),
+      });
     }
     for (const key of ['value', 'policy'] as const) {
       const text = entry[key];
       if (typeof text !== 'string' || text.trim() === '') {
-        issues.push({ path: `${path}.${key}`, message: '不能为空' });
+        issues.push({ path: `${path}.${key}`, message: t('uiConfig.notEmpty') });
       }
     }
   });
@@ -328,9 +358,10 @@ export function getUiConfig(): UiConfig {
   return active;
 }
 
-/** 更新内存中的生效值（调用方负责写回文件）。 */
+/** 更新内存中的生效值（调用方负责写回文件），语言跟着配置一起生效。 */
 export function setActiveUiConfig(config: UiConfig): UiConfig {
   active = config;
+  setLanguage(config.language);
   return active;
 }
 
@@ -364,10 +395,10 @@ export function readUiConfigDocument(file: string): {
   try {
     text = fs.readFileSync(file, 'utf8');
   } catch {
-    throw new Error(`配置文件不存在或不可读：${file}`);
+    throw new Error(t('uiConfig.fileMissing', { file }));
   }
   if (text.trim() === '') {
-    throw new Error(`配置文件是空文件（需要至少含 ruleTypes 等字段）：${file}`);
+    throw new Error(t('uiConfig.fileEmpty', { file }));
   }
 
   let raw: unknown;
@@ -375,7 +406,10 @@ export function readUiConfigDocument(file: string): {
     raw = JSON.parse(text);
   } catch (error) {
     throw new Error(
-      `配置文件不是合法 JSON：${file}（${error instanceof Error ? error.message : String(error)}）`,
+      t('uiConfig.fileNotJson', {
+        file,
+        reason: error instanceof Error ? error.message : String(error),
+      }),
     );
   }
 
@@ -383,7 +417,7 @@ export function readUiConfigDocument(file: string): {
     return parseUiConfigFile(raw);
   } catch (error) {
     if (error instanceof UiConfigValidationError) {
-      throw new UiConfigValidationError(error.issues, `配置文件字段不合法：${file}`);
+      throw new UiConfigValidationError(error.issues, t('uiConfig.fileInvalid', { file }));
     }
     throw error;
   }

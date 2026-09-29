@@ -4,6 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { t } from '../i18n.js';
 
 export interface Lock {
   release(): void;
@@ -49,11 +50,11 @@ export function acquireLock(lockFile: string): Lock {
   if (!tryCreate(lockFile)) {
     const holder = readHolder(lockFile);
     if (holder !== null && isAlive(holder)) {
-      throw new Error(`已有实例在运行（PID ${holder}），锁文件：${lockFile}`);
+      throw new Error(t('lock.alreadyRunning', { pid: holder, file: lockFile }));
     }
     fs.rmSync(lockFile, { force: true });
     if (!tryCreate(lockFile)) {
-      throw new Error(`无法获取锁文件：${lockFile}`);
+      throw new Error(t('lock.acquireFailed', { file: lockFile }));
     }
   }
 

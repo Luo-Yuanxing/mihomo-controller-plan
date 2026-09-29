@@ -3,6 +3,7 @@
  * 计划 §5.4 规则热更新、§7.2 生成的 rule-provider。
  */
 import type { Rule } from './repo.js';
+import { t } from '../i18n.js';
 import { getRuleTypes } from '../ui-config.js';
 
 export class RuleValidationError extends Error {
@@ -10,7 +11,7 @@ export class RuleValidationError extends Error {
     message: string,
     readonly ruleId: number,
   ) {
-    super(`规则 id=${ruleId} 不合法：${message}`);
+    super(t('rules.invalid', { id: ruleId, message }));
     this.name = 'RuleValidationError';
   }
 }
@@ -25,13 +26,13 @@ function emitScalar(value: string): string {
 /** 单条规则的 mihomo rule 文本；类型白名单来自统一配置文件 config.json。 */
 function renderRuleLine(rule: Rule): string {
   if (!getRuleTypes().includes(rule.type)) {
-    throw new RuleValidationError(`未知类型 ${rule.type}`, rule.id);
+    throw new RuleValidationError(t('rules.unknownType', { type: rule.type }), rule.id);
   }
   if (rule.policy.trim() === '') {
-    throw new RuleValidationError('目标策略为空', rule.id);
+    throw new RuleValidationError(t('rules.emptyPolicy'), rule.id);
   }
   if (rule.value.trim() === '') {
-    throw new RuleValidationError('匹配值为空', rule.id);
+    throw new RuleValidationError(t('rules.emptyValue'), rule.id);
   }
 
   const parts = [rule.type, rule.value, rule.policy];

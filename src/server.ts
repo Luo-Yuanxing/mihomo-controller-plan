@@ -14,6 +14,7 @@ import { createCoreApi } from './core/api.js';
 import { ensureGeodata } from './core/geodata.js';
 import { createCoreManager, type CoreStatus } from './core/manager.js';
 import { createKernelProxyLink } from './core/proxy-link.js';
+import { t } from './i18n.js';
 import { createProxyGuard, ensureLocalBypass } from './proxy/guard.js';
 import { registerRoutes } from './routes.js';
 import { openRulesDatabase } from './rules/db.js';
@@ -69,12 +70,12 @@ function registerStatic(app: FastifyInstance, uiDir: string): void {
     const relative = (request.params as Record<string, string>)['*'] ?? '';
     const requested = path.resolve(uiDir, relative === '' ? 'index.html' : relative);
     if (!requested.startsWith(path.resolve(uiDir))) {
-      return reply.status(403).send({ error: '越界路径' });
+      return reply.status(403).send({ error: t('server.pathEscape') });
     }
     const target =
       fs.existsSync(requested) && fs.statSync(requested).isFile() ? requested : indexPath;
     if (!fs.existsSync(target)) {
-      return reply.status(404).send({ error: '未找到前端产物，请先执行 npm run build' });
+      return reply.status(404).send({ error: t('server.uiMissing') });
     }
     reply.type(MIME[path.extname(target).toLowerCase()] ?? 'application/octet-stream');
     return reply.send(fs.createReadStream(target));
@@ -265,7 +266,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
           } else {
             const status = await core.restart();
             if (status.state === 'failed') {
-              throw new Error(status.error ?? '订阅已更新，但内核重启失败');
+              throw new Error(status.error ?? t('server.subscriptionRestartFailed'));
             }
           }
         }
@@ -304,7 +305,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     app.addHook('onRequest', async (request, reply) => {
       if (!request.url.startsWith('/api/')) return;
       if (request.headers['x-api-token'] !== token) {
-        return reply.status(401).send({ error: '缺少或错误的 X-Api-Token' });
+        return reply.status(401).send({ error: t('server.badToken') });
       }
     });
   }

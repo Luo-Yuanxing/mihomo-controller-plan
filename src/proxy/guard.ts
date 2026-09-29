@@ -8,6 +8,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { Logger } from 'pino';
+import { t } from '../i18n.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -136,7 +137,7 @@ export function createProxyGuard(options: ProxyGuardOptions): ProxyGuard {
     try {
       await notifyWinInet();
     } catch (error) {
-      lastError = `注册表已写入，但通知系统刷新失败：${String(error)}`;
+      lastError = t('guard.notifyFailed', { error: String(error) });
       options.log.warn({ err: lastError }, 'ProxyGuard 刷新通知失败');
     }
   }
@@ -164,7 +165,7 @@ export function createProxyGuard(options: ProxyGuardOptions): ProxyGuard {
           await writeDesired();
           options.log.warn({ desired }, '系统代理被改写，已按期望值回写');
         } catch (error) {
-          lastError = `回写系统代理失败：${String(error)}`;
+          lastError = t('guard.rewriteFailed', { error: String(error) });
           options.log.error({ err: lastError }, 'ProxyGuard 回写失败');
         }
       })();
@@ -187,7 +188,7 @@ export function createProxyGuard(options: ProxyGuardOptions): ProxyGuard {
     try {
       await notifyWinInet();
     } catch (error) {
-      lastError = `系统代理已关闭，但通知系统刷新失败：${String(error)}`;
+      lastError = t('guard.shutdownNotifyFailed', { error: String(error) });
       options.log.warn({ err: lastError }, '退出时刷新系统代理失败');
     }
   }

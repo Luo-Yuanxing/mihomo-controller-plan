@@ -4,6 +4,7 @@
  * 只装"可搬运"的部分：界面常量 + 自定义规则 + 内核路径/混合端口 + 系统代理期望值。
  * 明确排除订阅（URL / User-Agent / 下载设置）与内核 secret —— 订阅链接是私人凭据，不外传。
  */
+import { t } from './i18n.js';
 import {
   parseUiConfigFile,
   UiConfigValidationError,
@@ -55,21 +56,19 @@ export function decodeSharedConfig(text: string): SharedConfig {
   // 长串在聊天工具/文本框里难免被折行或插空格，一律先清掉空白：它只是一串 Base64，不需要词边界
   const raw = text.replace(/\s+/g, '');
   if (raw === '') {
-    throw new UiConfigValidationError([{ path: 'payload', message: '导入串不能为空' }]);
+    throw new UiConfigValidationError([{ path: 'payload', message: t('share.empty') }]);
   }
   if (!BASE64URL_PATTERN.test(raw)) {
-    throw new UiConfigValidationError([
-      { path: 'payload', message: '不是合法的 Base64URL 字符串' },
-    ]);
+    throw new UiConfigValidationError([{ path: 'payload', message: t('share.notBase64Url') }]);
   }
 
   const buffer = Buffer.from(raw, 'base64url');
   if (buffer.length === 0) {
-    throw new UiConfigValidationError([{ path: 'payload', message: '导入串解出来是空的' }]);
+    throw new UiConfigValidationError([{ path: 'payload', message: t('share.decodedEmpty') }]);
   }
   if (buffer.length > MAX_PAYLOAD_BYTES) {
     throw new UiConfigValidationError([
-      { path: 'payload', message: `导入串过大（上限 ${String(MAX_PAYLOAD_BYTES)} 字节）` },
+      { path: 'payload', message: t('share.tooLarge', { bytes: MAX_PAYLOAD_BYTES }) },
     ]);
   }
 
@@ -77,9 +76,7 @@ export function decodeSharedConfig(text: string): SharedConfig {
   try {
     parsed = JSON.parse(buffer.toString('utf8'));
   } catch {
-    throw new UiConfigValidationError([
-      { path: 'payload', message: '导入串解出来不是合法 JSON' },
-    ]);
+    throw new UiConfigValidationError([{ path: 'payload', message: t('share.notJson') }]);
   }
 
   const loaded = parseUiConfigFile(parsed);

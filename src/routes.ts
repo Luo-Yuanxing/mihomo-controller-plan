@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { PROXY_GROUP_NAME } from './config/template.js';
 import type { AppContext } from './context.js';
 import { CoreApiError, DELAY_TEST_URL, proxyGroups } from './core/api.js';
+import { t } from './i18n.js';
 import { parseFailedConnections } from './logs/failed-connections.js';
 import { RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { readSubscription } from './sub/subscription.js';
@@ -26,7 +27,7 @@ function ruleSchemas(ruleTypes: readonly string[]) {
     enabled: z.boolean().default(true),
     // 类型白名单在入口就拦下，避免脏数据进库（计划 §5.4 第 2 步）
     type: z.string().refine((value) => ruleTypes.includes(value), {
-      message: `类型不在白名单：${ruleTypes.join(' / ')}`,
+      message: t('routes.ruleTypeNotAllowed', { types: ruleTypes.join(' / ') }),
     }),
     value: z.string().default(''),
     policy: z.string().min(1),
@@ -42,7 +43,7 @@ function invalid(reply: FastifyReply, error: z.ZodError): FastifyReply {
   const detail = error.issues
     .map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`)
     .join('; ');
-  return reply.status(400).send({ error: `请求参数不合法：${detail}` });
+  return reply.status(400).send({ error: t('routes.invalidParams', { detail }) });
 }
 
 const selectProxySchema = z.object({ name: z.string().min(1) });
@@ -96,25 +97,31 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
     try {
       await ctx.writeConfig();
-      steps.push('已按当前设置重写 config.yaml');
+      steps.push(t('routes.recover.configRewritten'));
     } catch (error) {
-      steps.push(`重写配置失败：${errorText(error)}`);
+      steps.push(t('routes.recover.configFailed', { error: errorText(error) }));
     }
 
     let kernel = ctx.kernel.status();
     if (kernel.state === 'running' || kernel.state === 'adopted') {
-      steps.push('内核已在运行');
+      steps.push(t('routes.recover.kernelRunning'));
     } else {
       kernel = await ctx.restartKernel();
       steps.push(
-        kernel.state === 'failed' ? `内核启动失败：${kernel.error ?? '未知原因'}` : '内核已启动',
+        kernel.state === 'failed'
+          ? t('routes.recover.kernelFailed', {
+              error: kernel.error ?? t('common.unknownReason'),
+            })
+          : t('routes.recover.kernelStarted'),
       );
     }
 
     const kernelUp = kernel.state === 'running' || kernel.state === 'adopted';
     // 联动只往一个方向走：内核在跑就把系统代理指向它，没跑就关掉（反向不动内核）
     const proxy = kernelUp ? await ctx.guard.enable() : await ctx.guard.disable();
-    steps.push(kernelUp ? '内核已就绪，系统代理已指向内核' : '内核不可用，已关闭系统代理以免整机断网');
+    steps.push(
+      kernelUp ? t('routes.recover.proxyPointed') : t('routes.recover.proxyDisabled'),
+    );
     ctx.log.warn({ steps }, '一键修复完成');
     return { steps, kernel, proxy };
   });
@@ -168,7 +175,9 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
         const status = await ctx.kernel.restart();
         if (status.state === 'failed') {
           throw new SettingsApplyError(
-            `设置已保存，但内核重启失败：${status.error ?? '未知原因'}`,
+            t('routes.settingsRestartFailed', {
+              error: status.error ?? t('common.unknownReason'),
+            }),
             502,
           );
         }
@@ -313,7 +322,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
           try {
             binaryPath = resolveBinaryPath(ctx.appDir, binaryPath);
           } catch {
-            warnings.push(`分享串里的内核路径在本机不存在（${binaryPath}），已保留本机当前路径`);
+            warnings.push(t('routes.shareBinaryMissing', { path: binaryPath }));
             binaryPath = undefined;
           }
         }
@@ -386,7 +395,9 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.put('/api/rules/:id', async (request, reply) => {
     const id = Number((request.params as { id: string }).id);
-    if (!Number.isInteger(id) || id <= 0) return reply.status(400).send({ error: 'id 不合法' });
+    if (!Number.isInteger(id) || id <= 0) {
+      return reply.status(400).send({ error: t('routes.badId') });
+    }
     const parsed = ruleSchemas(ctx.uiConfig.ruleTypes).rulePatchSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply, parsed.error);
     const patch: Partial<RuleInput> = {};
@@ -400,7 +411,9 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.delete('/api/rules/:id', async (request, reply) => {
     const id = Number((request.params as { id: string }).id);
-    if (!Number.isInteger(id) || id <= 0) return reply.status(400).send({ error: 'id 不合法' });
+    if (!Number.isInteger(id) || id <= 0) {
+      return reply.status(400).send({ error: t('routes.badId') });
+    }
     ctx.repo.remove(id);
     return { rules: ctx.repo.list() };
   });
@@ -450,11 +463,13 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
       const snapshot = await ctx.api.proxies();
       const entry = snapshot[group];
       if (entry === undefined) {
-        return reply.status(404).send({ error: `代理组不存在：${group}` });
+        return reply.status(404).send({ error: t('routes.proxyGroupMissing', { group }) });
       }
       const all = entry.all ?? [];
       if (!all.includes(parsed.data.name)) {
-        return reply.status(400).send({ error: `节点不在代理组 ${group} 中：${parsed.data.name}` });
+        return reply
+          .status(400)
+          .send({ error: t('routes.nodeNotInGroup', { group, name: parsed.data.name }) });
       }
       await ctx.api.selectProxy(group, parsed.data.name);
       return { group, now: parsed.data.name, all };
@@ -470,7 +485,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
       return { group, url: DELAY_TEST_URL, delays: await ctx.api.groupDelay(group) };
     } catch (error) {
       if (error instanceof CoreApiError && error.status === 404) {
-        return reply.status(404).send({ error: `代理组不存在：${group}` });
+        return reply.status(404).send({ error: t('routes.proxyGroupMissing', { group }) });
       }
       return reply.status(502).send({ error: errorText(error) });
     }

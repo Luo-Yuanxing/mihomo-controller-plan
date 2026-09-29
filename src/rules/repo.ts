@@ -3,6 +3,7 @@
  * 计划 §5.3 规则存储。
  */
 import type { RulesDatabase } from './db.js';
+import { t } from '../i18n.js';
 
 export interface Rule {
   id: number;
@@ -154,7 +155,7 @@ export function createRuleRepo(db: RulesDatabase): RuleRepo {
         db.prepare(`UPDATE rules SET ${assignments} WHERE id = ?`).run(...values, id);
       }
       const updated = get(id);
-      if (updated === null) throw new Error(`规则不存在：id=${id}`);
+      if (updated === null) throw new Error(t('rules.notFound', { id }));
       return updated;
     },
     remove(id: number): void {

@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { t } from '../i18n.js';
 
 export interface DataDirResult {
   dataDir: string;
@@ -89,15 +90,15 @@ export function resolveResourcePath(appDir: string, configured: string): string 
  */
 export function resolveBinaryPath(appDir: string, configured: string): string {
   const raw = configured.trim();
-  if (raw === '') throw new Error('内核路径不能为空');
+  if (raw === '') throw new Error(t('paths.binaryEmpty'));
 
   const resolved = path.isAbsolute(raw) ? raw : resolveResourcePath(appDir, raw);
   let stat: fs.Stats;
   try {
     stat = fs.statSync(resolved);
   } catch {
-    throw new Error(`内核文件不存在或不可读：${resolved}`);
+    throw new Error(t('paths.binaryMissing', { path: resolved }));
   }
-  if (!stat.isFile()) throw new Error(`内核路径不是文件：${resolved}`);
+  if (!stat.isFile()) throw new Error(t('paths.binaryNotFile', { path: resolved }));
   return path.resolve(resolved);
 }

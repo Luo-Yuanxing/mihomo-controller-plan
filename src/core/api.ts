@@ -2,6 +2,8 @@
  * mihomo 内核 REST 客户端（HTTP 控制接口）。
  * 计划 §4.2 数据流、附录 B 内核 API 速查。
  */
+import { t } from '../i18n.js';
+
 /** GET /proxies 的单项：节点只有 name/type，代理组另有 all/now。 */
 export interface ProxyEntry {
   name: string;
@@ -98,12 +100,17 @@ export function createCoreApi(options: CoreApiOptions): CoreApi {
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      throw new Error(`连不上内核 ${base}（${reason}）`);
+      throw new Error(t('coreApi.unreachable', { base, reason }));
     }
     if (!response.ok) {
       const body = (await response.text()).slice(0, 200);
       throw new CoreApiError(
-        `${method} ${pathname} 返回 ${response.status}${body === '' ? '' : ` ${body}`}`,
+        t('coreApi.httpError', {
+          method,
+          path: pathname,
+          status: response.status,
+          body: body === '' ? '' : ` ${body}`,
+        }),
         response.status,
       );
     }
