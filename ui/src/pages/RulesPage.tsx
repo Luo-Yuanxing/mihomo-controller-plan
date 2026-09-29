@@ -222,17 +222,15 @@ export default function RulesPage() {
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="px-2 py-2">
-                <div className="flex flex-col items-start gap-0.5">
-                  <span>启用</span>
-                  <button
-                    type="button"
-                    disabled={rows.length === 0}
-                    className="text-xs normal-case text-slate-500 hover:text-slate-900 disabled:opacity-50"
-                    onClick={toggleAll}
-                  >
-                    {allEnabled ? '全禁用' : '全启用'}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  disabled={rows.length === 0}
+                  title={allEnabled ? '全部禁用' : '全部启用'}
+                  className="cursor-pointer uppercase hover:text-slate-900 hover:underline disabled:cursor-default disabled:opacity-50 disabled:hover:no-underline"
+                  onClick={toggleAll}
+                >
+                  启用
+                </button>
               </th>
               <th className="px-2 py-2">顺序</th>
               <th className="px-2 py-2">类型</th>
