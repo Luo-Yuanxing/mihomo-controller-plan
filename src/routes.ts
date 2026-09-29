@@ -8,30 +8,36 @@ import { z } from 'zod';
 import { renderConfig } from './config/template.js';
 import type { AppContext } from './context.js';
 import { parseFailedConnections } from './logs/failed-connections.js';
-import { RULE_TYPES, RuleValidationError, renderRuleProvider } from './rules/render.js';
+import { RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { countSubscriptionProxies } from './sub/download.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
+import { uiConfigPath } from './ui-config.js';
 import { readFileIfExists } from './util/atomic.js';
 import { logPaths, tailLines } from './util/logger.js';
 import type { RuleInput } from './rules/repo.js';
 
-const ruleInputSchema = z.object({
-  enabled: z.boolean().default(true),
-  // 类型白名单在入口就拦下，避免脏数据进库（计划 §5.4 第 2 步）
-  type: z.enum(RULE_TYPES),
-  value: z.string().default(''),
-  policy: z.string().min(1),
-  noResolve: z.boolean().default(true),
-});
-
-const rulePatchSchema = ruleInputSchema.partial();
-
-const createRulesSchema = z.union([
-  ruleInputSchema,
-  z.array(ruleInputSchema),
-  z.object({ rules: z.array(ruleInputSchema) }),
-]);
+/** 规则类型白名单来自 data/ui-config.json，每次请求按当前值校验。 */
+function ruleSchemas(ruleTypes: readonly string[]) {
+  const ruleInputSchema = z.object({
+    enabled: z.boolean().default(true),
+    // 类型白名单在入口就拦下，避免脏数据进库（计划 §5.4 第 2 步）
+    type: z.string().refine((value) => ruleTypes.includes(value), {
+      message: `类型不在白名单：${ruleTypes.join(' / ')}`,
+    }),
+    value: z.string().default(''),
+    policy: z.string().min(1),
+    noResolve: z.boolean().default(true),
+  });
+  return {
+    rulePatchSchema: ruleInputSchema.partial(),
+    createRulesSchema: z.union([
+      ruleInputSchema,
+      z.array(ruleInputSchema),
+      z.object({ rules: z.array(ruleInputSchema) }),
+    ]),
+  };
+}
 
 function invalid(reply: FastifyReply, error: z.ZodError): FastifyReply {
   const detail = error.issues
@@ -174,6 +180,19 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/rules', () => ({ rules: ctx.repo.list(), provider: ctx.ruleProvider }));
 
+  app.get('/api/ui-config', () => ({
+    file: uiConfigPath(ctx.dataDir),
+    config: ctx.uiConfig,
+  }));
+
+  app.post('/api/ui-config/reload', async (_request, reply) => {
+    const state = await ctx.reloadUiConfig();
+    if (state.error !== null) {
+      return reply.status(400).send({ error: `界面常量不合法，已回退默认值：${state.error}` });
+    }
+    return { file: state.file, config: state.config };
+  });
+
   app.get('/api/rules/provider', async () => {
     const file = `${ctx.paths.rulesDir}/${ctx.ruleProvider}.yaml`;
     const yaml = await readFileIfExists(file);
@@ -185,7 +204,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   app.post('/api/rules', async (request, reply) => {
-    const parsed = createRulesSchema.safeParse(request.body);
+    const parsed = ruleSchemas(ctx.uiConfig.ruleTypes).createRulesSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply, parsed.error);
 
     const inputs = Array.isArray(parsed.data)
@@ -208,7 +227,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.put('/api/rules/:id', async (request, reply) => {
     const id = Number((request.params as { id: string }).id);
     if (!Number.isInteger(id) || id <= 0) return reply.status(400).send({ error: 'id 不合法' });
-    const parsed = rulePatchSchema.safeParse(request.body);
+    const parsed = ruleSchemas(ctx.uiConfig.ruleTypes).rulePatchSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply, parsed.error);
     const patch: Partial<RuleInput> = {};
     if (parsed.data.enabled !== undefined) patch.enabled = parsed.data.enabled;

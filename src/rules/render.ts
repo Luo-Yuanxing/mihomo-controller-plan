@@ -3,11 +3,7 @@
  * 计划 §5.4 规则热更新、§7.2 生成的 rule-provider。
  */
 import type { Rule } from './repo.js';
-
-/** 只保留域名类规则，其余类型不开放。 */
-export const RULE_TYPES = ['DOMAIN-SUFFIX', 'DOMAIN'] as const;
-
-export type RuleType = (typeof RULE_TYPES)[number];
+import { getRuleTypes } from '../ui-config.js';
 
 export class RuleValidationError extends Error {
   constructor(
@@ -26,9 +22,9 @@ function emitScalar(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-/** 单条规则的 mihomo rule 文本。 */
+/** 单条规则的 mihomo rule 文本；类型白名单来自 data/ui-config.json。 */
 export function renderRuleLine(rule: Rule): string {
-  if (!(RULE_TYPES as readonly string[]).includes(rule.type)) {
+  if (!getRuleTypes().includes(rule.type)) {
     throw new RuleValidationError(`未知类型 ${rule.type}`, rule.id);
   }
   if (rule.policy.trim() === '') {

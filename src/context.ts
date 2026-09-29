@@ -7,6 +7,7 @@ import type { CoreManager, CoreStatus } from './core/manager.js';
 import type { ProxyGuard } from './proxy/guard.js';
 import type { RuleRepo } from './rules/repo.js';
 import type { Settings } from './settings.js';
+import type { UiConfig, UiConfigState } from './ui-config.js';
 import type { dataPaths } from './util/paths.js';
 
 export interface SubscriptionState {
@@ -36,6 +37,10 @@ export interface AppContext {
   subscription: SubscriptionState;
   subscriptionProvider: string;
   ruleProvider: string;
+  /** 当前生效的界面常量（data/ui-config.json）。 */
+  uiConfig: UiConfig;
+  /** 重新读取 ui-config.json 并立即生效。 */
+  reloadUiConfig(): Promise<UiConfigState>;
   /** 写入 settings.json 并刷新内存中的设置。 */
   saveSettings(next: Settings): Promise<Settings>;
   /** 重新渲染 config.yaml；端口/secret 变化后需要重启内核才生效。 */
