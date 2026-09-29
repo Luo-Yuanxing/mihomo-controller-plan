@@ -36,16 +36,21 @@ describe('ensureAppConfigFile', () => {
     expect(config.ui).toEqual(DEFAULT_UI_CONFIG);
     expect(config.settings).toEqual(DEFAULT_SETTINGS);
     expect(config.rules).toEqual([]);
+    // "配置文件路径"这一栏也在文件里，就是它自己
+    expect(config.configFile).toBe(file);
   });
 
-  it('已存在的文件不被覆盖', () => {
+  it('已存在的文件不被覆盖（但缺"配置文件路径"会补上）', () => {
     const appDir = tempDir('mcp-app-');
     const dataDir = tempDir('mcp-data-');
     const file = path.join(appDir, 'config.json');
     writeFileSync(file, JSON.stringify({ ...withRuleTypes(['DOMAIN']), core: { mixedPort: 7899 } }));
 
-    expect(readAppConfig(ensureAppConfigFile(appDir, dataDir)).ui.ruleTypes).toEqual(['DOMAIN']);
+    const ensured = ensureAppConfigFile(appDir, dataDir);
+
+    expect(readAppConfig(ensured).ui.ruleTypes).toEqual(['DOMAIN']);
     expect(readAppConfig(file).settings.core.mixedPort).toBe(7899);
+    expect(readAppConfig(file).configFile).toBe(file);
   });
 
   it('工作目录不可写时退回 data 目录', () => {
@@ -90,11 +95,34 @@ describe('renderAppConfig', () => {
       ui: withRuleTypes(['DOMAIN']),
       settings: { ...DEFAULT_SETTINGS, core: { ...DEFAULT_SETTINGS.core, secret: 'abc' } },
       rules: [{ enabled: true, type: 'DOMAIN', value: 'a.com', policy: 'PROXY', noResolve: true }],
+      configFile: null,
     });
 
     expect(Object.keys(JSON.parse(text) as object)).toContain('ruleTypes');
     expect(Object.keys(JSON.parse(text) as object)).toContain('core');
     expect(Object.keys(JSON.parse(text) as object)).toContain('rules');
+  });
+});
+
+describe('配置文件路径（界面那一栏）', () => {
+  it('写进统一文件后能读回，相对路径按绝对路径解析', () => {
+    const dir = tempDir('mcp-app-');
+    const file = path.join(dir, 'config.json');
+    writeFileSync(
+      file,
+      JSON.stringify({ ...DEFAULT_APP_CONFIG.ui, configFile: 'mine.json' }),
+      'utf8',
+    );
+
+    expect(readAppConfig(file).configFile).toBe(path.resolve('mine.json'));
+  });
+
+  it('renderAppConfig 有路径才写这一项，null 时省略', () => {
+    const withPath = renderAppConfig({ ...DEFAULT_APP_CONFIG, configFile: 'C:/x/mine.json' });
+    expect(JSON.parse(withPath)).toMatchObject({ configFile: 'C:/x/mine.json' });
+
+    const without = renderAppConfig(DEFAULT_APP_CONFIG);
+    expect('configFile' in (JSON.parse(without) as object)).toBe(false);
   });
 });
 

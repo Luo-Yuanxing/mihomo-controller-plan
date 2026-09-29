@@ -72,9 +72,10 @@ export function createUiConfigService(
   setActiveUiConfig(initial.ui);
 
   let state: StoredUiConfig = {
-    file: unifiedFile,
+    // "配置文件路径"本身也持久化在统一文件里，重启后界面还显示上次那一栏的值
+    file: initial.configFile ?? unifiedFile,
     config: initial.ui,
-    updatedAt: modifiedAt(unifiedFile),
+    updatedAt: modifiedAt(initial.configFile ?? unifiedFile),
   };
   log?.info({ file: state.file, ruleTypes: state.config.ruleTypes }, '界面常量生效值已就绪');
 
@@ -82,9 +83,10 @@ export function createUiConfigService(
 
   /** 写生效值：来源文件不是统一文件时，内容同时落进统一文件，重启后才还在。 */
   async function commit(source: string, config: UiConfig, message: string): Promise<StoredUiConfig> {
-    await saveUiConfig(unifiedFile, config);
+    const origin = path.resolve(source);
+    await saveUiConfig(unifiedFile, config, origin);
     setActiveUiConfig(config);
-    if (path.resolve(source) !== path.resolve(unifiedFile)) {
+    if (origin !== path.resolve(unifiedFile)) {
       log?.info({ source, unifiedFile }, '生效值来自外部文件，已同步写回统一配置文件');
     }
     state = { file: source, config, updatedAt: modifiedAt(source) };
@@ -121,11 +123,11 @@ export function createUiConfigService(
       };
     },
     apply: async (input: { file?: string; config: unknown }) => {
-      // 目标路径只做校验：生效值固定落统一配置文件，界面"另存为"走导出接口
-      if (input.file !== undefined) resolveConfigFile(input.file);
+      // 界面提交的界面常量 + 那一栏的路径一起存进统一文件（内容不来自那个文件，只记路径）
+      const target = input.file === undefined ? state.file : resolveConfigFile(input.file);
       return {
         state: await commit(
-          unifiedFile,
+          target,
           parseUiConfig(input.config),
           '界面常量已从界面保存到统一配置文件',
         ),

@@ -147,4 +147,19 @@ describe('界面常量生效值（统一配置文件）', () => {
     expect(unified.ruleTypes).toEqual(['DOMAIN']);
     expect(unified.core?.mixedPort).toBe(DEFAULT_SETTINGS.core.mixedPort);
   });
+
+  it('界面那一栏的配置文件路径也持久化，重启后还是它', async () => {
+    const dataDir = tempDataDir();
+    const file = uiConfigPath(dataDir);
+    writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
+    const service = createUiConfigService(file);
+    const external = path.join(dataDir, 'mine.json');
+    writeFileSync(external, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
+
+    const applied = await service.apply({ file: external, config: DEFAULT_UI_CONFIG });
+
+    expect(applied.state.file).toBe(external);
+    expect(readAppConfig(file).configFile).toBe(external);
+    expect(createUiConfigService(file).state().file).toBe(external);
+  });
 });
