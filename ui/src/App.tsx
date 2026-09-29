@@ -3,8 +3,10 @@
  * 计划 §8 界面。
  */
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from './lib/api';
+import { useOffline } from './lib/offline';
+import OfflineBanner from './components/OfflineBanner';
 import FailedConnectionsPage from './pages/FailedConnectionsPage';
 import RulesPage from './pages/RulesPage';
 import SettingsPage from './pages/SettingsPage';
@@ -26,6 +28,7 @@ const STATE_LABEL: Record<string, string> = {
 
 export default function App() {
   const [active, setActive] = useState<string>('rules');
+  const offline = useOffline();
   const current = TABS.find((tab) => tab.key === active) ?? TABS[0];
   const status = useQuery({
     queryKey: ['status'],
@@ -34,9 +37,23 @@ export default function App() {
   });
   const kernelState = status.data?.kernel.state ?? 'stopped';
 
+  // 一进离线状态就跳到状态页，那里能看到内核与系统代理的实时情况
+  useEffect(() => {
+    if (offline) setActive('status');
+  }, [offline]);
+
   return (
-    <div className="flex h-screen flex-col bg-slate-100 text-slate-900">
-      <header className="flex items-center gap-2 border-b border-slate-300 bg-white px-4 py-2">
+    <div
+      className={`flex h-screen flex-col text-slate-900 ${
+        offline ? 'bg-rose-100' : 'bg-slate-100'
+      }`}
+    >
+      <OfflineBanner />
+      <header
+        className={`flex items-center gap-2 border-b px-4 py-2 ${
+          offline ? 'border-rose-300 bg-rose-50' : 'border-slate-300 bg-white'
+        }`}
+      >
         <span className="text-base font-semibold">代理控制面板</span>
         <nav className="ml-4 flex gap-1">
           {TABS.map((tab) => (
