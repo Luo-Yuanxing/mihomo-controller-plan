@@ -345,7 +345,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | PUT | `/api/rules/{id}` | 修改 |
 | DELETE | `/api/rules/{id}` | 删除 |
 | POST | `/api/rules/sync` | 落盘 + 热更新 |
-| GET | `/api/ui-config` | 界面常量的生效值（来源文件 + 当前值 + 文件修改时间） |
+| GET | `/api/ui-config` | 界面常量的生效值（来源文件 + 当前值 + 文件修改时间），来源文件存在 config.json 的 `configFile` 字段里 |
 | POST | `/api/ui-config/preview` | 按配置文件预览对比，不生效 |
 | POST | `/api/ui-config/load-force` | 按配置文件覆盖生效值并写回 config.json；带 `rules` 段时整表覆盖规则并热更新，带 `core`/`subscription`/`proxy` 段时一并写回设置 |
 | POST | `/api/ui-config/apply` | 把界面上的界面常量写回 config.json |
