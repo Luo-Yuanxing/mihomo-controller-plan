@@ -43,6 +43,14 @@ interface RuleRow {
   no_resolve: number;
 }
 
+/**
+ * 规则唯一键：类型 + 取值，两者都一样才算重复（大小写不敏感，避免 DOMAIN/domain 各存一条）。
+ * 域名大小写等价、规则类型也是枚举，这里统一按小写归一。
+ */
+export function ruleKey(input: Pick<RuleInput, 'type' | 'value'>): string {
+  return `${input.type.trim().toLowerCase()}\u0000${input.value.trim().toLowerCase()}`;
+}
+
 function toRule(row: RuleRow): Rule {
   return {
     id: row.id,
@@ -128,7 +136,15 @@ export function createRuleRepo(db: RulesDatabase): RuleRepo {
   return {
     list,
     create(inputs: RuleInput[]): Rule[] {
-      const ids = insertMany(inputs);
+      const seen = new Set(list().map(ruleKey));
+      const fresh: RuleInput[] = [];
+      for (const input of inputs) {
+        const key = ruleKey(input);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        fresh.push(input);
+      }
+      const ids = insertMany(fresh);
       return ids.map((id) => get(id)).filter((rule): rule is Rule => rule !== null);
     },
     replaceAll(inputs: RuleInput[]): Rule[] {
