@@ -198,7 +198,7 @@ export const ZH = {
   'settings.binaryInvalidChars': '内核路径含非法字符：< > " | ? *',
   'settings.binaryNotExe': '内核路径必须以 .exe 结尾',
   'settings.effectiveValues':
-    '当前生效值：规则类型 {types}；目标策略 {policies}；失败连接 {interval}ms / {lines} 行',
+    '当前生效值：规则类型 {types}；目标策略 {policies}；失败连接 {lines} 行',
   'settings.needsSetup':
     '初始化标记还是 true：请从别处导入一份配置字符串，或直接点“立即初始化”沿用当前内容。',
   'settings.importPlaceholder': '把别处生成的配置字符串粘到这里，再点“导入字符串”',
@@ -425,7 +425,7 @@ export const EN: Record<MessageKey, string> = {
   'settings.binaryInvalidChars': 'Kernel path contains invalid characters: < > " | ? *',
   'settings.binaryNotExe': 'Kernel path must end with .exe',
   'settings.effectiveValues':
-    'Current values: rule types {types}; target policies {policies}; failed connections {interval} ms / {lines} lines',
+    'Current values: rule types {types}; target policies {policies}; failed connections {lines} lines',
   'settings.needsSetup':
     'The initialized flag is still true: import a config string from elsewhere, or click “Initialize now” to keep the current content.',
   'settings.importPlaceholder': 'Paste a config string generated elsewhere, then click “Import”',

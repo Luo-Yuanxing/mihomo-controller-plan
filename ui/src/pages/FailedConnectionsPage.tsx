@@ -9,6 +9,9 @@ import type { FailedConnection, RuleInput } from '../lib/types';
 import { useUiConfig } from '../lib/uiConfig';
 import { useNotices } from '../lib/useNotices';
 
+/** 兜底轮询间隔：列表按"上榜即稳"设计，靠短间隔刷新没有意义，60 s 足够。 */
+const FAILED_CONNECTIONS_REFETCH_MS = 60000;
+
 function displayTime(value: string): string {
   const timestamp = Date.parse(value);
   return Number.isNaN(timestamp)
@@ -22,13 +25,13 @@ export default function FailedConnectionsPage() {
   const uiConfig = useUiConfig();
   /**
    * 列表口径是"上榜即稳"：一次失败就留 10 分钟，新目标只往末尾追加，位置不会乱跳。
-   * 因此不要频繁轮询（默认 60 s 兜底），要立刻看最新状态用页面上的"刷新列表"；
-   * 新增规则后会主动失效重取，不需要靠短间隔刷新来反映变化。
+   * 因此不频繁轮询，兜底间隔是代码常量（不落 config.json）；要立刻看最新状态用"刷新列表"，
+   * 新增规则后也会主动失效重取。
    */
   const failedQuery = useQuery({
     queryKey: ['failedConnections'],
     queryFn: () => api.failedConnections(uiConfig.failedConnections.lines),
-    refetchInterval: uiConfig.failedConnections.refetchIntervalMs,
+    refetchInterval: FAILED_CONNECTIONS_REFETCH_MS,
   });
 
   const [selected, setSelected] = useState<Set<string>>(new Set());

@@ -12,8 +12,9 @@ export interface UiConfig {
   ruleTypes: string[];
   policies: { value: string; label: string }[];
   defaults: { ruleType: string; policy: string };
-  failedConnections: { refetchIntervalMs: number; lines: number };
-  settings: { logsRefetchIntervalMs: number; logsLines: number };
+  /** 只存"取多少"，不存"多久刷一次"：刷新节奏是代码常量（见各页面）。 */
+  failedConnections: { lines: number };
+  settings: { logsLines: number };
 }
 
 export const DEFAULT_UI_CONFIG: UiConfig = {
@@ -24,8 +25,8 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
     { value: 'DIRECT', label: '直连' },
   ],
   defaults: { ruleType: 'DOMAIN', policy: 'PROXY' },
-  failedConnections: { refetchIntervalMs: 60000, lines: 5000 },
-  settings: { logsRefetchIntervalMs: 5000, logsLines: 500 },
+  failedConnections: { lines: 5000 },
+  settings: { logsLines: 500 },
 };
 
 /** 生效值快照（GET /api/ui-config）：当前值 + 初始化标记（加载时即为 false）+ 文件修改时间。 */

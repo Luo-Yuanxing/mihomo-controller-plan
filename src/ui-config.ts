@@ -1,6 +1,9 @@
 /**
  * 界面常量：结构定义、默认值、文件解析、内存中的生效值。
  * 持久化见 app-config.ts：界面常量与应用设置同住在工作目录的 config.json 里，文件就是唯一真相源。
+ *
+ * 刷新节奏（失败连接、日志面板的轮询间隔）刻意不落配置：它们属于代码行为，
+ * 界面常量只管"看什么"（规则类型、目标策略、取多少行），不管"多久刷一次"。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,15 +18,17 @@ export const uiConfigSchema = z.object({
   /** 目标策略下拉项。 */
   policies: z.array(z.object({ value: z.string().min(1), label: z.string().min(1) })).min(1),
   defaults: z.object({ ruleType: z.string().min(1), policy: z.string().min(1) }),
-  failedConnections: z.object({
-    refetchIntervalMs: z.number().int().min(1000),
-    lines: z.number().int().min(1),
-  }),
-  settings: z.object({
-    logsRefetchIntervalMs: z.number().int().min(1000),
-    /** 日志面板每次取多少行（/api/logs 的取值范围同步为 1..2000）。 */
-    logsLines: z.number().int().min(1).max(2000).default(500),
-  }),
+  failedConnections: z
+    .object({
+      lines: z.number().int().min(1),
+    })
+    .default({ lines: 5000 }),
+  settings: z
+    .object({
+      /** 日志面板每次取多少行（/api/logs 的取值范围同步为 1..2000）；刷新节奏不落配置，写在界面代码里。 */
+      logsLines: z.number().int().min(1).max(2000).default(500),
+    })
+    .default({ logsLines: 500 }),
 });
 
 export type UiConfig = z.infer<typeof uiConfigSchema>;
@@ -96,7 +101,6 @@ export class UiConfigValidationError extends Error {
 export const UI_CONFIG_LIMITS = {
   maxRuleTypes: 20,
   maxPolicies: 20,
-  refetchIntervalMs: { min: 1000, max: 60000 },
   failedLines: { min: 100, max: 20000 },
   logsLines: { min: 1, max: 2000 },
 } as const;
@@ -242,12 +246,6 @@ export function uiConfigIssues(raw: unknown): UiConfigIssue[] {
   if (!isRecord(failed)) {
     issues.push({ path: 'failedConnections', message: t('uiConfig.mustBeObject') });
   } else {
-    checkInterval(
-      issues,
-      'failedConnections.refetchIntervalMs',
-      failed['refetchIntervalMs'],
-      UI_CONFIG_LIMITS.refetchIntervalMs,
-    );
     checkInterval(issues, 'failedConnections.lines', failed['lines'], UI_CONFIG_LIMITS.failedLines);
   }
 
@@ -255,12 +253,6 @@ export function uiConfigIssues(raw: unknown): UiConfigIssue[] {
   if (!isRecord(settings)) {
     issues.push({ path: 'settings', message: t('uiConfig.mustBeObject') });
   } else {
-    checkInterval(
-      issues,
-      'settings.logsRefetchIntervalMs',
-      settings['logsRefetchIntervalMs'],
-      UI_CONFIG_LIMITS.refetchIntervalMs,
-    );
     checkInterval(issues, 'settings.logsLines', settings['logsLines'], UI_CONFIG_LIMITS.logsLines);
   }
 
@@ -275,8 +267,8 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
     { value: 'DIRECT', label: '直连' },
   ],
   defaults: { ruleType: 'DOMAIN', policy: 'PROXY' },
-  failedConnections: { refetchIntervalMs: 60000, lines: 5000 },
-  settings: { logsRefetchIntervalMs: 5000, logsLines: 500 },
+  failedConnections: { lines: 5000 },
+  settings: { logsLines: 500 },
 };
 
 /** 文件级校验：界面常量 + 可选的 rules 段（类型要在 ruleTypes 白名单里）。 */

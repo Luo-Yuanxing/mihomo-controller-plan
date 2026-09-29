@@ -21,6 +21,9 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const inputClass = 'w-full rounded border border-slate-300 px-2 py-1 font-mono text-sm';
 
+/** 日志面板轮询间隔：刷新节奏是代码常量，不落 config.json（条数仍可配）。 */
+const LOGS_REFETCH_MS = 5000;
+
 export default function SettingsPage() {
   const t = useT();
   const language = useLanguage();
@@ -33,7 +36,7 @@ export default function SettingsPage() {
   const logsQuery = useQuery({
     queryKey: ['logs', logsLines],
     queryFn: () => api.logs(logsLines),
-    refetchInterval: uiConfigQuery.data?.config.settings.logsRefetchIntervalMs ?? 5000,
+    refetchInterval: LOGS_REFETCH_MS,
   });
 
   const [draft, setDraft] = useState<Settings | null>(null);
@@ -247,7 +250,6 @@ export default function SettingsPage() {
             types: uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—',
             policies:
               uiConfigQuery.data?.config.policies.map((option) => option.label).join(' / ') ?? '—',
-            interval: uiConfigQuery.data?.config.failedConnections.refetchIntervalMs ?? '—',
             lines: uiConfigQuery.data?.config.failedConnections.lines ?? '—',
           })}
         </p>
