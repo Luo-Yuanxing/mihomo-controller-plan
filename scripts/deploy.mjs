@@ -75,7 +75,13 @@ function stopProcesses(pids) {
       execFileSync('taskkill', ['/pid', pid.trim(), '/t', '/f'], { windowsHide: true });
       process.stdout.write(`已结束占用程序：PID ${pid.trim()}\n`);
     } catch (error) {
-      fail(`结束 PID ${pid.trim()} 失败：${String(error)}`);
+      // 同一个进程树里的子进程会随父进程一起退出，轮到它时已经"不存在"：这不算失败
+      const message = String(error);
+      if (/not found|找不到/i.test(message)) {
+        process.stdout.write(`PID ${pid.trim()} 已随父进程退出\n`);
+        continue;
+      }
+      fail(`结束 PID ${pid.trim()} 失败：${message}`);
     }
   }
 }
