@@ -35,6 +35,7 @@ import { writeFileAtomic } from './util/atomic.js';
 import { acquireLock } from './util/lock.js';
 import { createLogger, logPaths } from './util/logger.js';
 import { dataPaths, resolveDataDir, resolveResourcePath } from './util/paths.js';
+import { APP_VERSION } from './version.js';
 
 export interface ServerOptions {
   /** 应用根目录：开发期是仓库根，打包后是 app.asar 根。 */
@@ -199,7 +200,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const failureTracker = createConnectionTracker();
 
   const context: AppContext = {
-    appVersion: process.env['npm_package_version'] ?? '0.1.0',
+    appVersion: APP_VERSION,
     appDir,
     dataDir,
     dataFallback: fallback,

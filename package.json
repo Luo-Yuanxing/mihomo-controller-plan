@@ -11,12 +11,13 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "concurrently -k \"npm:dev:ui\" \"npm:dev:server\" \"npm:dev:electron\"",
+    "dev": "npm run gen:version && concurrently -k \"npm:dev:ui\" \"npm:dev:server\" \"npm:dev:electron\"",
     "dev:server": "node electron/dev-server.mjs",
     "dev:ui": "vite --config ui/vite.config.ts",
     "dev:electron": "node electron/dev-launcher.mjs",
+    "gen:version": "node scripts/gen-version.mjs",
     "clean": "node scripts/clean.mjs",
-    "build": "npm run clean && tsc -p tsconfig.json && vite build --config ui/vite.config.ts",
+    "build": "npm run gen:version && npm run clean && tsc -p tsconfig.json && vite build --config ui/vite.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p ui/tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --write .",
