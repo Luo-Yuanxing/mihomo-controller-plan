@@ -120,18 +120,6 @@ export const api = {
       },
     ),
 
-  subscription: () =>
-    request<{
-      config: SubscriptionConfig;
-      state: SubscriptionState;
-      file: string;
-      fileExists: boolean;
-    }>('/api/subscription'),
-  saveSubscription: (patch: Partial<SubscriptionConfig>) =>
-    request<{ config: SubscriptionConfig }>('/api/subscription', {
-      method: 'PUT',
-      body: JSON.stringify(patch),
-    }),
   deleteSubscription: () =>
     request<{ deleted: boolean; config: SubscriptionConfig; kernel: CoreStatus }>(
       '/api/subscription',
@@ -140,7 +128,6 @@ export const api = {
   refreshSubscription: () => post<SubscriptionState>('/api/subscription/refresh'),
   subscriptionGroups: () => request<SubscriptionGroupsResponse>('/api/subscription/groups'),
 
-  proxy: () => request<ProxyState>('/api/proxy'),
   proxyGroups: () => request<{ target: string; groups: ProxyGroupSummary[] }>('/api/proxies'),
   selectProxy: (group: string, name: string) =>
     request<{ group: string; now: string; all: string[] }>(
