@@ -13,7 +13,7 @@ export interface UiConfig {
   policies: { value: string; label: string }[];
   defaults: { ruleType: string; policy: string };
   failedConnections: { refetchIntervalMs: number; lines: number };
-  settings: { logsRefetchIntervalMs: number };
+  settings: { logsRefetchIntervalMs: number; logsLines: number };
 }
 
 export const DEFAULT_UI_CONFIG: UiConfig = {
@@ -25,7 +25,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   ],
   defaults: { ruleType: 'DOMAIN', policy: 'PROXY' },
   failedConnections: { refetchIntervalMs: 5000, lines: 5000 },
-  settings: { logsRefetchIntervalMs: 5000 },
+  settings: { logsRefetchIntervalMs: 5000, logsLines: 500 },
 };
 
 /** 生效值快照（GET /api/ui-config）：当前值 + 初始化标记（加载时即为 false）+ 文件修改时间。 */

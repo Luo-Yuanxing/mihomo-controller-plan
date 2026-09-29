@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { LANGUAGES, setLanguage, type Language } from '../lib/i18n';
 import { useLanguage, useT } from '../lib/useI18n';
 import type { Settings } from '../lib/types';
+import { DEFAULT_UI_CONFIG } from '../lib/types';
 import { useNotices } from '../lib/useNotices';
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -26,9 +27,12 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: api.settings });
   const uiConfigQuery = useQuery({ queryKey: ['ui-config'], queryFn: api.uiConfig });
+  /** 日志行数跟随界面常量：默认 500，可在 config.json 的 settings.logsLines 调整。 */
+  const logsLines =
+    uiConfigQuery.data?.config.settings.logsLines ?? DEFAULT_UI_CONFIG.settings.logsLines;
   const logsQuery = useQuery({
-    queryKey: ['logs'],
-    queryFn: () => api.logs(200),
+    queryKey: ['logs', logsLines],
+    queryFn: () => api.logs(logsLines),
     refetchInterval: uiConfigQuery.data?.config.settings.logsRefetchIntervalMs ?? 5000,
   });
 
@@ -321,7 +325,9 @@ export default function SettingsPage() {
       </div>
 
       <section className="rounded border border-slate-300 bg-white p-3">
-        <h2 className="mb-2 text-base font-semibold">{t('settings.logsTitle')}</h2>
+        <h2 className="mb-2 text-base font-semibold">
+          {t('settings.logsTitle', { lines: String(logsLines) })}
+        </h2>
         <div className="grid grid-cols-2 gap-3">
           {(['app', 'core'] as const).map((key) => (
             <div key={key}>

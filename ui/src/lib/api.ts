@@ -61,7 +61,7 @@ export const api = {
   offlineShutdown: () => post<{ proxy: ProxyState; kernel: CoreStatus }>('/api/offline/shutdown'),
   /** 离线兜底：无条件写系统代理期望值 + 重启内核。 */
   offlineRestart: () => post<{ proxy: ProxyState; kernel: CoreStatus }>('/api/offline/restart'),
-  logs: (lines = 200) => request<LogsResponse>(`/api/logs?lines=${String(lines)}`),
+  logs: (lines = 500) => request<LogsResponse>(`/api/logs?lines=${String(lines)}`),
   failedConnections: (lines = 5000) =>
     request<{ file: string; scannedLines: number; connections: FailedConnection[] }>(
       `/api/failed-connections?lines=${String(lines)}`,

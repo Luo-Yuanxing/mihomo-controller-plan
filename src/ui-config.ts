@@ -19,7 +19,11 @@ export const uiConfigSchema = z.object({
     refetchIntervalMs: z.number().int().min(1000),
     lines: z.number().int().min(1),
   }),
-  settings: z.object({ logsRefetchIntervalMs: z.number().int().min(1000) }),
+  settings: z.object({
+    logsRefetchIntervalMs: z.number().int().min(1000),
+    /** 日志面板每次取多少行（/api/logs 的取值范围同步为 1..2000）。 */
+    logsLines: z.number().int().min(1).max(2000).default(500),
+  }),
 });
 
 export type UiConfig = z.infer<typeof uiConfigSchema>;
@@ -94,6 +98,7 @@ export const UI_CONFIG_LIMITS = {
   maxPolicies: 20,
   refetchIntervalMs: { min: 1000, max: 60000 },
   failedLines: { min: 100, max: 20000 },
+  logsLines: { min: 1, max: 2000 },
 } as const;
 
 const RULE_TYPE_PATTERN = /^[A-Z0-9][A-Z0-9-]*$/;
@@ -256,6 +261,7 @@ export function uiConfigIssues(raw: unknown): UiConfigIssue[] {
       settings['logsRefetchIntervalMs'],
       UI_CONFIG_LIMITS.refetchIntervalMs,
     );
+    checkInterval(issues, 'settings.logsLines', settings['logsLines'], UI_CONFIG_LIMITS.logsLines);
   }
 
   return issues;
@@ -270,7 +276,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   ],
   defaults: { ruleType: 'DOMAIN', policy: 'PROXY' },
   failedConnections: { refetchIntervalMs: 5000, lines: 5000 },
-  settings: { logsRefetchIntervalMs: 5000 },
+  settings: { logsRefetchIntervalMs: 5000, logsLines: 500 },
 };
 
 /** 文件级校验：界面常量 + 可选的 rules 段（类型要在 ruleTypes 白名单里）。 */

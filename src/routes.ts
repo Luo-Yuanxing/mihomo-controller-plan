@@ -600,8 +600,8 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   app.get('/api/logs', (request) => {
-    const lines = Number((request.query as { lines?: string }).lines ?? 200);
-    const max = Number.isInteger(lines) && lines > 0 && lines <= 2000 ? lines : 200;
+    const lines = Number((request.query as { lines?: string }).lines ?? 500);
+    const max = Number.isInteger(lines) && lines > 0 && lines <= 2000 ? lines : 500;
     const paths = logPaths(ctx.dataDir);
     return { app: tailLines(paths.app, max), core: tailLines(paths.core, max) };
   });

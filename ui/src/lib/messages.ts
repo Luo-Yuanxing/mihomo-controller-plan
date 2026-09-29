@@ -220,7 +220,7 @@ export const ZH = {
   'settings.shareNote':
     '字符串里只有界面常量、自定义规则、内核路径与系统代理期望值；订阅与内核 secret 不外传。',
   'settings.saveButton': '保存设置',
-  'settings.logsTitle': '日志（最近 200 行）',
+  'settings.logsTitle': '日志（最近 {lines} 行）',
   'settings.noLogs': '（暂无日志）',
   'settings.languageSaved': '界面语言已切换',
 
@@ -445,7 +445,7 @@ export const EN: Record<MessageKey, string> = {
   'settings.shareNote':
     'The string carries only UI constants, custom rules, the kernel path and the desired system proxy; the subscription and the kernel secret never leave this machine.',
   'settings.saveButton': 'Save settings',
-  'settings.logsTitle': 'Logs (last 200 lines)',
+  'settings.logsTitle': 'Logs (last {lines} lines)',
   'settings.noLogs': '(no logs yet)',
   'settings.languageSaved': 'Interface language switched',
 
