@@ -52,7 +52,8 @@ export function encodeSharedConfig(input: {
  * 复用配置文件那一套严格校验（规则类型白名单、跨字段一致性都在里面）。
  */
 export function decodeSharedConfig(text: string): SharedConfig {
-  const raw = text.trim();
+  // 长串在聊天工具/文本框里难免被折行或插空格，一律先清掉空白：它只是一串 Base64，不需要词边界
+  const raw = text.replace(/\s+/g, '');
   if (raw === '') {
     throw new UiConfigValidationError([{ path: 'payload', message: '导入串不能为空' }]);
   }
