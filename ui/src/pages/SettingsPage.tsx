@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import NoticeStack from '../components/NoticeStack';
+import Notice from '../components/Notice';
 import { api, ApiError } from '../lib/api';
 import type { Settings, UiConfigPreview } from '../lib/types';
 import { useNotices } from '../lib/useNotices';
@@ -320,33 +321,32 @@ export default function SettingsPage() {
         </div>
 
         {valueIssues.length > 0 && (
-          <div
-            className={`rounded border p-2 text-xs ${
-              issuesFrom === 'backend'
-                ? 'border-rose-300 bg-rose-50 text-rose-900'
-                : 'border-amber-300 bg-amber-50 text-amber-900'
-            }`}
-          >
-            <p className="mb-1 font-semibold">
-              {issuesFrom === 'backend'
-                ? `后端取值检测未通过（${String(valueIssues.length)} 项），已阻止保存`
-                : `前端备份检测（${String(valueIssues.length)} 项，后端未返回明细，仅供参考）`}
-            </p>
-            <ul className="list-disc pl-4">
-              {valueIssues.map((issue) => (
-                <li key={`${issue.path}-${issue.message}`}>
-                  <span className="font-mono">
-                    {issue.path === ''
-                      ? '配置'
-                      : issue.path === 'file'
-                        ? '配置文件路径'
-                        : issue.path}
-                  </span>
-                  ：{issue.message}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <Notice
+            kind={issuesFrom === 'backend' ? 'error' : 'warn'}
+            text={
+              <>
+                <p className="mb-1 font-semibold">
+                  {issuesFrom === 'backend'
+                    ? `后端取值检测未通过（${String(valueIssues.length)} 项），已阻止保存`
+                    : `前端备份检测（${String(valueIssues.length)} 项，后端未返回明细，仅供参考）`}
+                </p>
+                <ul className="list-disc pl-4">
+                  {valueIssues.map((issue) => (
+                    <li key={`${issue.path}-${issue.message}`}>
+                      <span className="font-mono">
+                        {issue.path === ''
+                          ? '配置'
+                          : issue.path === 'file'
+                            ? '配置文件路径'
+                            : issue.path}
+                      </span>
+                      ：{issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            }
+          />
         )}
 
         {preview !== null && (

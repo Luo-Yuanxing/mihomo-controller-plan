@@ -4,7 +4,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type NoticeKind = 'ok' | 'error';
+/** warn 用于常驻的说明性提示（例如数据目录回退），与 error 一样等用户处理。 */
+export type NoticeKind = 'ok' | 'error' | 'warn';
 
 export interface NoticeItem {
   id: number;

@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import NoticeStack from '../components/NoticeStack';
+import Notice from '../components/Notice';
 import { api } from '../lib/api';
 import type { ProxyValues } from '../lib/types';
 import { useNotices, type NoticeKind } from '../lib/useNotices';
@@ -312,9 +313,7 @@ export default function StatusPage() {
         数据目录：{data?.app.dataDir ?? '—'}
       </p>
       {dirHintOpen && data?.app.dataFallback === true && (
-        <p className="mt-1 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          程序目录不可写，数据实际存放在 {data.app.dataDir}
-        </p>
+        <Notice kind="warn" text={`程序目录不可写，数据实际存放在 ${data.app.dataDir}`} />
       )}
     </div>
   );
