@@ -61,7 +61,6 @@ async function createBuilder(): Promise<BuildApp> {
     const context = {
       appVersion: 'test',
       appDir: '',
-      uiDir: '',
       dataDir: '',
       dataFallback: false,
       log: pino({ level: 'silent' }),
