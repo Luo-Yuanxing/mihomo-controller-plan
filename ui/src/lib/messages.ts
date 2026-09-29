@@ -87,7 +87,6 @@ export const ZH = {
   'rules.newBadge': '新',
   'rules.empty': '还没有规则，点“新增规则”添加一条。',
   'rules.emptyFiltered': '没有符合筛选条件的规则',
-  'rules.preview': '预览模式',
 
   // 失败连接页（FailedConnectionsPage.tsx）
   'failed.heading': '失败连接（{count} 个目标）',
@@ -223,7 +222,6 @@ export const ZH = {
   'settings.saveButton': '保存设置',
   'settings.logsTitle': '日志（最近 200 行）',
   'settings.noLogs': '（暂无日志）',
-  'settings.languageNote': '语言存在 config.json 的 language 字段里，托盘菜单会一起跟着变。',
   'settings.languageSaved': '界面语言已切换',
 
   // REST 客户端（lib/api.ts）
@@ -312,7 +310,6 @@ export const EN: Record<MessageKey, string> = {
   'rules.newBadge': 'new',
   'rules.empty': 'No rules yet, click “Add rule” to create one.',
   'rules.emptyFiltered': 'No rule matches the filters',
-  'rules.preview': 'Preview mode',
 
   'failed.heading': 'Failed connections ({count} targets)',
   'failed.selected': '{count} selected',
@@ -450,8 +447,6 @@ export const EN: Record<MessageKey, string> = {
   'settings.saveButton': 'Save settings',
   'settings.logsTitle': 'Logs (last 200 lines)',
   'settings.noLogs': '(no logs yet)',
-  'settings.languageNote':
-    'The language lives in the language field of config.json; the tray menu follows it.',
   'settings.languageSaved': 'Interface language switched',
 
   'api.requestFailed': 'Request failed: HTTP {status}',

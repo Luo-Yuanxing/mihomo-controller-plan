@@ -72,7 +72,6 @@ export default function RulesPage() {
   const queryClient = useQueryClient();
   const uiConfig = useUiConfig();
   const rulesQuery = useQuery({ queryKey: ['rules'], queryFn: api.rules });
-  const providerQuery = useQuery({ queryKey: ['ruleProvider'], queryFn: api.ruleProvider });
 
   const [rows, setRows] = useState<EditableRule[]>([]);
   const [removed, setRemoved] = useState<number[]>([]);
@@ -148,7 +147,6 @@ export default function RulesPage() {
         }),
       );
       await queryClient.invalidateQueries({ queryKey: ['rules'] });
-      await queryClient.invalidateQueries({ queryKey: ['ruleProvider'] });
       await queryClient.invalidateQueries({ queryKey: ['status'] });
     },
     onError: (error: Error) => {
@@ -421,17 +419,6 @@ export default function RulesPage() {
             )}
           </tbody>
         </table>
-      </div>
-
-      <div>
-        <div className="mb-1 flex items-center gap-2 text-sm">
-          <span className="font-semibold">{t('rules.preview')}</span>
-        </div>
-        <textarea
-          readOnly
-          className="h-48 w-full rounded border border-slate-300 bg-white p-2 font-mono text-xs"
-          value={providerQuery.data?.yaml ?? ''}
-        />
       </div>
     </div>
   );

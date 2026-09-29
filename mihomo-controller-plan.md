@@ -416,7 +416,6 @@ rules:
 ### 7.2 生成的 rule-provider
 
 ```yaml
-# 预览模式
 payload:
   - DOMAIN-SUFFIX,example.com,PROXY
   - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve

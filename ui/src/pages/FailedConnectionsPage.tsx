@@ -90,7 +90,6 @@ export default function FailedConnectionsPage() {
       setSelected(new Set());
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['rules'] }),
-        queryClient.invalidateQueries({ queryKey: ['ruleProvider'] }),
         queryClient.invalidateQueries({ queryKey: ['status'] }),
       ]);
     },

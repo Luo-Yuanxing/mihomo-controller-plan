@@ -147,7 +147,7 @@ export default function SettingsPage() {
       <NoticeStack notices={notices.items} onDismiss={notices.dismiss} />
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
-        <Field label={t('settings.language')} hint={t('settings.languageNote')}>
+        <Field label={t('settings.language')}>
           <select
             className="w-40 rounded border border-slate-300 px-2 py-1 text-sm"
             value={language}

@@ -42,10 +42,9 @@ function renderRuleLine(rule: Rule): string {
 
 /** 渲染 rule-provider 内容（behavior: classical），计划 §7.2。 */
 export function renderRuleProvider(rules: Rule[]): string {
-  const header = ['# 预览模式'];
   const enabled = rules.filter((rule) => rule.enabled);
-  if (enabled.length === 0) return `${[...header, 'payload: []'].join('\n')}\n`;
+  if (enabled.length === 0) return 'payload: []\n';
 
   const lines = enabled.map((rule) => `  - ${renderRuleLine(rule)}`);
-  return `${[...header, 'payload:', ...lines].join('\n')}\n`;
+  return `${['payload:', ...lines].join('\n')}\n`;
 }

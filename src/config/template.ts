@@ -73,7 +73,6 @@ function renderGroupLines(group: RenderedGroup, provider: string): string[] {
 export function renderConfig(options: TemplateOptions): string {
   const { settings, secret } = options;
   const lines = [
-    '# 预览模式',
     `mixed-port: ${settings.core.mixedPort}`,
     'mode: rule',
     'log-level: info',
