@@ -20,7 +20,7 @@
     "format": "prettier --write .",
     "test": "vitest run --passWithNoTests",
     "start": "npm run build && electron .",
-    "dist": "npm run build && electron-builder"
+    "dist": "node scripts/check-mihomo-binary.mjs && npm run build && electron-builder"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.66.0",
