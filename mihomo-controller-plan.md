@@ -315,6 +315,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | 轮询 | 每 60 s 一次，读三项与 desired 比对 |
 | 纠正 | 不一致则回写 desired，并调用 `InternetSetOption` 的 `SETTINGS_CHANGED` + `REFRESH` 立即生效 |
 | 未接管 | 用户关掉系统代理后立即停止干预 |
+| 守护开关 | 不单独提供：开启系统代理即纳入守护，关闭系统代理即停止守护；界面只有这两个动作，用户改不了守护本身 |
 | 退出 | 不做还原，注册表保持当前值 |
 | 失败 | 回写失败属于环境类异常 → 记录并停止工作 |
 | 持久化 | 开关与绕过列表存在 `config.json` 的 `proxy` 段里；代理服务器地址每次启动按混合端口重算 |
