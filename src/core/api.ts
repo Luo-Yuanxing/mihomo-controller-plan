@@ -49,6 +49,11 @@ export interface CoreApi {
   proxies(): Promise<ProxySnapshot>;
   /** PUT /proxies/{name}，切换代理组的当前出口。 */
   selectProxy(name: string, choice: string): Promise<void>;
+  /**
+   * GET /group/{name}/delay，并发测组内每个节点的时延（毫秒）。
+   * 测不通的节点不会出现在结果里；整组都不通时返回空对象。
+   */
+  groupDelay(name: string): Promise<Record<string, number>>;
   /** GET /configs。 */
   configs(): Promise<Record<string, unknown>>;
   /** GET /rules，用于核对当前生效规则。 */
@@ -61,20 +66,39 @@ export interface CoreApiOptions {
   timeoutMs?: number;
 }
 
+/** 内核 REST 的错误，带状态码：504 表示组内节点全部超时，是正常结果不是故障。 */
+export class CoreApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'CoreApiError';
+  }
+}
+
+/** 测延迟的探针地址与单节点超时，和 proxy-provider 的健康检查保持一致。 */
+export const DELAY_TEST_URL = 'http://www.gstatic.com/generate_204';
+export const DELAY_TEST_TIMEOUT_MS = 3000;
+
 export function createCoreApi(options: CoreApiOptions): CoreApi {
   const base = `http://${options.controller}`;
   const timeoutMs = options.timeoutMs ?? 5000;
   const authHeaders: Record<string, string> =
     options.secret === '' ? {} : { Authorization: `Bearer ${options.secret}` };
 
-  async function request(pathname: string, init: RequestInit = {}): Promise<Response> {
+  async function request(
+    pathname: string,
+    init: RequestInit = {},
+    requestTimeoutMs: number = timeoutMs,
+  ): Promise<Response> {
     const method = init.method ?? 'GET';
     let response: Response;
     try {
       response = await fetch(`${base}${pathname}`, {
         ...init,
         headers: { ...authHeaders, ...(init.headers as Record<string, string> | undefined) },
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(requestTimeoutMs),
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -82,8 +106,9 @@ export function createCoreApi(options: CoreApiOptions): CoreApi {
     }
     if (!response.ok) {
       const body = (await response.text()).slice(0, 200);
-      throw new Error(
+      throw new CoreApiError(
         `${method} ${pathname} 返回 ${response.status}${body === '' ? '' : ` ${body}`}`,
+        response.status,
       );
     }
     return response;
@@ -112,6 +137,21 @@ export function createCoreApi(options: CoreApiOptions): CoreApi {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ name: choice }),
       });
+    },
+    async groupDelay(name: string) {
+      const query = `timeout=${String(DELAY_TEST_TIMEOUT_MS)}&url=${encodeURIComponent(DELAY_TEST_URL)}`;
+      try {
+        const response = await request(
+          `/group/${encodeURIComponent(name)}/delay?${query}`,
+          {},
+          DELAY_TEST_TIMEOUT_MS + 5000,
+        );
+        return (await response.json()) as Record<string, number>;
+      } catch (error) {
+        // 全部节点都超时是正常测试结果，交给界面按"超时"渲染
+        if (error instanceof CoreApiError && error.status === 504) return {};
+        throw error;
+      }
     },
     async configs() {
       const response = await request('/configs');

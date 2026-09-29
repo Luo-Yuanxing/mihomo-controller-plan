@@ -123,6 +123,10 @@ export const api = {
       `/api/proxies/${encodeURIComponent(group)}`,
       { method: 'PUT', body: JSON.stringify({ name }) },
     ),
+  groupDelay: (group: string) =>
+    request<{ group: string; url: string; delays: Record<string, number> }>(
+      `/api/proxies/${encodeURIComponent(group)}/delay`,
+    ),
   enableProxy: () => post<ProxyState>('/api/proxy/enable'),
   disableProxy: () => post<ProxyState>('/api/proxy/disable'),
   applyProxy: () => post<ProxyState>('/api/proxy/apply'),

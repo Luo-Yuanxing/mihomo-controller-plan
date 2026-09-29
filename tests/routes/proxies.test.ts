@@ -23,7 +23,7 @@ interface FakeApi extends CoreApi {
   readonly selected: { group: string; choice: string }[];
 }
 
-function fakeApi(): FakeApi {
+function fakeApi(delays: Record<string, number> = { 香港: 123 }): FakeApi {
   const selected: { group: string; choice: string }[] = [];
   return {
     selected,
@@ -34,6 +34,7 @@ function fakeApi(): FakeApi {
     selectProxy: async (group, choice) => {
       selected.push({ group, choice });
     },
+    groupDelay: async () => delays,
     configs: async () => ({}),
     rules: async () => ({}),
   };
@@ -139,6 +140,17 @@ describe.skipIf(!canLoadFastify)('/api/proxies', () => {
     expect(unknown.statusCode).toBe(404);
     expect(empty.statusCode).toBe(400);
     expect(api.selected).toEqual([]);
+    await app.close();
+  });
+
+  it('测延迟返回每个节点的毫秒数，没测通的节点不在结果里', async () => {
+    const app = buildApp(fakeApi({ 香港: 123 }));
+    const response = await app.inject({ method: 'GET', url: '/api/proxies/PROXY/delay' });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ group: string; delays: Record<string, number> }>();
+    expect(body.group).toBe('PROXY');
+    expect(body.delays).toEqual({ 香港: 123 });
     await app.close();
   });
 });

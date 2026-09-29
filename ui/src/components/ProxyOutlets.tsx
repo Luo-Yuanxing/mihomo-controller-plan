@@ -1,6 +1,6 @@
 /** 代理出口：目标策略"代理"指向订阅哪个组、当前走哪个节点。提示统一由页面顶部的 NoticeStack 显示。 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import type { NoticeKind } from '../lib/useNotices';
 
@@ -20,6 +20,7 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
   });
   const settingsQuery = useQuery({ queryKey: ['settings'], queryFn: api.settings });
   const [node, setNode] = useState('');
+  const [delays, setDelays] = useState<Record<string, number> | null>(null);
 
   const target = groupsQuery.data?.target ?? '';
   const group = groupsQuery.data?.groups.find((item) => item.name === target);
@@ -35,6 +36,16 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
     },
     onError: (error: Error) => push('error', error.message),
   });
+
+  const delay = useMutation({
+    mutationFn: () => api.groupDelay(target),
+    onSuccess: (result) => setDelays(result.delays),
+    onError: (error: Error) => push('error', error.message),
+  });
+
+  // 成员变了（换了指代的组、订阅刷新）旧时延就作废，回到"没测过"的状态
+  const members = group?.all.join('\n') ?? '';
+  useEffect(() => setDelays(null), [members]);
 
   const saveGroup = useMutation({
     mutationFn: (next: string) => {
@@ -91,33 +102,56 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
           <span className="text-slate-500">
             {groupsQuery.isError ? String(groupsQuery.error) : '内核未运行，读不到代理组'}
           </span>
-        ) : SELECTOR_TYPES.has(group.type) ? (
-          <>
-            <select
-              aria-label="代理出口节点"
-              className="w-72 rounded border border-slate-300 px-1 py-1"
-              value={value}
-              disabled={select.isPending}
-              onChange={(event) => {
-                setNode(event.target.value);
-                select.mutate(event.target.value);
-              }}
-            >
-              {!group.all.includes(value) && <option value={value}>{value}</option>}
-              {group.all.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-slate-500">当前：{group.now || '—'}</span>
-          </>
         ) : (
-          <span className="text-slate-500">
-            {group.type} 组自动选出口，不能手动切换（当前：{group.now || '—'}）
-          </span>
+          <>
+            <span className="text-slate-500">{group.now || '—'}</span>
+            {!SELECTOR_TYPES.has(group.type) && (
+              <span className="text-xs text-slate-500">（{group.type} 组自动选出口）</span>
+            )}
+            <button
+              type="button"
+              className="ml-auto rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
+              disabled={delay.isPending}
+              onClick={() => delay.mutate()}
+            >
+              {delay.isPending ? '测延迟中…' : '测延迟'}
+            </button>
+          </>
         )}
       </div>
+
+      {group !== undefined && (
+        <div className="flex flex-wrap gap-1">
+          {group.all.map((name) => {
+            const active = name === value;
+            const ms = delays?.[name];
+            const selectable = SELECTOR_TYPES.has(group.type);
+            return (
+              <button
+                key={name}
+                type="button"
+                disabled={!selectable || select.isPending}
+                onClick={() => {
+                  setNode(name);
+                  select.mutate(name);
+                }}
+                className={`rounded border px-2 py-1 text-xs ${
+                  active
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-300 bg-white hover:bg-slate-50'
+                } ${selectable ? '' : 'cursor-default'}`}
+              >
+                {name}
+                {delays !== null && (
+                  <span className={ms === undefined ? 'ml-1 text-rose-400' : 'ml-1 opacity-70'}>
+                    {ms === undefined ? '超时' : `${String(ms)} ms`}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
