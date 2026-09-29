@@ -12,6 +12,7 @@ import { RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { countSubscriptionProxies } from './sub/download.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
+import { UiConfigValidationError } from './ui-config.js';
 import { readFileIfExists } from './util/atomic.js';
 import { logPaths, tailLines } from './util/logger.js';
 import type { RuleInput } from './rules/repo.js';
@@ -181,6 +182,15 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   const uiConfigFileSchema = z.object({ file: z.string().min(1).optional() });
 
+  /** 取值不合法时返回 400 + 逐项明细，界面按字段展示。 */
+  const uiConfigFailure = (reply: FastifyReply, error: unknown): FastifyReply => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof UiConfigValidationError) {
+      return reply.status(400).send({ error: message, issues: error.issues });
+    }
+    return reply.status(400).send({ error: message });
+  };
+
   app.get('/api/ui-config', () => ctx.uiConfigState());
 
   /** 强制按配置文件加载：直接覆盖系统值。 */
@@ -190,9 +200,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     try {
       return await ctx.forceLoadUiConfig(parsed.data.file);
     } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) });
+      return uiConfigFailure(reply, error);
     }
   });
 
@@ -204,9 +212,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
       const preview = await ctx.previewUiConfig(parsed.data.file);
       return { ...preview, same: preview.diff.every((item) => item.same) };
     } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) });
+      return uiConfigFailure(reply, error);
     }
   });
 
@@ -220,9 +226,7 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
         config: parsed.data.config,
       });
     } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) });
+      return uiConfigFailure(reply, error);
     }
   });
 

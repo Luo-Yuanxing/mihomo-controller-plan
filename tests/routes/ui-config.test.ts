@@ -128,7 +128,15 @@ describe.skipIf(!canLoadFastify)('/api/ui-config', () => {
   it('预览只对比不生效，强制加载才覆盖', async () => {
     const app = buildApp(dataDir);
     const file = uiConfigPath(dataDir);
-    writeFileSync(file, JSON.stringify({ ...DEFAULT_UI_CONFIG, ruleTypes: ['DOMAIN'] }), 'utf8');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...DEFAULT_UI_CONFIG,
+        ruleTypes: ['DOMAIN'],
+        defaults: { ...DEFAULT_UI_CONFIG.defaults, ruleType: 'DOMAIN' },
+      }),
+      'utf8',
+    );
 
     const preview = await app.inject({ method: 'POST', url: '/api/ui-config/preview' });
     expect(preview.statusCode).toBe(200);

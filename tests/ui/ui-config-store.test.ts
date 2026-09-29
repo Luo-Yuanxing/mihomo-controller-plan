@@ -48,7 +48,15 @@ describe.skipIf(!canLoadSqlite)('界面常量持久化', () => {
   it('首次启动：用现有配置文件初始化系统值', () => {
     const dataDir = tempDataDir();
     const file = uiConfigPath(dataDir);
-    writeFileSync(file, JSON.stringify({ ...DEFAULT_UI_CONFIG, ruleTypes: ['DOMAIN'] }), 'utf8');
+    writeFileSync(
+      file,
+      JSON.stringify({
+        ...DEFAULT_UI_CONFIG,
+        ruleTypes: ['DOMAIN'],
+        defaults: { ...DEFAULT_UI_CONFIG.defaults, ruleType: 'DOMAIN' },
+      }),
+      'utf8',
+    );
     const db = open(dataDir);
 
     const state = loadStoredUiConfig(db, file);
@@ -73,13 +81,21 @@ describe.skipIf(!canLoadSqlite)('界面常量持久化', () => {
   });
 
   it('diffUiConfig 标出不一致项', () => {
-    const incoming = { ...DEFAULT_UI_CONFIG, ruleTypes: ['DOMAIN'] };
+    const incoming = {
+      ...DEFAULT_UI_CONFIG,
+      ruleTypes: ['DOMAIN'],
+      defaults: { ...DEFAULT_UI_CONFIG.defaults, ruleType: 'DOMAIN' },
+    };
     const diff = diffUiConfig('/sys.json', DEFAULT_UI_CONFIG, '/sys.json', incoming);
 
     const types = diff.find((item) => item.label === '规则类型');
     expect(types?.same).toBe(false);
     expect(types?.current).toBe('DOMAIN-SUFFIX / DOMAIN');
     expect(types?.incoming).toBe('DOMAIN');
-    expect(diff.filter((item) => !item.same)).toHaveLength(1);
+    // 规则类型与它的默认值一起变了
+    expect(diff.filter((item) => !item.same).map((item) => item.label)).toEqual([
+      '规则类型',
+      '默认规则类型',
+    ]);
   });
 });

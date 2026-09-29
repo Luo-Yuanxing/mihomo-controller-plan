@@ -19,9 +19,18 @@ function tempFile(text: string): string {
   return file;
 }
 
+/** 合法的最小变体：改规则类型时默认值要跟着改，否则跨字段检测会拦下。 */
+function withRuleTypes(ruleTypes: string[]): typeof DEFAULT_UI_CONFIG {
+  return {
+    ...DEFAULT_UI_CONFIG,
+    ruleTypes,
+    defaults: { ...DEFAULT_UI_CONFIG.defaults, ruleType: ruleTypes[0] ?? 'DOMAIN' },
+  };
+}
+
 describe('readUiConfigFile', () => {
   it('读合法 JSON', () => {
-    const file = tempFile(JSON.stringify({ ...DEFAULT_UI_CONFIG, ruleTypes: ['DOMAIN'] }));
+    const file = tempFile(JSON.stringify(withRuleTypes(['DOMAIN'])));
     expect(readUiConfigFile(file).ruleTypes).toEqual(['DOMAIN']);
   });
 
@@ -30,13 +39,13 @@ describe('readUiConfigFile', () => {
     expect(() => readUiConfigFile(uiConfigPath(dir))).toThrow('配置文件不存在或不可读');
     expect(() => readUiConfigFile(tempFile('   '))).toThrow('配置文件是空文件');
     expect(() => readUiConfigFile(tempFile('不是 json'))).toThrow('配置文件不是合法 JSON');
-    expect(() => readUiConfigFile(tempFile('{"ruleTypes": []}'))).toThrow('配置文件字段不完整');
+    expect(() => readUiConfigFile(tempFile('{"ruleTypes": []}'))).toThrow('配置文件字段不合法');
   });
 });
 
 describe('系统值', () => {
   it('setActiveUiConfig 立即影响规则类型白名单', () => {
-    setActiveUiConfig({ ...DEFAULT_UI_CONFIG, ruleTypes: ['DOMAIN'] });
+    setActiveUiConfig(withRuleTypes(['DOMAIN']));
     expect(getRuleTypes()).toEqual(['DOMAIN']);
     setActiveUiConfig(DEFAULT_UI_CONFIG);
     expect(getRuleTypes()).toEqual(DEFAULT_UI_CONFIG.ruleTypes);
@@ -61,7 +70,7 @@ describe('ensureUiConfigFile', () => {
   it('已存在的文件不被覆盖', () => {
     const appDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-app-'));
     const dataDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-data-'));
-    const existing = { ...DEFAULT_UI_CONFIG, ruleTypes: ['DOMAIN'] };
+    const existing = withRuleTypes(['DOMAIN']);
     writeFileSync(path.join(appDir, 'config.json'), JSON.stringify(existing), 'utf8');
 
     expect(readUiConfigFile(ensureUiConfigFile(appDir, dataDir)).ruleTypes).toEqual(['DOMAIN']);
