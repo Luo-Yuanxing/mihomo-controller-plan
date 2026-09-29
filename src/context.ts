@@ -58,5 +58,10 @@ export interface AppContext {
   /** 重新渲染 config.yaml；端口/secret 变化后需要重启内核才生效。 */
   writeConfig(): Promise<void>;
   refreshSubscription(): Promise<SubscriptionState>;
+  /** 启动内核，并按其结果联动系统代理（起来就开、没起来就关）。 */
+  startKernel(): Promise<CoreStatus>;
+  /** 停止内核，并关闭系统代理（内核没了端口就没人接听）。 */
+  stopKernel(): Promise<CoreStatus>;
+  /** 重启内核，并按结果联动系统代理。 */
   restartKernel(): Promise<CoreStatus>;
 }

@@ -13,6 +13,7 @@ import type { AppContext, SubscriptionState } from './context.js';
 import { createCoreApi } from './core/api.js';
 import { ensureGeodata } from './core/geodata.js';
 import { createCoreManager, type CoreStatus } from './core/manager.js';
+import { createKernelProxyLink } from './core/proxy-link.js';
 import { createProxyGuard, ensureLocalBypass } from './proxy/guard.js';
 import { registerRoutes } from './routes.js';
 import { openRulesDatabase } from './rules/db.js';
@@ -193,6 +194,9 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     },
   });
 
+  /** 单向联动：内核在跑才让系统代理指向它，内核不在跑就关掉（反向不成立）。 */
+  const proxyLink = createKernelProxyLink({ guard, log });
+
   const context: AppContext = {
     appVersion: process.env['npm_package_version'] ?? '0.1.0',
     appDir,
@@ -273,8 +277,21 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
         context.subscription.refreshing = false;
       }
     },
+    async startKernel(): Promise<CoreStatus> {
+      const status = await core.start();
+      await proxyLink.sync(status, '内核启动');
+      return status;
+    },
+    async stopKernel(): Promise<CoreStatus> {
+      await core.stop();
+      const status = core.status();
+      await proxyLink.sync(status, '内核停止');
+      return status;
+    },
     async restartKernel(): Promise<CoreStatus> {
-      return core.restart();
+      const status = await core.restart();
+      await proxyLink.sync(status, '内核重启');
+      return status;
     },
   };
 
@@ -317,13 +334,11 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     core.watch((failed) => {
       log.error({ err: failed.error }, '内核退出，停止守护类工作');
       // 内核已死，代理指向的端口不再可达，必须关闭系统代理避免整机断网
-      void guard.disable().catch((error) => {
-        log.error({ err: String(error) }, '内核退出后关闭系统代理失败');
-      });
+      void proxyLink.sync(failed, '内核退出');
     });
-    await guard.apply();
-    guard.start();
   }
+  // 内核起来就开系统代理、没起来就关掉：这条联动只在启动时走一遍
+  await proxyLink.sync(coreStatus, '服务启动');
 
   const close = async (): Promise<void> => {
     try {

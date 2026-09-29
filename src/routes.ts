@@ -118,8 +118,9 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     }
 
     const kernelUp = kernel.state === 'running' || kernel.state === 'adopted';
-    const proxy = kernelUp ? await ctx.guard.apply() : await ctx.guard.disable();
-    steps.push(kernelUp ? '系统代理已写回期望值' : '内核不可用，已关闭系统代理以免整机断网');
+    // 联动只往一个方向走：内核在跑就把系统代理指向它，没跑就关掉（反向不动内核）
+    const proxy = kernelUp ? await ctx.guard.enable() : await ctx.guard.disable();
+    steps.push(kernelUp ? '内核已就绪，系统代理已指向内核' : '内核不可用，已关闭系统代理以免整机断网');
     ctx.log.warn({ steps }, '一键修复完成');
     return { steps, kernel, proxy };
   });
@@ -530,15 +531,15 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   app.post('/api/kernel/start', async () => {
-    const status = await ctx.kernel.start();
+    const status = await ctx.startKernel();
     ctx.log.info({ state: status.state }, '内核启动完成');
     return status;
   });
 
   app.post('/api/kernel/stop', async () => {
-    await ctx.kernel.stop();
-    ctx.log.info('内核已停止');
-    return ctx.kernel.status();
+    const status = await ctx.stopKernel();
+    ctx.log.info({ state: status.state }, '内核已停止');
+    return status;
   });
 
   app.get('/api/logs', (request) => {
