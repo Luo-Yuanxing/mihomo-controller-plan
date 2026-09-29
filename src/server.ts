@@ -17,7 +17,12 @@ import { registerRoutes } from './routes.js';
 import { openRulesDatabase } from './rules/db.js';
 import { RuleValidationError } from './rules/render.js';
 import { createRuleRepo } from './rules/repo.js';
-import { loadSettings, saveSettings as persistSettings, type Settings } from './settings.js';
+import {
+  CONTROL_PORT,
+  loadSettings,
+  saveSettings as persistSettings,
+  type Settings,
+} from './settings.js';
 import { ensureUiConfigFile, getUiConfig } from './ui-config.js';
 import { createUiConfigService } from './ui-config-store.js';
 import { countSubscriptionProxies, downloadSubscription } from './sub/download.js';
@@ -144,7 +149,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   };
 
   const api = createCoreApi({
-    controller: `127.0.0.1:${settings.core.controllerPort}`,
+    controller: `127.0.0.1:${CONTROL_PORT}`,
     secret: settings.core.secret,
   });
 
@@ -153,7 +158,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     binaryPath: resolveResourcePath(appDir, settings.core.binaryPath),
     configFile: paths.config,
     mixedPort: settings.core.mixedPort,
-    controllerPort: settings.core.controllerPort,
+    controllerPort: CONTROL_PORT,
     secret: settings.core.secret,
     coreLogFile: logPaths(dataDir).core,
     log,
@@ -162,7 +167,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   const guard = createProxyGuard({
     desired: {
       enable: settings.proxy.enabled,
-      server: settings.proxy.server,
+      // 系统代理指向哪里由混合端口决定，不给用户填
+      server: `127.0.0.1:${settings.core.mixedPort}`,
       override: settings.proxy.override,
     },
     log,
@@ -172,7 +178,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
         proxy: {
           ...settings.proxy,
           enabled: values.enable,
-          server: values.server,
           override: values.override,
         },
       };

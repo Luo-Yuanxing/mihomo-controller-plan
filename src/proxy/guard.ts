@@ -60,6 +60,8 @@ export interface ProxyGuard {
   enable(): Promise<ProxyState>;
   disable(): Promise<ProxyState>;
   apply(): Promise<ProxyState>;
+  /** 换期望的代理服务器地址（混合端口变了）；正在守护就顺手写一遍注册表。 */
+  setServer(server: string): Promise<ProxyState>;
   shutdown(): Promise<void>;
   start(): void;
   stop(): void;
@@ -208,6 +210,13 @@ export function createProxyGuard(options: ProxyGuardOptions): ProxyGuard {
     },
     async apply() {
       await writeDesired();
+      return state();
+    },
+    async setServer(server: string) {
+      if (desired.server === server) return state();
+      desired = { ...desired, server };
+      await options.onDesiredChange({ ...desired });
+      if (guarding) await writeDesired();
       return state();
     },
     shutdown,

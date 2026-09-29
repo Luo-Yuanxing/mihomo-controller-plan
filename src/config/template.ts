@@ -2,7 +2,7 @@
  * 配置模板渲染，产出 data/config.yaml。
  * 计划 §7.1 生成的 config.yaml。
  */
-import type { Settings } from '../settings.js';
+import { CONTROL_PORT, type Settings } from '../settings.js';
 import type { RenderedGroup } from '../sub/groups.js';
 import { stringify } from 'yaml';
 
@@ -80,7 +80,7 @@ export function renderConfig(options: TemplateOptions): string {
     // 用本地 geoip.dat/geosite.dat，避免内核去 GitHub 下载 MMDB 而卡在启动阶段
     'geodata-mode: true',
     'geo-auto-update: false',
-    `external-controller: 127.0.0.1:${settings.core.controllerPort}`,
+    `external-controller: 127.0.0.1:${CONTROL_PORT}`,
     `secret: "${secret}"`,
     '',
     // 代理组的当前选择落 cache.db，否则每次重启都回到第一个节点

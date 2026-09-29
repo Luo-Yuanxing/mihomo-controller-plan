@@ -218,7 +218,7 @@ mihomo-controller-plan/
 | 界面 | `app.requestSingleInstanceLock()` | 重复双击时唤起已有窗口 |
 | 内核 | `data/run/core.lock` + 固定端口绑定 | 报错退出，不换端口 |
 
-端口固定：mixed `7890`、controller `9090`（可改）。被占用时报错写明端口与 PID，不做迁移。
+端口固定：mixed `7890`（可改）、controller `9090`（不给改）。被占用时报错写明端口与 PID，不做迁移。
 
 ### 4.5 出错即停（fail-stop）
 
@@ -307,7 +307,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 
 只做一件事：自己设的系统代理不被别人改掉。
 
-接管范围仅 `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 下三项：`ProxyEnable`、`ProxyServer`、`ProxyOverride`。不写 `AutoConfigURL`。
+接管范围仅 `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 下三项：`ProxyEnable`、`ProxyServer`、`ProxyOverride`。不写 `AutoConfigURL`。`ProxyServer` 不给用户填，固定由 `127.0.0.1` + 混合端口拼出来（改混合端口就跟着变）。
 
 | 环节 | 设计 |
 | --- | --- |
@@ -317,7 +317,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | 未接管 | 用户关掉系统代理后立即停止干预 |
 | 退出 | 不做还原，注册表保持当前值 |
 | 失败 | 回写失败属于环境类异常 → 记录并停止工作 |
-| 持久化 | 三项期望值存在 `data/settings.json` 里，随其它设置一起 |
+| 持久化 | 开关与绕过列表存在 `data/settings.json` 里；代理服务器地址每次启动按混合端口重算 |
 
 代价：最坏 1 分钟内系统代理处于被改状态，界面提供"立即写入"按钮兜底。
 

@@ -18,15 +18,16 @@ export const settingsSchema = z.object({
   core: z.object({
     binaryPath: z.string().min(1),
     mixedPort: z.number().int().min(1).max(65535),
-    controllerPort: z.number().int().min(1).max(65535),
     secret: z.string(),
   }),
   proxy: z.object({
     enabled: z.boolean(),
-    server: z.string().min(1),
     override: z.string(),
   }),
 });
+
+/** 控制端口不给用户改：内核 REST 固定挂在本机 9090。 */
+export const CONTROL_PORT = 9090;
 
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -40,12 +41,10 @@ export const DEFAULT_SETTINGS: Settings = {
   core: {
     binaryPath: 'resources/bin/mihomo.exe',
     mixedPort: 7890,
-    controllerPort: 9090,
     secret: '',
   },
   proxy: {
     enabled: false,
-    server: '127.0.0.1:7890',
     override: 'localhost;127.*;10.*;172.16.*;192.168.*',
   },
 };

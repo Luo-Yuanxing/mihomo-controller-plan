@@ -179,16 +179,6 @@ export default function SettingsPage() {
             }
           />
         </Field>
-        <Field label="控制端口">
-          <input
-            type="number"
-            className={inputClass}
-            value={draft.core.controllerPort}
-            onChange={(event) =>
-              patch({ core: { ...draft.core, controllerPort: Number(event.target.value) } })
-            }
-          />
-        </Field>
       </section>
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
@@ -224,13 +214,6 @@ export default function SettingsPage() {
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
         <h2 className="text-base font-semibold">系统代理期望值</h2>
-        <Field label="代理服务器">
-          <input
-            className={inputClass}
-            value={draft.proxy.server}
-            onChange={(event) => patch({ proxy: { ...draft.proxy, server: event.target.value } })}
-          />
-        </Field>
         <Field label="ProxyOverride">
           <input
             className={inputClass}

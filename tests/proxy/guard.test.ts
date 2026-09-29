@@ -36,4 +36,23 @@ describe('ProxyGuard 期望值', () => {
     const state = await guard.state();
     expect(state.desired.override).toBe('192.168.*;localhost;127.*');
   });
+
+  it('setServer 改期望的代理服务器地址并回调落盘', async () => {
+    const saved: string[] = [];
+    const guard = createProxyGuard({
+      desired: { enable: false, server: '127.0.0.1:7890', override: '' },
+      log,
+      onDesiredChange: async (values) => {
+        saved.push(values.server);
+      },
+    });
+
+    const state = await guard.setServer('127.0.0.1:7891');
+    expect(state.desired.server).toBe('127.0.0.1:7891');
+    expect(saved).toEqual(['127.0.0.1:7891']);
+
+    // 地址没变就什么都不做
+    await guard.setServer('127.0.0.1:7891');
+    expect(saved).toHaveLength(1);
+  });
 });

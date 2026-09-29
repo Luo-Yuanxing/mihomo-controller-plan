@@ -93,6 +93,10 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
       core: { ...parsed.data.core, binaryPath },
     });
     ctx.kernel.setBinary(binaryPath);
+    // 混合端口变了，系统代理要跟着指向新端口
+    if (previous.core.mixedPort !== settings.core.mixedPort) {
+      await ctx.guard.setServer(`127.0.0.1:${settings.core.mixedPort}`);
+    }
     ctx.subscription.url = settings.subscription.url;
     ctx.subscription.useProxy = settings.subscription.useProxy;
     ctx.subscription.userAgent = settings.subscription.userAgent;
@@ -100,7 +104,6 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
     const needsRestart =
       previous.core.mixedPort !== settings.core.mixedPort ||
-      previous.core.controllerPort !== settings.core.controllerPort ||
       previous.core.secret !== settings.core.secret;
 
     // 换了指代的组，代理组结构就变了：不重建的话界面列的还是旧组的节点

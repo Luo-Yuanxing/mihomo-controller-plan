@@ -130,12 +130,10 @@ export interface Settings {
   core: {
     binaryPath: string;
     mixedPort: number;
-    controllerPort: number;
     secret: string;
   };
   proxy: {
     enabled: boolean;
-    server: string;
     override: string;
   };
 }
