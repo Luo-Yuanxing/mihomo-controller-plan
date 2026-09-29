@@ -5,6 +5,7 @@
 import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, session } from 'electron';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { offlineAction } from './offline-actions.mjs';
 
 /** 开发期由 Vite dev server 提供界面，打包后加载内置后端（同一进程）。 */
 const devServerUrl = process.env['MCP_DEV_SERVER_URL'] ?? '';
@@ -43,28 +44,13 @@ ipcMain.handle('mcp:save-json', async (_event, defaultPath) => {
   return result.canceled || result.filePath === '' ? null : result.filePath;
 });
 
-/** 离线兜底动作：关代理 + 停内核 / 写期望值 + 重启内核。 */
-const OFFLINE_ACTIONS = {
-  shutdown: async (context) => {
-    await context.kernel.stop();
-    return { proxy: await context.guard.disable() };
-  },
-  restart: async (context) => {
-    const proxy = await context.guard.apply();
-    await context.writeConfig();
-    return { proxy, kernel: await context.restartKernel() };
-  },
-};
-
 /**
  * 界面离线时点的那两个按钮走进程间调用：主进程直接调后端对象（开发期后端在独立进程，退回 HTTP）。
  * 系统级动作（注册表、内核进程）只由后端执行——壳和界面都不自己动系统。
  */
 ipcMain.handle('mcp:offline-action', async (_event, name) => {
-  const run = OFFLINE_ACTIONS[name];
-  if (run === undefined) throw new Error(`未知的离线动作：${String(name)}`);
-  const httpPath = name === 'shutdown' ? '/api/offline/shutdown' : '/api/offline/restart';
   try {
+    const { httpPath, run } = offlineAction(name);
     return await callBackend(httpPath, run);
   } catch (error) {
     const hint = runningServer === null ? '（开发期后端是独立进程，请重启 npm run dev）' : '';

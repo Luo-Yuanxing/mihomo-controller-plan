@@ -1,0 +1,31 @@
+/**
+ * 离线兜底动作表：Electron 壳只负责把点击转交给后端，
+ * 写注册表、停/起内核这些系统级副作用全部在后端里做。
+ */
+
+export const OFFLINE_ACTIONS = {
+  /** 完全关闭代理：停内核 + 关系统代理。 */
+  shutdown: {
+    httpPath: '/api/offline/shutdown',
+    run: async (context) => {
+      await context.kernel.stop();
+      return { proxy: await context.guard.disable() };
+    },
+  },
+  /** 立即重启内核：无条件写系统代理期望值 → 重写配置 → 重启内核。 */
+  restart: {
+    httpPath: '/api/offline/restart',
+    run: async (context) => {
+      const proxy = await context.guard.apply();
+      await context.writeConfig();
+      return { proxy, kernel: await context.restartKernel() };
+    },
+  },
+};
+
+/** 找不到的动作直接报错，别静默什么都不做。 */
+export function offlineAction(name) {
+  const action = OFFLINE_ACTIONS[name];
+  if (action === undefined) throw new Error(`未知的离线动作：${String(name)}`);
+  return action;
+}
