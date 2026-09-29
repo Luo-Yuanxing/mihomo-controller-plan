@@ -328,11 +328,21 @@ describe.skipIf(!canLoadFastify)('POST /api/ui-config/export', () => {
     const written = JSON.parse(readFileSync(target, 'utf8')) as {
       ruleTypes: string[];
       rules: unknown[];
+      core: { binaryPath: string; mixedPort: number };
+      subscription: Record<string, unknown>;
+      proxy: { override: string };
     };
     expect(written.ruleTypes).toEqual(DEFAULT_UI_CONFIG.ruleTypes);
     expect(written.rules).toEqual([
       { enabled: true, type: 'DOMAIN', value: 'a.com', policy: 'PROXY', noResolve: true },
     ]);
+    // 设置页那几项也要带上
+    expect(written.core).toEqual({
+      binaryPath: DEFAULT_SETTINGS.core.binaryPath,
+      mixedPort: DEFAULT_SETTINGS.core.mixedPort,
+    });
+    expect(written.subscription).toEqual({ ...DEFAULT_SETTINGS.subscription });
+    expect(written.proxy).toEqual({ override: DEFAULT_SETTINGS.proxy.override });
     await app.close();
   });
 
@@ -385,6 +395,14 @@ describe.skipIf(!canLoadFastify)('POST /api/ui-config/export', () => {
         rules: [
           { enabled: true, type: 'DOMAIN', value: 'b.com', policy: 'PROXY', noResolve: true },
         ],
+        app: null,
+      }),
+      previewUiConfig: async () => ({
+        file,
+        config: DEFAULT_UI_CONFIG,
+        diff: [],
+        rules: null,
+        app: null,
       }),
     });
 
@@ -400,6 +418,62 @@ describe.skipIf(!canLoadFastify)('POST /api/ui-config/export', () => {
     expect(readFileSync(path.join(dir, 'rules', 'custom.yaml'), 'utf8')).toContain(
       'DOMAIN,b.com,PROXY',
     );
+    await app.close();
+  });
+
+  it('配置文件里带的设置段写回系统设置', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'mcp-load-settings-'));
+    const file = path.join(dir, 'config.json');
+    writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
+    const saved: { core: { mixedPort: number }; subscription: { url: string } }[] = [];
+    const app = buildApp(fakeApi(), {
+      dataDir: dir,
+      ruleProvider: 'custom',
+      settings: {
+        ...DEFAULT_SETTINGS,
+        core: { ...DEFAULT_SETTINGS.core, binaryPath: process.execPath },
+      },
+      subscription: {
+        url: '',
+        useProxy: false,
+        userAgent: '',
+        lastOkAt: null,
+        lastError: null,
+        bytes: null,
+        refreshing: false,
+      },
+      saveSettings: async (next: unknown) => {
+        saved.push(next as { core: { mixedPort: number }; subscription: { url: string } });
+        return next;
+      },
+      writeConfig: async () => undefined,
+      kernel: { status: () => ({ state: 'stopped' }), setBinary: () => undefined },
+      guard: { setServer: async () => undefined },
+      repo: { replaceAll: () => [], list: () => [] },
+      previewUiConfig: async () => ({
+        file,
+        config: DEFAULT_UI_CONFIG,
+        diff: [],
+        rules: null,
+        app: { core: { mixedPort: 7899 }, subscription: { url: 'https://example.com/sub' } },
+      }),
+      forceLoadUiConfig: async () => ({
+        state: { file, config: DEFAULT_UI_CONFIG, updatedAt: null },
+        rules: null,
+        app: null,
+      }),
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/ui-config/load-force',
+      payload: { file },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(saved).toHaveLength(1);
+    expect(saved[0]?.core.mixedPort).toBe(7899);
+    expect(saved[0]?.subscription.url).toBe('https://example.com/sub');
     await app.close();
   });
 });

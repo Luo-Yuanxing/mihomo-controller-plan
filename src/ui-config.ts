@@ -39,6 +39,29 @@ export const uiConfigFileSchema = uiConfigSchema.extend({
   rules: z.array(ruleEntrySchema).optional(),
 });
 
+/** 应用设置（内核/订阅/系统代理）能出现在 config.json 里的字段，都是可选的。 */
+export const appSettingsFileSchema = z.object({
+  core: z
+    .object({
+      binaryPath: z.string().min(1),
+      mixedPort: z.number().int().min(1).max(65535),
+    })
+    .partial()
+    .optional(),
+  subscription: z
+    .object({
+      url: z.string(),
+      useProxy: z.boolean(),
+      userAgent: z.string().min(1),
+      proxyGroup: z.string(),
+    })
+    .partial()
+    .optional(),
+  proxy: z.object({ override: z.string() }).partial().optional(),
+});
+
+export type AppSettingsFile = z.infer<typeof appSettingsFileSchema>;
+
 export interface UiConfigIssue {
   path: string;
   message: string;
@@ -224,10 +247,33 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   settings: { logsRefetchIntervalMs: 5000 },
 };
 
+/** 预生成的 config.json：界面默认值 + 空规则表（让用户一眼看到 rules 键）。 */
+export const DEFAULT_UI_CONFIG_FILE = { ...DEFAULT_UI_CONFIG, rules: [] };
+
 /** 文件级校验：界面常量 + 可选的 rules 段（类型要在 ruleTypes 白名单里）。 */
 export function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
   const issues = uiConfigIssues(raw);
   if (!isRecord(raw)) return issues;
+
+  const core = raw['core'];
+  if (isRecord(core)) {
+    const binaryPath = core['binaryPath'];
+    if (binaryPath !== undefined && (typeof binaryPath !== 'string' || binaryPath.trim() === '')) {
+      issues.push({ path: 'core.binaryPath', message: '不能为空' });
+    }
+    const mixedPort = core['mixedPort'];
+    if (
+      mixedPort !== undefined &&
+      (typeof mixedPort !== 'number' ||
+        !Number.isInteger(mixedPort) ||
+        mixedPort < 1 ||
+        mixedPort > 65535)
+    ) {
+      issues.push({ path: 'core.mixedPort', message: '需在 1-65535 之间' });
+    }
+  } else if (core !== undefined) {
+    issues.push({ path: 'core', message: '必须是对象' });
+  }
 
   const rules = raw['rules'];
   if (rules === undefined) return issues;
@@ -261,17 +307,30 @@ export function uiConfigFileIssues(raw: unknown): UiConfigIssue[] {
   return issues;
 }
 
-/** 解析配置文件：拆成界面常量与规则两段；没有 rules 段时 rules 为 null。 */
-export function parseUiConfigFile(raw: unknown): { config: UiConfig; rules: RuleEntry[] | null } {
+/** 解析配置文件：界面常量、规则、应用设置三段；缺席的段为 null。 */
+export function parseUiConfigFile(raw: unknown): {
+  config: UiConfig;
+  rules: RuleEntry[] | null;
+  app: AppSettingsFile | null;
+} {
   const issues = uiConfigFileIssues(raw);
   if (issues.length > 0) throw new UiConfigValidationError(issues);
-  const { rules, ...rest } = uiConfigFileSchema.parse(raw);
-  return { config: uiConfigSchema.parse(rest), rules: rules ?? null };
+  const { rules, core, subscription, proxy, ...rest } = uiConfigFileSchema
+    .extend(appSettingsFileSchema.shape)
+    .parse(raw);
+  const app = appSettingsFileSchema.parse({ core, subscription, proxy });
+  const hasApp =
+    app.core !== undefined || app.subscription !== undefined || app.proxy !== undefined;
+  return { config: uiConfigSchema.parse(rest), rules: rules ?? null, app: hasApp ? app : null };
 }
 
-/** 生成导出内容：界面常量原样 + 自定义规则。 */
-export function renderUiConfigFile(config: UiConfig, rules: RuleEntry[]): string {
-  return `${JSON.stringify(uiConfigFileSchema.parse({ ...config, rules }), null, 2)}\n`;
+/** 生成导出内容：界面常量 + 自定义规则 + 应用设置（内核/订阅/系统代理）。 */
+export function renderUiConfigFile(
+  config: UiConfig,
+  rules: RuleEntry[],
+  app: AppSettingsFile | null = null,
+): string {
+  return `${JSON.stringify(uiConfigFileSchema.extend(appSettingsFileSchema.shape).parse({ ...config, rules, ...app }), null, 2)}\n`;
 }
 
 /** 导出目标：非空 + .json，允许文件不存在（导出就是新建），父目录自动建。 */
@@ -329,7 +388,7 @@ export function ensureUiConfigFile(appDir: string, dataDir: string, log?: Logger
     try {
       if (!fs.existsSync(target)) {
         fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.writeFileSync(target, `${JSON.stringify(DEFAULT_UI_CONFIG, null, 2)}\n`, 'utf8');
+        fs.writeFileSync(target, `${JSON.stringify(DEFAULT_UI_CONFIG_FILE, null, 2)}\n`, 'utf8');
         log?.info({ file: target }, '已预生成界面常量配置文件');
       }
       return target;
@@ -380,6 +439,7 @@ export function readUiConfigFile(file: string): UiConfig {
 export function readUiConfigDocument(file: string): {
   config: UiConfig;
   rules: RuleEntry[] | null;
+  app: AppSettingsFile | null;
 } {
   let text: string;
   try {

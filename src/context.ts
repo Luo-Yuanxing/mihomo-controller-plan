@@ -50,6 +50,7 @@ export interface AppContext {
     config: UiConfig;
     diff: UiConfigDiffItem[];
     rules: RuleEntry[] | null;
+    app: import('./ui-config.js').AppSettingsFile | null;
   }>;
   /** 把界面上的值保存进系统（持久化并立即生效）。 */
   applyUiConfig(input: { file?: string; config: unknown }): Promise<UiConfigLoadResult>;

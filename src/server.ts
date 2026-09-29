@@ -107,7 +107,10 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
 
   // 界面常量：先在 app 启动路径预生成配置文件，再由 SQLite 里的系统值覆盖，之后 UI 才启动
   const uiConfigFile = ensureUiConfigFile(appDir, dataDir, log);
-  const uiConfigService = createUiConfigService(db, uiConfigFile, log);
+  const uiConfigService = createUiConfigService(db, uiConfigFile, log, {
+    // 预览对比要用到当前设置（内核路径、端口、订阅、ProxyOverride）
+    currentSettings: () => settings,
+  });
 
   /** 订阅文件存在且含节点才算可用；空订阅按无订阅处理，避免 PROXY 组静默直连。 */
   const hasUsableSubscription = (): boolean => countSubscriptionProxies(paths.subscription) > 0;

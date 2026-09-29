@@ -15,6 +15,7 @@ import { readSubscriptionDns } from './sub/dns.js';
 import { planProxyGroups, readSubscriptionGroups } from './sub/groups.js';
 import { syncRules } from './rules/sync.js';
 import { settingsSchema } from './settings.js';
+import type { Settings } from './settings.js';
 import {
   renderUiConfigFile,
   resolveExportTarget,
@@ -80,22 +81,31 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
 
   app.get('/api/settings', async () => ctx.settings);
 
-  app.put('/api/settings', async (request, reply) => {
-    const parsed = settingsSchema.safeParse(request.body);
-    if (!parsed.success) return invalid(reply, parsed.error);
-
-    // 内核路径和界面常量配置文件一样：解析成绝对路径并落盘，路径不存在直接拒绝
-    let binaryPath: string;
-    try {
-      binaryPath = resolveBinaryPath(ctx.appDir, parsed.data.core.binaryPath);
-    } catch (error) {
-      return reply.status(400).send({ error: errorText(error) });
+  /** 保存设置后已经落盘、但后续动作失败：带状态码交给调用方回。 */
+  class SettingsApplyError extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+    ) {
+      super(message);
+      this.name = 'SettingsApplyError';
     }
+  }
+
+  /**
+   * 保存设置并做完副作用：路径校验 → 落盘 → 通知内核/守护 → 重写 config.yaml，
+   * 换了 PROXY 指代就重建代理组。PUT /api/settings 与"按配置文件加载"共用。
+   */
+  const applySettings = async (
+    next: Settings,
+  ): Promise<{ settings: Settings; needsRestart: boolean; groupsRebuilt: boolean }> => {
+    // 内核路径和界面常量配置文件一样：解析成绝对路径并落盘，路径不存在直接拒绝
+    const binaryPath = resolveBinaryPath(ctx.appDir, next.core.binaryPath);
 
     const previous = ctx.settings;
     const settings = await ctx.saveSettings({
-      ...parsed.data,
-      core: { ...parsed.data.core, binaryPath },
+      ...next,
+      core: { ...next.core, binaryPath },
     });
     ctx.kernel.setBinary(binaryPath);
     // 混合端口变了，系统代理要跟着指向新端口
@@ -112,21 +122,32 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
       previous.core.secret !== settings.core.secret;
 
     // 换了指代的组，代理组结构就变了：不重建的话界面列的还是旧组的节点
-    let groupsRebuilt = false;
     if (previous.subscription.proxyGroup !== settings.subscription.proxyGroup) {
       const state = ctx.kernel.status().state;
       if (state === 'running' || state === 'adopted') {
         const status = await ctx.kernel.restart();
         if (status.state === 'failed') {
-          return reply
-            .status(502)
-            .send({ error: `设置已保存，但内核重启失败：${status.error ?? '未知原因'}` });
+          throw new SettingsApplyError(
+            `设置已保存，但内核重启失败：${status.error ?? '未知原因'}`,
+            502,
+          );
         }
-        groupsRebuilt = true;
+        return { settings, needsRestart, groupsRebuilt: true };
       }
     }
 
-    return { settings, needsRestart, groupsRebuilt };
+    return { settings, needsRestart, groupsRebuilt: false };
+  };
+
+  app.put('/api/settings', async (request, reply) => {
+    const parsed = settingsSchema.safeParse(request.body);
+    if (!parsed.success) return invalid(reply, parsed.error);
+    try {
+      return await applySettings(parsed.data);
+    } catch (error) {
+      const status = error instanceof SettingsApplyError ? error.status : 400;
+      return reply.status(status).send({ error: errorText(error) });
+    }
   });
 
   /** 订阅文件里的代理组：设置页用它选"PROXY 指代哪个组"。 */
@@ -266,9 +287,36 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     const parsed = uiConfigFileSchema.safeParse(request.body ?? {});
     if (!parsed.success) return invalid(reply, parsed.error);
     try {
-      const loaded = await ctx.forceLoadUiConfig(parsed.data.file);
+      // 先只读一遍：应用设置要能在动任何状态之前就校验失败
+      const peek = await ctx.previewUiConfig(parsed.data.file);
+      if (peek.app !== null) {
+        const current = ctx.settings;
+        const app = peek.app;
+        // 文件里没带的字段保持现状（空串也是有意义的值，所以用 ?? 而不是 ||）
+        await applySettings({
+          core: {
+            binaryPath: app.core?.binaryPath ?? current.core.binaryPath,
+            mixedPort: app.core?.mixedPort ?? current.core.mixedPort,
+            secret: current.core.secret,
+          },
+          subscription: {
+            url: app.subscription?.url ?? current.subscription.url,
+            useProxy: app.subscription?.useProxy ?? current.subscription.useProxy,
+            userAgent: app.subscription?.userAgent ?? current.subscription.userAgent,
+            proxyGroup: app.subscription?.proxyGroup ?? current.subscription.proxyGroup,
+          },
+          proxy: {
+            enabled: current.proxy.enabled,
+            override: app.proxy?.override ?? current.proxy.override,
+          },
+        });
+      }
+      const loaded = await ctx.forceLoadUiConfig(peek.file);
       return { ...loaded.state, rules: await applyRulesFromConfig(loaded.rules) };
     } catch (error) {
+      if (error instanceof SettingsApplyError) {
+        return reply.status(error.status).send({ error: errorText(error) });
+      }
       return uiConfigFailure(reply, error);
     }
   });
@@ -280,7 +328,19 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     try {
       const state = ctx.uiConfigState();
       const target = resolveExportTarget(parsed.data.file ?? state.file);
-      const json = renderUiConfigFile(state.config, ctx.repo.list());
+      const json = renderUiConfigFile(state.config, ctx.repo.list(), {
+        core: {
+          binaryPath: ctx.settings.core.binaryPath,
+          mixedPort: ctx.settings.core.mixedPort,
+        },
+        subscription: {
+          url: ctx.settings.subscription.url,
+          useProxy: ctx.settings.subscription.useProxy,
+          userAgent: ctx.settings.subscription.userAgent,
+          proxyGroup: ctx.settings.subscription.proxyGroup,
+        },
+        proxy: { override: ctx.settings.proxy.override },
+      });
       await writeFileAtomic(target, json);
       ctx.log.info({ file: target }, '配置已导出');
       return { file: target, rules: ctx.repo.list().length, bytes: Buffer.byteLength(json) };

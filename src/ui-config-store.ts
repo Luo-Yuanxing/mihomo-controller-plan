@@ -11,9 +11,11 @@ import {
   readUiConfigDocument,
   readUiConfigFile,
   setActiveUiConfig,
+  type AppSettingsFile,
   type RuleEntry,
   type UiConfig,
 } from './ui-config.js';
+import type { Settings } from './settings.js';
 
 export const UI_CONFIG_KEY = 'ui-config';
 
@@ -86,6 +88,8 @@ export interface UiConfigDiffItem {
 export interface UiConfigLoadResult {
   state: StoredUiConfig;
   rules: RuleEntry[] | null;
+  /** 配置文件里的应用设置（内核/订阅/系统代理），null = 文件没带。 */
+  app: AppSettingsFile | null;
 }
 
 /** 界面常量的系统值服务：server 与测试共用同一份编排逻辑。 */
@@ -97,6 +101,7 @@ export interface UiConfigService {
     config: UiConfig;
     diff: UiConfigDiffItem[];
     rules: RuleEntry[] | null;
+    app: AppSettingsFile | null;
   };
   apply(input: { file?: string; config: unknown }): UiConfigLoadResult;
 }
@@ -105,6 +110,7 @@ export function createUiConfigService(
   db: RulesDatabase,
   defaultFile: string,
   log?: Logger,
+  deps?: { currentSettings?: () => Settings },
 ): UiConfigService {
   let state = loadStoredUiConfig(db, defaultFile);
   log?.info({ file: state.file, ruleTypes: state.config.ruleTypes }, '界面常量系统值已就绪');
@@ -125,11 +131,13 @@ export function createUiConfigService(
       return {
         state: commit(target, loaded.config, '界面常量已按配置文件强制覆盖系统值'),
         rules: loaded.rules,
+        app: loaded.app,
       };
     },
     preview: (file?: string) => {
       const target = resolveConfigFile(file ?? state.file);
       const loaded = readUiConfigDocument(target);
+      const current = deps?.currentSettings?.();
       return {
         file: target,
         config: loaded.config,
@@ -140,8 +148,10 @@ export function createUiConfigService(
             String(countRules(db)),
             String(loaded.rules?.length ?? countRules(db)),
           ),
+          ...(current === undefined ? [] : diffSettings(current, loaded.app)),
         ],
         rules: loaded.rules,
+        app: loaded.app,
       };
     },
     apply: (input: { file?: string; config: unknown }) => ({
@@ -152,8 +162,51 @@ export function createUiConfigService(
       ),
       // 界面提交的只有界面常量，规则不动
       rules: null,
+      app: null,
     }),
   };
+}
+
+/** 应用设置逐项对比：只列文件里带了的那几项。 */
+function diffSettings(current: Settings, incoming: AppSettingsFile | null): UiConfigDiffItem[] {
+  if (incoming === null) return [];
+  const items: UiConfigDiffItem[] = [];
+  if (incoming.core?.binaryPath !== undefined) {
+    items.push(item('内核路径', current.core.binaryPath, incoming.core.binaryPath));
+  }
+  if (incoming.core?.mixedPort !== undefined) {
+    items.push(item('混合端口', String(current.core.mixedPort), String(incoming.core.mixedPort)));
+  }
+  if (incoming.subscription?.url !== undefined) {
+    items.push(item('订阅 URL', current.subscription.url, incoming.subscription.url));
+  }
+  if (incoming.subscription?.userAgent !== undefined) {
+    items.push(
+      item('订阅 User-Agent', current.subscription.userAgent, incoming.subscription.userAgent),
+    );
+  }
+  if (incoming.subscription?.useProxy !== undefined) {
+    items.push(
+      item(
+        '订阅下载走代理',
+        String(current.subscription.useProxy),
+        String(incoming.subscription.useProxy),
+      ),
+    );
+  }
+  if (incoming.subscription?.proxyGroup !== undefined) {
+    items.push(
+      item(
+        'PROXY 指代',
+        current.subscription.proxyGroup === '' ? '订阅全部节点' : current.subscription.proxyGroup,
+        incoming.subscription.proxyGroup === '' ? '订阅全部节点' : incoming.subscription.proxyGroup,
+      ),
+    );
+  }
+  if (incoming.proxy?.override !== undefined) {
+    items.push(item('ProxyOverride', current.proxy.override, incoming.proxy.override));
+  }
+  return items;
 }
 
 function countRules(db: RulesDatabase): number {

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_UI_CONFIG,
+  DEFAULT_UI_CONFIG_FILE,
   ensureUiConfigFile,
   getRuleTypes,
   parseUiConfig,
@@ -95,6 +96,32 @@ describe('config.json 里的规则', () => {
     expect(() => resolveExportTarget('  ')).toThrow('导出路径不能为空');
     expect(() => resolveExportTarget(path.join(dir, '备份.yaml'))).toThrow('必须以 .json 结尾');
   });
+
+  it('设置段（内核/订阅/系统代理）能与界面常量、规则一起导出并解析回来', () => {
+    const json = renderUiConfigFile(withRuleTypes(['DOMAIN']), [], {
+      core: { binaryPath: 'C:/x/mihomo.exe', mixedPort: 7891 },
+      subscription: {
+        url: 'https://example.com/sub',
+        useProxy: true,
+        userAgent: 'ua',
+        proxyGroup: 'Proxy',
+      },
+      proxy: { override: 'localhost;127.*' },
+    });
+    const parsed = parseUiConfigFile(JSON.parse(json));
+
+    expect(parsed.app?.core).toEqual({ binaryPath: 'C:/x/mihomo.exe', mixedPort: 7891 });
+    expect(parsed.app?.subscription?.url).toBe('https://example.com/sub');
+    expect(parsed.app?.subscription?.proxyGroup).toBe('Proxy');
+    expect(parsed.app?.proxy?.override).toBe('localhost;127.*');
+  });
+
+  it('没有设置段时 app 为 null，端口越界会被拦下', () => {
+    expect(parseUiConfigFile(withRuleTypes(['DOMAIN'])).app).toBeNull();
+    expect(() =>
+      parseUiConfigFile({ ...withRuleTypes(['DOMAIN']), core: { mixedPort: 70000 } }),
+    ).toThrow('core.mixedPort');
+  });
 });
 
 describe('系统值', () => {
@@ -118,7 +145,7 @@ describe('ensureUiConfigFile', () => {
     const file = ensureUiConfigFile(appDir, dataDir);
 
     expect(file).toBe(path.join(appDir, 'config.json'));
-    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual(DEFAULT_UI_CONFIG);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual(DEFAULT_UI_CONFIG_FILE);
   });
 
   it('已存在的文件不被覆盖', () => {
@@ -138,6 +165,6 @@ describe('ensureUiConfigFile', () => {
     const file = ensureUiConfigFile(blocker, dataDir);
 
     expect(file).toBe(uiConfigPath(dataDir));
-    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual(DEFAULT_UI_CONFIG);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual(DEFAULT_UI_CONFIG_FILE);
   });
 });
