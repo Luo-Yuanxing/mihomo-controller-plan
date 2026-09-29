@@ -83,7 +83,6 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
             </option>
           ))}
         </select>
-        <span className="text-xs text-slate-400">改完要重启内核</span>
       </label>
 
       <div className="flex items-center gap-2 text-sm">
@@ -112,7 +111,6 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
               ))}
             </select>
             <span className="text-xs text-slate-500">当前：{group.now || '—'}</span>
-            <span className="text-xs text-slate-400">选完即生效，内核会记住</span>
           </>
         ) : (
           <span className="text-slate-500">
