@@ -1,4 +1,4 @@
-/** 规则页：规则表格 + 原始 yaml + 保存并热更新。计划 §8。 */
+/** 规则页：规则表格 + 原始 yaml + 保存规则（落库并热更新）。计划 §8。 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
@@ -112,7 +112,7 @@ export default function RulesPage() {
 
   const allEnabled = rows.length > 0 && rows.every((row) => row.enabled);
 
-  /** 一键全启用/全禁用；和单元格里的勾选一样，改动要靠"保存并热更新"落库。 */
+  /** 一键全启用/全禁用；和单元格里的勾选一样，改动要靠"保存规则"落库。 */
   function toggleAll(): void {
     const next = !allEnabled;
     setRows((current) => current.map((row) => ({ ...row, enabled: next, dirty: true })));
@@ -214,7 +214,7 @@ export default function RulesPage() {
           }}
           className="rounded bg-slate-900 px-3 py-1 text-sm text-white disabled:opacity-50"
         >
-          {saveMutation.isPending ? '保存中…' : '保存并热更新'}
+          {saveMutation.isPending ? '保存中…' : '保存规则'}
         </button>
       </div>
 
