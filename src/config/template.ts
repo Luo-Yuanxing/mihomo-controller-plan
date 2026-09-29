@@ -124,9 +124,9 @@ export function renderConfig(options: TemplateOptions): string {
   lines.push(
     '',
     'rules:',
+    // rule-provider 里每条规则自带目标策略，命中就按规则走；没命中一律直连
     `  - RULE-SET,${options.ruleProvider},${PROXY_GROUP_NAME}`,
-    '  - GEOIP,CN,DIRECT',
-    `  - MATCH,${PROXY_GROUP_NAME}`,
+    '  - MATCH,DIRECT',
     '',
   );
 

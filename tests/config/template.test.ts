@@ -32,7 +32,8 @@ describe('renderConfig', () => {
     expect(yaml).not.toContain('./subscription.yaml');
     expect(yaml).toContain('    proxies:\n      - REJECT-DROP');
     expect(yaml).not.toContain('      - DIRECT');
-    expect(yaml).toContain('MATCH,PROXY');
+    expect(yaml).toContain('MATCH,DIRECT');
+    expect(yaml).not.toContain('GEOIP,CN');
   });
 
   it('选了 PROXY 指代的组时按该组复刻，节点仍由 provider 提供', () => {
@@ -58,7 +59,7 @@ describe('renderConfig', () => {
     expect(yaml).toContain('  - name: failover\n    type: fallback\n    use:\n      - sub-main');
     expect(yaml).toContain('    url: http://www.gstatic.com/generate_204');
     expect(yaml).toContain('    interval: 300');
-    expect(yaml).toContain('MATCH,PROXY');
+    expect(yaml).toContain('MATCH,DIRECT');
   });
 
   it('组名带特殊字符时加引号，避免 YAML 解析歧义', () => {
