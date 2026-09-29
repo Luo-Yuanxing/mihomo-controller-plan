@@ -179,6 +179,7 @@ export function createConnectionTracker(): ConnectionTracker {
   };
 }
 
+/** 按首次观测升序：面板列表只往末尾追加，已上榜的不会被后来的失败挤动位置。 */
 function byRecency(left: ConnectionFinding, right: ConnectionFinding): number {
-  return Date.parse(right.lastSeen) - Date.parse(left.lastSeen);
+  return Date.parse(left.firstSeen) - Date.parse(right.firstSeen);
 }

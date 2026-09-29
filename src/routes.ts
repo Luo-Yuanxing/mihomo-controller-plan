@@ -64,23 +64,10 @@ function findingToFailed(finding: ConnectionFinding): FailedConnection {
     host: finding.host,
     port: finding.port,
     count: 1,
+    firstSeen: finding.firstSeen,
     lastSeen: finding.lastSeen,
     error: findingError(finding),
   };
-}
-
-/**
- * 两条来源的同一条连接取"更确定"的那条：
- * dial 失败来自内核日志（已定论），零回程判定来自采样（观察中），后者不如前者精确。
- */
-function preferFailure(left: FailedConnection, right: FailedConnection): FailedConnection {
-  const time = (value: FailedConnection): number => Date.parse(value.lastSeen);
-  return [
-    left,
-    right,
-    { ...left, count: left.count + right.count },
-    { ...right, count: left.count + right.count },
-  ].sort((a, b) => time(b) - time(a) || b.count - a.count)[0] as FailedConnection;
 }
 
 /**
@@ -92,6 +79,42 @@ function createFailureMerger(
 ): (fromLog: FailedConnection[], now: number) => Promise<FailedConnection[]> {
   let lastSampleAt = 0;
   let lastError: string | null = null;
+
+  /**
+   * 已经写进规则库的目标不再算"失败"：用户加完规则，下一条不该再重复提示。
+   * 只看域名不看端口：规则拦的是域名，同域名换端口也没有再看的意义。
+   */
+  function ruleMatcher(): { exact: Set<string>; suffix: string[] } {
+    const exact = new Set<string>();
+    const suffix: string[] = [];
+    for (const rule of ctx.repo.list()) {
+      const value = rule.value.trim().toLowerCase();
+      if (value === '') continue;
+      if (rule.type.trim().toUpperCase() === 'DOMAIN-SUFFIX') suffix.push(value);
+      else exact.add(value);
+    }
+    return { exact, suffix };
+  }
+
+  /**
+   * 两条来源按 id 合并：取更早的 firstSeen（决定列表里的位置）与更晚的 lastSeen，
+   * 失败次数相加，其余字段信先到的那条。
+   */
+  function mergeInto(target: Map<string, FailedConnection>, item: FailedConnection): void {
+    const existing = target.get(item.id);
+    if (existing === undefined) {
+      target.set(item.id, item);
+      return;
+    }
+    const earlier = Date.parse(item.firstSeen) < Date.parse(existing.firstSeen) ? item : existing;
+    const later = Date.parse(item.lastSeen) > Date.parse(existing.lastSeen) ? item : existing;
+    target.set(item.id, {
+      ...earlier,
+      count: existing.count + item.count,
+      lastSeen: later.lastSeen,
+      error: existing.error || item.error,
+    });
+  }
 
   return async (fromLog, now) => {
     if (now - lastSampleAt >= SAMPLE_INTERVAL_MS) {
@@ -106,21 +129,24 @@ function createFailureMerger(
     }
 
     const merged = new Map<string, FailedConnection>();
-    for (const item of fromLog) merged.set(item.id, item);
+    for (const item of fromLog) mergeInto(merged, item);
     for (const finding of ctx.failureTracker.findings(now)) {
       const sampled = findingToFailed(finding);
-      const existing = merged.get(sampled.id);
       // 同主机同端口可能同时挂着多条连接，靠 count 让面板显示"几次"，与日志来源口径一致
-      if (existing === undefined) {
-        merged.set(sampled.id, sampled);
-        continue;
-      }
-      merged.set(sampled.id, preferFailure(existing, { ...sampled, count: existing.count + 1 }));
+      const existing = merged.get(sampled.id);
+      if (existing !== undefined) sampled.count += existing.count;
+      mergeInto(merged, sampled);
     }
     if (lastError !== null) ctx.log.debug({ err: lastError }, '连接采样失败，仅返回日志来源');
-    return [...merged.values()].sort(
-      (left, right) => Date.parse(right.lastSeen) - Date.parse(left.lastSeen),
-    );
+
+    // 排序与过滤都在最后一道做：列表按首次失败升序，已被规则覆盖的目标直接剔除
+    const rules = ruleMatcher();
+    const covered = (host: string): boolean =>
+      rules.exact.has(host) ||
+      rules.suffix.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
+    return [...merged.values()]
+      .filter((item) => !covered(item.host.toLowerCase()))
+      .sort((left, right) => Date.parse(left.firstSeen) - Date.parse(right.firstSeen));
   };
 }
 
@@ -461,8 +487,9 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     if (!parsed.success) return invalid(reply, parsed.error);
 
     const created = ctx.repo.create(parsed.data.rules);
-    ctx.log.info({ count: created.length }, '新增规则');
-    return reply.status(201).send({ created });
+    const skipped = parsed.data.rules.length - created.length;
+    ctx.log.info({ count: created.length, skipped }, '新增规则');
+    return reply.status(201).send({ created, skipped });
   });
 
   app.put('/api/rules/order', async (request, reply) => {

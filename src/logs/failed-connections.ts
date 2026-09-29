@@ -5,6 +5,8 @@ export interface FailedConnection {
   host: string;
   port: number;
   count: number;
+  /** 窗口内首次失败时刻：面板按它升序排，老目标位置稳定、新目标只往末尾追加。 */
+  firstSeen: string;
   lastSeen: string;
   error: string;
 }
@@ -62,6 +64,7 @@ export function parseFailedConnections(lines: string[], now = Date.now()): Faile
         host,
         port,
         count: 1,
+        firstSeen: timestamp,
         lastSeen: timestamp,
         error: normalizeError(rawError ?? ''),
       });
@@ -72,7 +75,8 @@ export function parseFailedConnections(lines: string[], now = Date.now()): Faile
     existing.lastSeen = timestamp;
   }
 
+  // 升序：新上榜的目标追加在末尾，老目标只更新 lastSeen/count，不再上下跳
   return [...grouped.values()].sort(
-    (left, right) => Date.parse(right.lastSeen) - Date.parse(left.lastSeen),
+    (left, right) => Date.parse(left.firstSeen) - Date.parse(right.firstSeen),
   );
 }

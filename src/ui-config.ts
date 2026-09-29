@@ -275,7 +275,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
     { value: 'DIRECT', label: '直连' },
   ],
   defaults: { ruleType: 'DOMAIN', policy: 'PROXY' },
-  failedConnections: { refetchIntervalMs: 5000, lines: 5000 },
+  failedConnections: { refetchIntervalMs: 60000, lines: 5000 },
   settings: { logsRefetchIntervalMs: 5000, logsLines: 500 },
 };
 

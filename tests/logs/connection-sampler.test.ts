@@ -100,7 +100,7 @@ describe('createConnectionTracker', () => {
     expect(tracker.observe([], 3200)).toEqual([]);
   });
 
-  it('多条判定按最近活动倒序，clear 后清空', () => {
+  it('多条判定按首次观测升序（新目标只在末尾追加），clear 后清空', () => {
     const tracker = createConnectionTracker();
     tracker.observe([snapshot('a', 'old.example', 0)], 1000);
     tracker.observe([snapshot('a', 'old.example', 0), snapshot('b', 'new.example', 0)], 1600);
@@ -109,8 +109,8 @@ describe('createConnectionTracker', () => {
     tracker.observe([], 3200);
 
     expect(tracker.findings(3200).map((finding) => finding.host)).toEqual([
-      'new.example',
       'old.example',
+      'new.example',
     ]);
     tracker.clear();
     expect(tracker.findings(3200)).toEqual([]);
