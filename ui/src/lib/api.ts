@@ -3,6 +3,7 @@ import type {
   CoreStatus,
   FailedConnection,
   LogsResponse,
+  ProxyGroupSummary,
   ProxyState,
   Rule,
   RuleInput,
@@ -114,6 +115,12 @@ export const api = {
   refreshSubscription: () => post<SubscriptionState>('/api/subscription/refresh'),
 
   proxy: () => request<ProxyState>('/api/proxy'),
+  proxyGroups: () => request<{ groups: ProxyGroupSummary[] }>('/api/proxies'),
+  selectProxy: (group: string, name: string) =>
+    request<{ group: string; now: string; all: string[] }>(
+      `/api/proxies/${encodeURIComponent(group)}`,
+      { method: 'PUT', body: JSON.stringify({ name }) },
+    ),
   enableProxy: () => post<ProxyState>('/api/proxy/enable'),
   disableProxy: () => post<ProxyState>('/api/proxy/disable'),
   applyProxy: () => post<ProxyState>('/api/proxy/apply'),

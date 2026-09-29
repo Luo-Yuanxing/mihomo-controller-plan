@@ -94,6 +94,14 @@ export interface ProxyState {
   error: string | null;
 }
 
+/** 目标策略里的"代理"最终落到的组；now 是当前出口，all 是可选节点。 */
+export interface ProxyGroupSummary {
+  name: string;
+  type: string;
+  now: string;
+  all: string[];
+}
+
 export interface SubscriptionConfig {
   url: string;
   interval: number;

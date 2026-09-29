@@ -346,6 +346,8 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | POST | `/api/proxy/enable` | 开启并纳入守护 |
 | POST | `/api/proxy/disable` | 关闭并交还控制权 |
 | POST | `/api/proxy/apply` | 立即把 desired 三项写一遍（相当于手动触发一次守护） |
+| GET | `/api/proxies` | 代理组与当前出口（目标策略"代理"的落点） |
+| PUT | `/api/proxies/{group}` | 切换该组的出口节点 |
 | GET | `/api/logs` | 最近 N 行日志 |
 
 ---
@@ -360,6 +362,9 @@ mode: rule
 log-level: info
 external-controller: 127.0.0.1:9090
 secret: "<随机生成>"
+
+profile:
+  store-selected: true   # 用户选的出口跨重启保留
 
 dns:
   enable: true
@@ -409,7 +414,7 @@ payload:
 | 页面 | 内容 |
 | --- | --- |
 | 规则 | 规则表格（增删改、启停、拖拽排序）+ 原始 yaml 文本框 + 保存并热更新 |
-| 状态 | 内核状态与版本、端口、订阅信息与刷新订阅、系统代理三项状态、重启内核按钮 |
+| 状态 | 内核状态与版本、端口、订阅信息与刷新订阅、代理出口选择、系统代理三项状态、重启内核按钮 |
 | 设置 | 内核路径、端口、订阅 URL 与刷新间隔、系统代理开关、日志查看 |
 
 保存反馈：显示本次 PUT 的 provider 与耗时，失败直接展示内核原始错误。
