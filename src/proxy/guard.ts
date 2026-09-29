@@ -1,6 +1,9 @@
 /**
  * ProxyGuard：只保证自己写进注册表的三项不被别人改掉。
  * 计划 §5.5、FR-08、FR-09。
+ *
+ * 守护与系统代理开关捆绑，不提供单独开关：enable 就纳入守护，disable 就停止守护，
+ * 所以界面上只有"开启系统代理 / 关闭系统代理"两个动作。
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -57,14 +60,15 @@ export interface ProxyState {
 
 export interface ProxyGuard {
   state(): Promise<ProxyState>;
+  /** 开启系统代理并纳入守护（守护跟着开关走，没有单独的守护开关）。 */
   enable(): Promise<ProxyState>;
+  /** 关闭系统代理并停止守护，把控制权交还用户。 */
   disable(): Promise<ProxyState>;
+  /** 按期望值写一遍注册表，不改守护状态。 */
   apply(): Promise<ProxyState>;
   /** 换期望的代理服务器地址（混合端口变了）；正在守护就顺手写一遍注册表。 */
   setServer(server: string): Promise<ProxyState>;
   shutdown(): Promise<void>;
-  start(): void;
-  stop(): void;
 }
 
 export interface ProxyGuardOptions {
@@ -220,7 +224,5 @@ export function createProxyGuard(options: ProxyGuardOptions): ProxyGuard {
       return state();
     },
     shutdown,
-    start,
-    stop,
   };
 }

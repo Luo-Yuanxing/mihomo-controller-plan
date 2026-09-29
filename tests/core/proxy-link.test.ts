@@ -30,8 +30,6 @@ function fakeGuard(calls: string[], enableThrows = false): ProxyGuard {
     apply: async () => proxyState(false),
     setServer: async () => proxyState(false),
     shutdown: async () => undefined,
-    start: () => undefined,
-    stop: () => undefined,
   };
 }
 
