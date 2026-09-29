@@ -1,15 +1,13 @@
-/** 代理出口：目标策略"代理"指向订阅哪个组、当前走哪个节点。 */
+/** 代理出口：目标策略"代理"指向订阅哪个组、当前走哪个节点。提示统一由页面顶部的 NoticeStack 显示。 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../lib/api';
-import { useNotices } from '../lib/useNotices';
-import NoticeStack from './NoticeStack';
+import type { NoticeKind } from '../lib/useNotices';
 
 const SELECTOR_TYPES = new Set(['Selector', 'select']);
 
-export default function ProxyOutlets() {
+export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: string) => void }) {
   const queryClient = useQueryClient();
-  const notices = useNotices();
   const groupsQuery = useQuery({
     queryKey: ['proxyGroups'],
     queryFn: api.proxyGroups,
@@ -31,11 +29,11 @@ export default function ProxyOutlets() {
   const select = useMutation({
     mutationFn: (name: string) => api.selectProxy(target, name),
     onSuccess: async (result) => {
-      notices.push('ok', `${result.group} 已切到 ${result.now}，新连接立即生效`);
+      push('ok', `${result.group} 已切到 ${result.now}，新连接立即生效`);
       setNode('');
       await queryClient.invalidateQueries({ queryKey: ['proxyGroups'] });
     },
-    onError: (error: Error) => notices.push('error', error.message),
+    onError: (error: Error) => push('error', error.message),
   });
 
   const saveGroup = useMutation({
@@ -48,13 +46,13 @@ export default function ProxyOutlets() {
       });
     },
     onSuccess: async (result) => {
-      notices.push('ok', result.needsRestart ? '已保存；重启内核后生效' : '已保存');
+      push('ok', result.needsRestart ? '已保存；重启内核后生效' : '已保存');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['settings'] }),
         queryClient.invalidateQueries({ queryKey: ['subscription-groups'] }),
       ]);
     },
-    onError: (error: Error) => notices.push('error', error.message),
+    onError: (error: Error) => push('error', error.message),
   });
 
   return (
@@ -65,7 +63,6 @@ export default function ProxyOutlets() {
           目标策略选"代理"的规则走这里；没命中的规则一律直连
         </span>
       </div>
-      <NoticeStack notices={notices.items} onDismiss={notices.dismiss} />
 
       <label className="flex items-center gap-2 text-sm">
         <span className="w-28 shrink-0 text-slate-500">PROXY 指代</span>

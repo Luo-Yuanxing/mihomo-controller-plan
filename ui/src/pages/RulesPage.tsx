@@ -207,7 +207,7 @@ export default function RulesPage() {
         onDismiss={notices.dismiss}
       />
 
-      <ProxyOutlets />
+      <ProxyOutlets push={notices.push} />
 
       <div className="overflow-auto rounded border border-slate-300 bg-white">
         <table className="w-full text-sm">
