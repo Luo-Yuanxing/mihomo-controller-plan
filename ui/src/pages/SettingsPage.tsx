@@ -115,7 +115,7 @@ export default function SettingsPage() {
     },
     onSuccess: async (result) => {
       setPreview(null);
-      notices.push('ok', `已从界面保存到系统：${result.file}`);
+      notices.push('ok', `已保存到 ${result.file}`);
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
     onError: (error: Error) => notices.push('error', error.message),
@@ -282,7 +282,7 @@ export default function SettingsPage() {
                 applyUiConfig.mutate();
               }}
             >
-              {applyUiConfig.isPending ? '保存中…' : '确认保存到系统'}
+              {applyUiConfig.isPending ? '保存中…' : '确认保存'}
             </button>
           )}
         </div>
