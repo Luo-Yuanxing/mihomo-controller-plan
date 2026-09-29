@@ -54,10 +54,6 @@ export interface CoreApi {
    * 测不通的节点不会出现在结果里；整组都不通时返回空对象。
    */
   groupDelay(name: string): Promise<Record<string, number>>;
-  /** GET /configs。 */
-  configs(): Promise<Record<string, unknown>>;
-  /** GET /rules，用于核对当前生效规则。 */
-  rules(): Promise<Record<string, unknown>>;
 }
 
 export interface CoreApiOptions {
@@ -152,14 +148,6 @@ export function createCoreApi(options: CoreApiOptions): CoreApi {
         if (error instanceof CoreApiError && error.status === 504) return {};
         throw error;
       }
-    },
-    async configs() {
-      const response = await request('/configs');
-      return (await response.json()) as Record<string, unknown>;
-    },
-    async rules() {
-      const response = await request('/rules');
-      return (await response.json()) as Record<string, unknown>;
     },
   };
 }

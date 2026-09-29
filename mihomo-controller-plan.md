@@ -190,7 +190,7 @@ mihomo-controller-plan/
 │  ├─ config.yaml               生成的 mihomo 配置
 │  ├─ rules/custom.yaml         生成的 rule-provider
 │  ├─ logs/                     app.log / core.log
-│  └─ run/                      app.lock / core.lock
+│  └─ run/                      app.lock
 ├─ README.txt                   一页说明：怎么启动、数据在哪、怎么备份
 └─ 卸载.txt                     绿色版：删掉整个文件夹即可
 ```
@@ -215,7 +215,7 @@ mihomo-controller-plan/
 | --- | --- | --- |
 | 应用 | `data/run/app.lock` 文件锁 | 提示已在运行并退出 |
 | 界面 | `app.requestSingleInstanceLock()` | 重复双击时唤起已有窗口 |
-| 内核 | `data/run/core.lock` + 固定端口绑定 | 报错退出，不换端口 |
+| 内核 | 固定端口绑定（探测到已有内核在跑就接管） | 报错退出，不换端口 |
 
 端口固定：mixed `7890`（可改）、controller `9090`（不给改）。被占用时报错写明端口与 PID，不做迁移。
 
@@ -268,7 +268,7 @@ proxy-providers:
 | 就绪探测 | 轮询 `GET /version`，超时 15 s 视为失败并附日志尾部，随后停止 |
 | 运行期 | 每 10 s 探活；发现内核退出则记录退出码与日志尾部后停止工作 |
 | 存活关系 | 内核不随窗口关闭结束；只有托盘菜单"退出"才结束它 |
-| 重复双击 | 启动时检测 `core.lock` 与端口：已有内核在跑则直接接管，不重复启动 |
+| 重复双击 | 启动时探测控制端口：已有内核在跑则直接接管，不重复启动 |
 | 退出 | 走托盘菜单退出时触发 `-post-down` 清理；超时后强杀进程树 |
 | 版本 | 解析 `-v` 记录版本与构建 tag |
 

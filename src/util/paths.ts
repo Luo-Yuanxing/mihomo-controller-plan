@@ -13,7 +13,7 @@ export interface DataDirResult {
 }
 
 /** 运行时目录固定四件套：data/ 本身 + rules/ + logs/ + run/。 */
-export function ensureDataDirs(dataDir: string): void {
+function ensureDataDirs(dataDir: string): void {
   fs.mkdirSync(dataDir, { recursive: true });
   for (const sub of ['rules', 'logs', 'run']) {
     fs.mkdirSync(path.join(dataDir, sub), { recursive: true });
@@ -62,7 +62,6 @@ export function dataPaths(dataDir: string) {
     logsDir: path.join(dataDir, 'logs'),
     runDir: path.join(dataDir, 'run'),
     appLock: path.join(dataDir, 'run', 'app.lock'),
-    coreLock: path.join(dataDir, 'run', 'core.lock'),
   };
 }
 
