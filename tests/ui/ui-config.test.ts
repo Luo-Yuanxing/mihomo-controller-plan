@@ -7,10 +7,8 @@ import {
   getRuleTypes,
   parseUiConfig,
   parseUiConfigFile,
-  renderUiConfigFile,
   readUiConfigDocument,
   readUiConfigFile,
-  resolveExportTarget,
   setActiveUiConfig,
   uiConfigPath,
 } from '../../src/ui-config.js';
@@ -75,28 +73,10 @@ describe('config.json 里的规则', () => {
     expect(() => readUiConfigDocument(bad)).toThrow('不在规则类型列表里：IP-CIDR');
   });
 
-  it('导出内容含界面常量与规则，能被自己解析回来', () => {
-    const json = renderUiConfigFile(withRuleTypes(['DOMAIN']), [
-      { enabled: false, type: 'DOMAIN', value: 'a.com', policy: 'DIRECT', noResolve: false },
-    ]);
-    const parsed = parseUiConfigFile(JSON.parse(json));
-
-    expect(parsed.config.ruleTypes).toEqual(['DOMAIN']);
-    expect(parsed.rules).toEqual([
-      { enabled: false, type: 'DOMAIN', value: 'a.com', policy: 'DIRECT', noResolve: false },
-    ]);
-  });
-
-  it('导出目标允许文件不存在，但必须 .json', () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), 'mcp-export-'));
-    const target = resolveExportTarget(path.join(dir, '备份.json'));
-    expect(target).toBe(path.join(dir, '备份.json'));
-    expect(() => resolveExportTarget('  ')).toThrow('导出路径不能为空');
-    expect(() => resolveExportTarget(path.join(dir, '备份.yaml'))).toThrow('必须以 .json 结尾');
-  });
-
-  it('设置段（内核/订阅/系统代理）能与界面常量、规则一起导出并解析回来', () => {
-    const json = renderUiConfigFile(withRuleTypes(['DOMAIN']), [], {
+  it('设置段（内核/订阅/系统代理）能与界面常量、规则一起解析回来', () => {
+    const json = JSON.stringify({
+      ...withRuleTypes(['DOMAIN']),
+      rules: [],
       core: { binaryPath: 'C:/x/mihomo.exe', mixedPort: 7891 },
       subscription: {
         url: 'https://example.com/sub',

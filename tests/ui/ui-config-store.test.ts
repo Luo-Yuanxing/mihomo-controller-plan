@@ -5,161 +5,127 @@ import { describe, expect, it } from 'vitest';
 import { readAppConfig } from '../../src/app-config.js';
 import { DEFAULT_SETTINGS } from '../../src/settings.js';
 import { DEFAULT_UI_CONFIG, getRuleTypes, uiConfigPath } from '../../src/ui-config.js';
-import { createUiConfigService, diffUiConfig } from '../../src/ui-config-store.js';
+import { decodeSharedConfig, encodeSharedConfig } from '../../src/ui-config-share.js';
+import { createUiConfigService } from '../../src/ui-config-store.js';
 
 function tempDataDir(): string {
   return mkdtempSync(path.join(os.tmpdir(), 'mcp-ui-store-'));
 }
 
-describe('界面常量生效值（统一配置文件）', () => {
-  it('文件不可用时用默认值，规则类型白名单立即就绪', () => {
+/** 合法的最小变体：改规则类型时默认值要跟着改，否则跨字段检测会拦下。 */
+function withRuleTypes(ruleTypes: string[]): typeof DEFAULT_UI_CONFIG {
+  return {
+    ...DEFAULT_UI_CONFIG,
+    ruleTypes,
+    defaults: { ...DEFAULT_UI_CONFIG.defaults, ruleType: ruleTypes[0] ?? 'DOMAIN' },
+  };
+}
+
+describe('导入设置的生效值', () => {
+  it('文件不可用时用默认值，并且还在初始化态', () => {
     const dataDir = tempDataDir();
 
     const service = createUiConfigService(uiConfigPath(dataDir));
 
     expect(service.state().config).toEqual(DEFAULT_UI_CONFIG);
-    expect(service.state().updatedAt).toBeNull();
+    expect(service.state().initialized).toBe(true);
     expect(getRuleTypes()).toEqual(DEFAULT_UI_CONFIG.ruleTypes);
   });
 
-  it('已有配置文件按内容生效', () => {
+  it('已有配置文件按内容生效，标记为已初始化时不再引导', () => {
     const dataDir = tempDataDir();
     const file = uiConfigPath(dataDir);
     writeFileSync(
       file,
-      JSON.stringify({
-        ...DEFAULT_UI_CONFIG,
-        ruleTypes: ['DOMAIN'],
-        defaults: { ...DEFAULT_UI_CONFIG.defaults, ruleType: 'DOMAIN' },
-      }),
+      JSON.stringify({ ...withRuleTypes(['DOMAIN']), initialized: false }),
       'utf8',
     );
 
     const service = createUiConfigService(file);
 
     expect(service.state().config.ruleTypes).toEqual(['DOMAIN']);
-    expect(service.state().updatedAt).not.toBeNull();
+    expect(service.state().initialized).toBe(false);
     expect(getRuleTypes()).toEqual(['DOMAIN']);
   });
 
-  it('保存后重启仍读到文件里的值', async () => {
+  it('保存界面常量后重启仍读到，且文件里的应用设置段不受影响', async () => {
     const dataDir = tempDataDir();
     const file = uiConfigPath(dataDir);
-    writeFileSync(file, JSON.stringify({ ...DEFAULT_UI_CONFIG, core: { mixedPort: 7899 } }), 'utf8');
-    const service = createUiConfigService(file);
-    await service.apply({
-      config: { ...DEFAULT_UI_CONFIG, defaults: { ruleType: 'DOMAIN', policy: 'DIRECT' } },
-    });
-
-    // 新实例模拟重启：直接读文件
-    const restarted = createUiConfigService(file);
-
-    expect(restarted.state().config.defaults).toEqual({ ruleType: 'DOMAIN', policy: 'DIRECT' });
-    // 保存界面常量不会碰同一文件里的应用设置段
-    expect(readAppConfig(file).settings.core.mixedPort).toBe(7899);
-  });
-
-  it('diffUiConfig 标出不一致项', () => {
-    const incoming = {
-      ...DEFAULT_UI_CONFIG,
-      ruleTypes: ['DOMAIN'],
-      defaults: { ...DEFAULT_UI_CONFIG.defaults, ruleType: 'DOMAIN' },
-    };
-    const diff = diffUiConfig('/sys.json', DEFAULT_UI_CONFIG, '/sys.json', incoming);
-
-    const types = diff.find((item) => item.label === '规则类型');
-    expect(types?.same).toBe(false);
-    expect(types?.current).toBe('DOMAIN-SUFFIX / DOMAIN');
-    expect(types?.incoming).toBe('DOMAIN');
-    // 规则类型与它的默认值一起变了
-    expect(diff.filter((item) => !item.same).map((item) => item.label)).toEqual([
-      '规则类型',
-      '默认规则类型',
-    ]);
-  });
-
-  it('严格路径：forceLoad / apply 都要求 .json 且文件存在', async () => {
-    const dataDir = tempDataDir();
-    const service = createUiConfigService(uiConfigPath(dataDir));
-
-    await expect(service.forceLoad('not-json')).rejects.toThrow('必须以 .json 结尾');
-    expect(() => service.preview(path.join(dataDir, 'missing.json'))).toThrow('不存在或不可读');
-    await expect(service.apply({ file: 'aaa', config: DEFAULT_UI_CONFIG })).rejects.toThrow(
-      '必须以 .json 结尾',
-    );
-
-    // 合法路径：写入统一配置文件
-    const file = uiConfigPath(dataDir);
-    writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
-    const applied = await service.apply({ config: DEFAULT_UI_CONFIG });
-    expect(applied.state.file).toBe(file);
-    // 界面提交的只有界面常量，规则不动
-    expect(applied.rules).toBeNull();
-  });
-
-  it('配置文件里的 rules 段随加载一起返回，预览 diff 标出规则条数', async () => {
-    const dataDir = tempDataDir();
-    const file = uiConfigPath(dataDir);
-    const service = createUiConfigService(file);
     writeFileSync(
       file,
-      JSON.stringify({
-        ...DEFAULT_UI_CONFIG,
-        rules: [{ type: 'DOMAIN-SUFFIX', value: 'a.com', policy: 'PROXY' }],
-      }),
+      JSON.stringify({ ...DEFAULT_UI_CONFIG, core: { mixedPort: 7899 }, initialized: true }),
       'utf8',
     );
+    const service = createUiConfigService(file);
 
-    const loaded = await service.forceLoad();
-    expect(loaded.rules).toHaveLength(1);
-    expect(loaded.rules?.[0]?.value).toBe('a.com');
+    const saved = await service.apply(withRuleTypes(['DOMAIN']));
 
-    const preview = service.preview();
-    expect(preview.rules).toHaveLength(1);
-    expect(preview.diff.map((item) => item.label)).toContain('自定义规则（条）');
+    expect(saved.initialized).toBe(false);
+    expect(readAppConfig(file).settings.core.mixedPort).toBe(7899);
+    expect(createUiConfigService(file).state().config.ruleTypes).toEqual(['DOMAIN']);
   });
 
-  it('从外部文件加载时，内容同步写回统一配置文件', async () => {
+  it('立即初始化：只把标记改成 false，内容与内存生效值都不动', async () => {
     const dataDir = tempDataDir();
     const file = uiConfigPath(dataDir);
-    writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
+    writeFileSync(file, JSON.stringify({ ...withRuleTypes(['DOMAIN']), initialized: true }), 'utf8');
     const service = createUiConfigService(file);
-    const external = path.join(dataDir, 'mine.json');
-    writeFileSync(
-      external,
-      JSON.stringify({
-        ...DEFAULT_UI_CONFIG,
-        ruleTypes: ['DOMAIN'],
-        defaults: { ...DEFAULT_UI_CONFIG.defaults, ruleType: 'DOMAIN' },
-        core: { mixedPort: 7899 },
-      }),
-      'utf8',
-    );
 
-    const loaded = await service.forceLoad(external);
+    const state = await service.initialize();
 
-    expect(loaded.state.file).toBe(external);
-    // 界面常量落回统一文件；应用设置段由 /api/settings 那条路管，加载界面常量不碰它
-    const unified = JSON.parse(readFileSync(file, 'utf8')) as {
-      ruleTypes: string[];
-      core?: { mixedPort?: number };
-    };
-    expect(unified.ruleTypes).toEqual(['DOMAIN']);
-    expect(unified.core?.mixedPort).toBe(DEFAULT_SETTINGS.core.mixedPort);
+    expect(state.initialized).toBe(false);
+    expect(readAppConfig(file).initialized).toBe(false);
+    expect(readAppConfig(file).ui.ruleTypes).toEqual(['DOMAIN']);
+    expect(getRuleTypes()).toEqual(['DOMAIN']);
   });
 
-  it('界面那一栏的配置文件路径也持久化，重启后还是它', async () => {
+  it('导入分享串：界面常量与规则段落盘、标记改成已初始化', async () => {
     const dataDir = tempDataDir();
     const file = uiConfigPath(dataDir);
-    writeFileSync(file, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
+    writeFileSync(file, JSON.stringify({ ...DEFAULT_UI_CONFIG, initialized: true }), 'utf8');
     const service = createUiConfigService(file);
-    const external = path.join(dataDir, 'mine.json');
-    writeFileSync(external, JSON.stringify(DEFAULT_UI_CONFIG), 'utf8');
+    const payload = encodeSharedConfig({
+      config: withRuleTypes(['DOMAIN']),
+      rules: [{ enabled: true, type: 'DOMAIN', value: 'a.com', policy: 'PROXY', noResolve: true }],
+      app: { proxy: { enabled: true, override: 'localhost;127.*' } },
+    });
 
-    const applied = await service.apply({ file: external, config: DEFAULT_UI_CONFIG });
+    const result = await service.importShared(payload);
 
-    expect(applied.state.file).toBe(external);
-    expect(readAppConfig(file).configFile).toBe(external);
-    expect(createUiConfigService(file).state().file).toBe(external);
+    expect(result.state.initialized).toBe(false);
+    expect(result.rules).toHaveLength(1);
+    expect(result.app?.proxy?.enabled).toBe(true);
+    const written = readAppConfig(file);
+    expect(written.ui.ruleTypes).toEqual(['DOMAIN']);
+    expect(written.rules).toHaveLength(1);
+    expect(written.initialized).toBe(false);
+    expect(getRuleTypes()).toEqual(['DOMAIN']);
+  });
+
+  it('导入串字段不合法时抛错，文件一个字节都不动', async () => {
+    const dataDir = tempDataDir();
+    const file = uiConfigPath(dataDir);
+    const original = JSON.stringify({ ...DEFAULT_UI_CONFIG, initialized: true });
+    writeFileSync(file, original, 'utf8');
+    const service = createUiConfigService(file);
+
+    await expect(service.importShared('这不是base64!!')).rejects.toThrow('不是合法的 Base64URL 字符串');
+    await expect(
+      service.importShared(Buffer.from('{"ruleTypes": []}', 'utf8').toString('base64url')),
+    ).rejects.toThrow('ruleTypes');
+    expect(readFileSync(file, 'utf8')).toBe(original);
+  });
+
+  it('生成的分享串能被自己解析回来', () => {
+    const service = createUiConfigService(uiConfigPath(tempDataDir()));
+    const payload = service.share([], {
+      core: { binaryPath: 'resources/bin/mihomo.exe', mixedPort: 7890 },
+      proxy: { enabled: false, override: DEFAULT_SETTINGS.proxy.override },
+    });
+
+    const shared = decodeSharedConfig(payload);
+    expect(shared.config).toEqual(DEFAULT_UI_CONFIG);
+    expect(shared.app?.core?.mixedPort).toBe(7890);
+    expect(shared.app?.subscription).toBeUndefined();
   });
 });
