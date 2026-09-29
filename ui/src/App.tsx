@@ -36,19 +36,11 @@ export default function App() {
     refetchInterval: 5000,
   });
   const kernelState = status.data?.kernel.state ?? 'stopped';
-  // 数据目录回退警告：悬停触发，显示 10 s 后自动消失
-  const [dataDirHintOpen, setDataDirHintOpen] = useState(false);
 
   // 一进离线状态就跳到状态页，那里能看到内核与系统代理的实时情况
   useEffect(() => {
     if (offline) setActive('status');
   }, [offline]);
-
-  useEffect(() => {
-    if (!dataDirHintOpen) return;
-    const timer = setTimeout(() => setDataDirHintOpen(false), 10_000);
-    return () => clearTimeout(timer);
-  }, [dataDirHintOpen]);
 
   return (
     <div
@@ -80,21 +72,6 @@ export default function App() {
         <span className="ml-auto text-xs text-slate-500">
           {STATUS_HINT(kernelState, status.data?.kernel.error ?? null)}
         </span>
-        {status.data?.app.dataFallback === true && (
-          <span
-            className="relative cursor-help rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900"
-            onMouseEnter={() => setDataDirHintOpen(true)}
-            onFocus={() => setDataDirHintOpen(true)}
-            tabIndex={0}
-          >
-            数据目录
-            {dataDirHintOpen && (
-              <span className="absolute right-0 top-full z-10 mt-1 w-max max-w-md rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900 shadow">
-                程序目录不可写，数据实际存放在 {status.data.app.dataDir}
-              </span>
-            )}
-          </span>
-        )}
       </header>
       <main className="flex-1 overflow-auto p-4">{current.render()}</main>
     </div>

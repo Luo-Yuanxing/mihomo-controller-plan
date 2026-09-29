@@ -1,5 +1,6 @@
 /** 状态页：内核状态、端口、订阅信息、系统代理三项状态、重启内核。计划 §8。 */
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import NoticeStack from '../components/NoticeStack';
 import { api } from '../lib/api';
 import type { ProxyValues } from '../lib/types';
@@ -93,6 +94,13 @@ export default function StatusPage() {
   const applyProxy = useAction(queryClient, notices.push, api.applyProxy, () => '系统代理写入成功');
 
   const data = statusQuery.data;
+  // 数据目录提示：悬停在数据目录行上时显示，10 s 后自动消失
+  const [dirHintOpen, setDirHintOpen] = useState(false);
+  useEffect(() => {
+    if (!dirHintOpen) return;
+    const timer = setTimeout(() => setDirHintOpen(false), 10_000);
+    return () => clearTimeout(timer);
+  }, [dirHintOpen]);
   const busy =
     restart.isPending ||
     startKernel.isPending ||
@@ -296,9 +304,18 @@ export default function StatusPage() {
         )}
       </section>
 
-      <p className="text-xs text-slate-500">
+      <p
+        className="text-xs text-slate-500"
+        onMouseEnter={() => setDirHintOpen(true)}
+        onFocus={() => setDirHintOpen(true)}
+      >
         数据目录：{data?.app.dataDir ?? '—'}
       </p>
+      {dirHintOpen && data?.app.dataFallback === true && (
+        <p className="mt-1 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          程序目录不可写，数据实际存放在 {data.app.dataDir}
+        </p>
+      )}
     </div>
   );
 }
