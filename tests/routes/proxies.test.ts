@@ -1,0 +1,124 @@
+import type { FastifyInstance } from 'fastify';
+import pino from 'pino';
+import { beforeAll, describe, expect, it } from 'vitest';
+import type { AppContext } from '../../src/context.js';
+import type { CoreApi, ProxySnapshot } from '../../src/core/api.js';
+import { DEFAULT_UI_CONFIG, getUiConfig } from '../../src/ui-config.js';
+
+// 与 routes/ui-config.test.ts 同一门槛：fastify v5 需要 Node >= 20。
+const canLoadFastify = Number(process.versions.node.split('.')[0] ?? 0) >= 20;
+
+const SNAPSHOT: ProxySnapshot = {
+  PROXY: { name: 'PROXY', type: 'Selector', now: '香港', all: ['香港', '日本'] },
+  香港: { name: '香港', type: 'Vless' },
+  日本: { name: '日本', type: 'Vless' },
+};
+
+interface FakeApi extends CoreApi {
+  readonly selected: { group: string; choice: string }[];
+}
+
+function fakeApi(): FakeApi {
+  const selected: { group: string; choice: string }[] = [];
+  return {
+    selected,
+    version: async () => ({ version: 'test', meta: true }),
+    reloadRuleProvider: async () => undefined,
+    reloadProxyProvider: async () => undefined,
+    proxies: async () => SNAPSHOT,
+    selectProxy: async (group, choice) => {
+      selected.push({ group, choice });
+    },
+    configs: async () => ({}),
+    rules: async () => ({}),
+  };
+}
+
+type BuildApp = (api: CoreApi) => FastifyInstance;
+
+async function createBuilder(): Promise<BuildApp> {
+  const [{ default: Fastify }, { registerRoutes }] = await Promise.all([
+    import('fastify'),
+    import('../../src/routes.js'),
+  ]);
+
+  return (api: CoreApi): FastifyInstance => {
+    const context = {
+      appVersion: 'test',
+      appDir: '',
+      uiDir: '',
+      dataDir: '',
+      dataFallback: false,
+      log: pino({ level: 'silent' }),
+      api,
+      get uiConfig() {
+        return getUiConfig();
+      },
+    } as unknown as AppContext;
+    const app = Fastify();
+    registerRoutes(app, context);
+    return app;
+  };
+}
+
+describe.skipIf(!canLoadFastify)('/api/proxies', () => {
+  let buildApp: BuildApp;
+
+  beforeAll(async () => {
+    buildApp = await createBuilder();
+  });
+
+  it('只返回代理组，不含节点', async () => {
+    const app = buildApp(fakeApi());
+    const response = await app.inject({ method: 'GET', url: '/api/proxies' });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ groups: { name: string; now: string; all: string[] }[] }>();
+    expect(body.groups).toHaveLength(1);
+    expect(body.groups[0]?.name).toBe('PROXY');
+    expect(body.groups[0]?.now).toBe('香港');
+    expect(DEFAULT_UI_CONFIG.policies.map((policy) => policy.value)).toContain('PROXY');
+    await app.close();
+  });
+
+  it('切到组内节点时写回内核', async () => {
+    const api = fakeApi();
+    const app = buildApp(api);
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/proxies/PROXY',
+      payload: { name: '日本' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ now: string }>().now).toBe('日本');
+    expect(api.selected).toEqual([{ group: 'PROXY', choice: '日本' }]);
+    await app.close();
+  });
+
+  it('组外节点与不存在的组都拒绝，且不写内核', async () => {
+    const api = fakeApi();
+    const app = buildApp(api);
+    const outside = await app.inject({
+      method: 'PUT',
+      url: '/api/proxies/PROXY',
+      payload: { name: '不存在的节点' },
+    });
+    const unknown = await app.inject({
+      method: 'PUT',
+      url: '/api/proxies/OTHER',
+      payload: { name: '香港' },
+    });
+    const empty = await app.inject({
+      method: 'PUT',
+      url: '/api/proxies/PROXY',
+      payload: { name: '' },
+    });
+
+    expect(outside.statusCode).toBe(400);
+    expect(unknown.statusCode).toBe(404);
+    expect(empty.statusCode).toBe(400);
+    expect(api.selected).toEqual([]);
+    await app.close();
+  });
+});

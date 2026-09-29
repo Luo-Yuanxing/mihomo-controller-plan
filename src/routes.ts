@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { renderConfig } from './config/template.js';
 import type { AppContext } from './context.js';
+import { proxyGroups } from './core/api.js';
 import { parseFailedConnections } from './logs/failed-connections.js';
 import { RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { countSubscriptionProxies } from './sub/download.js';
@@ -44,6 +45,12 @@ function invalid(reply: FastifyReply, error: z.ZodError): FastifyReply {
     .map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`)
     .join('; ');
   return reply.status(400).send({ error: `请求参数不合法：${detail}` });
+}
+
+const selectProxySchema = z.object({ name: z.string().min(1) });
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -306,6 +313,40 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   });
 
   app.get('/api/proxy', () => ctx.guard.state());
+
+  /**
+   * 目标策略里的"代理"统一落到 PROXY 组，具体走哪个节点由用户在这里选。
+   * 列表与当前出口都取内核实时状态，不落库。
+   */
+  app.get('/api/proxies', async (_request, reply) => {
+    try {
+      return { groups: proxyGroups(await ctx.api.proxies()) };
+    } catch (error) {
+      return reply.status(502).send({ error: errorText(error) });
+    }
+  });
+
+  /** 切组内出口：先按内核快照校验节点属于该组，再写回内核。 */
+  app.put('/api/proxies/:group', async (request, reply) => {
+    const parsed = selectProxySchema.safeParse(request.body);
+    if (!parsed.success) return invalid(reply, parsed.error);
+    const { group } = request.params as { group: string };
+    try {
+      const snapshot = await ctx.api.proxies();
+      const entry = snapshot[group];
+      if (entry === undefined) {
+        return reply.status(404).send({ error: `代理组不存在：${group}` });
+      }
+      const all = entry.all ?? [];
+      if (!all.includes(parsed.data.name)) {
+        return reply.status(400).send({ error: `节点不在代理组 ${group} 中：${parsed.data.name}` });
+      }
+      await ctx.api.selectProxy(group, parsed.data.name);
+      return { group, now: parsed.data.name, all };
+    } catch (error) {
+      return reply.status(502).send({ error: errorText(error) });
+    }
+  });
 
   app.post('/api/proxy/enable', async () => {
     const state = await ctx.guard.enable();
