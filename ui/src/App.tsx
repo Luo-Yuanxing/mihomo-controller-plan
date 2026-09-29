@@ -65,7 +65,12 @@ export default function App() {
   });
   const kernelState = status.data?.kernel.state ?? 'stopped';
   const stateMark = STATE_MARK[kernelState] ?? STATE_UNKNOWN;
-  const refresh = useMutation({ mutationFn: () => queryClient.invalidateQueries() });
+  // 刷新 = 重新拉一遍所有查询 + 重建当前页面（重挂载），所以点下去一定看得出变化
+  const [resetKey, setResetKey] = useState(0);
+  const refresh = useMutation({
+    mutationFn: () => queryClient.refetchQueries(),
+    onSuccess: () => setResetKey((value) => value + 1),
+  });
 
   // 一进离线状态就跳到状态页，那里能看到内核与系统代理的实时情况
   useEffect(() => {
@@ -115,7 +120,9 @@ export default function App() {
           {STATUS_HINT(kernelState, status.data?.kernel.error ?? null)}
         </span>
       </header>
-      <main className="flex-1 overflow-auto p-4">{current.render()}</main>
+      <main key={resetKey} className="flex-1 overflow-auto p-4">
+        {current.render()}
+      </main>
     </div>
   );
 }
