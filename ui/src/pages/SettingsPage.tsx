@@ -190,18 +190,6 @@ export default function SettingsPage() {
             }
           />
         </Field>
-        <Field label="刷新间隔（秒）">
-          <input
-            type="number"
-            className={inputClass}
-            value={draft.subscription.interval}
-            onChange={(event) =>
-              patch({
-                subscription: { ...draft.subscription, interval: Number(event.target.value) },
-              })
-            }
-          />
-        </Field>
         <Field label="User-Agent">
           <input
             className={inputClass}

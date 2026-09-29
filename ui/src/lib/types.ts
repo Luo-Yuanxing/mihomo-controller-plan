@@ -104,7 +104,6 @@ export interface ProxyGroupSummary {
 
 export interface SubscriptionConfig {
   url: string;
-  interval: number;
   useProxy: boolean;
   userAgent: string;
   /** PROXY 策略指代订阅里的哪个组；空串 = 订阅全部节点。 */

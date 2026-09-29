@@ -213,10 +213,6 @@ export default function StatusPage() {
             <dd className="break-all font-mono text-xs">{data?.subscription.url || '未配置'}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="text-slate-500">刷新间隔</dt>
-            <dd>{data === undefined ? '—' : `${String(data.subscription.interval)} s`}</dd>
-          </div>
-          <div className="flex gap-2">
             <dt className="text-slate-500">订阅文件</dt>
             <dd>{data?.subscription.fileExists === true ? '已存在' : '未配置'}</dd>
           </div>

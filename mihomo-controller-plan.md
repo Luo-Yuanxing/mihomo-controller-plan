@@ -52,7 +52,7 @@
 | --- | --- | --- |
 | FR-01 | 单实例运行 | 文件锁；重复启动即唤起已有窗口 |
 | FR-02 | 订阅下载 | 按 URL 下载 YAML，校验含 `proxies`/`proxy-providers`，原子写入 `data/subscription.yaml` |
-| FR-03 | 订阅刷新 | 手动触发 + 按间隔自动刷新；失败保留旧文件并报错 |
+| FR-03 | 订阅刷新 | 只手动触发，不做定时自动刷新；失败保留旧文件并报错 |
 | FR-04 | 内核托管 | 启动、就绪探测、退出清理；内核作为独立进程运行，不随窗口关闭而结束 |
 | FR-05 | 配置生成与预检 | 模板渲染 `config.yaml`，应用前 `mihomo -t` 校验 |
 | FR-06 | 规则存储 | SQLite 单表，支持高频增删改 |
@@ -123,7 +123,7 @@
 
 ### 4.2 数据流
 
-**订阅下载（启动时 + 定时 + 手动）**
+**订阅下载（启动时缺失才下载 + 手动刷新）**
 
 ```
 URL（可选走本机代理）→ GET，带 UA 与超时 → 校验是 YAML 且含 proxies
@@ -239,12 +239,12 @@ mihomo-controller-plan/
 
 | 项 | 设计 |
 | --- | --- |
-| 配置 | `settings.json` 中 `subscription: { url, interval, useProxy, userAgent, proxyGroup }` |
+| 配置 | `settings.json` 中 `subscription: { url, useProxy, userAgent, proxyGroup }` |
 | 下载 | `fetch` GET，默认 20 s 超时，默认 UA `clash-verge/v3`（可覆盖），可选走本机 mixed 端口或系统代理 |
 | 校验 | 状态码 2xx；剥 BOM；YAML 可解析；含 `proxies` 或 `proxy-providers` |
 | 落盘 | 写 `subscription.yaml.tmp` → `rename` 覆盖，再 `PUT /providers/proxies/sub-main` |
 | 失败 | 保留旧文件并返回错误；首次启动时失败则直接停止 |
-| 自动刷新 | 按 `interval`（默认 24 h）定时执行同一流程 |
+| 刷新 | 只有手动触发（状态页"刷新订阅"）；不装定时器，避免后台悄悄换节点 |
 | PROXY 指代 | `proxyGroup` 空 = `PROXY` 组用订阅全部节点；非空 = 按订阅里同名组复刻（类型、url 等原样带过，节点仍由 provider 提供，组引用递归生成）。找不到该组就回退成全部节点 |
 
 内核侧配置成文件 provider，避免"访问订阅域名本身需要代理"的自举问题：
@@ -336,7 +336,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | --- | --- | --- |
 | GET | `/api/status` | 内核状态、版本、端口、订阅状态、系统代理状态 |
 | GET | `/api/subscription` | 当前订阅配置与最近一次下载结果 |
-| PUT | `/api/subscription` | 修改订阅 URL / 刷新间隔 / 是否走代理下载 |
+| PUT | `/api/subscription` | 修改订阅 URL / 是否走代理下载 |
 | POST | `/api/subscription/refresh` | 立即下载并生效 |
 | GET | `/api/subscription/groups` | 订阅文件里的代理组，用于选 `PROXY` 指代哪个组 |
 | GET | `/api/rules` | 规则列表 |
@@ -350,6 +350,7 @@ CREATE INDEX IF NOT EXISTS idx_rules_position ON rules(position);
 | POST | `/api/proxy/apply` | 立即把 desired 三项写一遍（相当于手动触发一次守护） |
 | GET | `/api/proxies` | 代理组与当前出口（目标策略"代理"的落点） |
 | PUT | `/api/proxies/{group}` | 切换该组的出口节点 |
+| GET | `/api/proxies/{group}/delay` | 并发测组内各节点时延（毫秒） |
 | GET | `/api/logs` | 最近 N 行日志 |
 
 ---
@@ -419,9 +420,9 @@ payload:
 
 | 页面 | 内容 |
 | --- | --- |
-| 规则 | 代理出口（PROXY 指代哪个订阅组 + 当前出口节点）+ 规则表格（增删改、启停、拖拽排序）+ 原始 yaml 文本框 + 保存并热更新 |
+| 规则 | 代理出口（PROXY 指代哪个订阅组 + 出口节点按钮块，可一键测各节点时延）+ 规则表格（增删改、启停、拖拽排序）+ 原始 yaml 文本框 + 保存并热更新 |
 | 状态 | 内核状态与版本、端口、订阅信息与刷新订阅、系统代理三项状态、重启内核按钮 |
-| 设置 | 内核路径、端口、订阅 URL 与刷新间隔、系统代理开关、日志查看 |
+| 设置 | 内核路径、端口、订阅 URL、系统代理开关、日志查看 |
 
 保存反馈：显示本次 PUT 的 provider 与耗时，失败直接展示内核原始错误。
 

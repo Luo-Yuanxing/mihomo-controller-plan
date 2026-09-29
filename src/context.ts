@@ -13,7 +13,6 @@ import type { dataPaths } from './util/paths.js';
 
 export interface SubscriptionState {
   url: string;
-  interval: number;
   useProxy: boolean;
   userAgent: string;
   lastOkAt: string | null;
@@ -57,7 +56,5 @@ export interface AppContext {
   /** 重新渲染 config.yaml；端口/secret 变化后需要重启内核才生效。 */
   writeConfig(): Promise<void>;
   refreshSubscription(): Promise<SubscriptionState>;
-  /** 根据当前 URL 启停自动刷新定时器。 */
-  syncSubscriptionTimer(): void;
   restartKernel(): Promise<CoreStatus>;
 }

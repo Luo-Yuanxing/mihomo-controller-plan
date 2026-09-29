@@ -4,7 +4,6 @@
  */
 export interface SubscriptionOptions {
   url: string;
-  interval: number;
   useProxy: boolean;
   userAgent: string;
 }

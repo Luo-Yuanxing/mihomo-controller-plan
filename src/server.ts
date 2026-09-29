@@ -108,7 +108,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
 
   const subscription: SubscriptionState = {
     url: settings.subscription.url,
-    interval: settings.subscription.interval,
     useProxy: settings.subscription.useProxy,
     userAgent: settings.subscription.userAgent,
     lastOkAt: null,
@@ -116,7 +115,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     bytes: null,
     refreshing: false,
   };
-  let subscriptionTimer: NodeJS.Timeout | null = null;
 
   /**
    * 用户选的"PROXY 指代订阅哪个组"。订阅换掉、组没了都会回退成 null（= 用订阅全部节点），
@@ -130,19 +128,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       log.warn({ group: chosen }, '订阅里没有这个代理组，PROXY 回退为订阅全部节点');
     }
     return plan;
-  };
-
-  const syncSubscriptionTimer = (): void => {
-    if (subscriptionTimer !== null) {
-      clearInterval(subscriptionTimer);
-      subscriptionTimer = null;
-    }
-    if (settings.subscription.url === '') return;
-
-    subscriptionTimer = setInterval(() => {
-      void context.refreshSubscription().catch(() => undefined);
-    }, settings.subscription.interval * 1000);
-    subscriptionTimer.unref?.();
   };
 
   const writeConfig = async (): Promise<void> => {
@@ -238,7 +223,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
         const result = await downloadSubscription(
           {
             url: settings.subscription.url,
-            interval: settings.subscription.interval,
             useProxy: settings.subscription.useProxy,
             userAgent: settings.subscription.userAgent,
           },
@@ -276,7 +260,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
         context.subscription.refreshing = false;
       }
     },
-    syncSubscriptionTimer,
     async restartKernel(): Promise<CoreStatus> {
       return core.restart();
     },
@@ -329,10 +312,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     guard.start();
   }
 
-  context.syncSubscriptionTimer();
-
   const close = async (): Promise<void> => {
-    if (subscriptionTimer !== null) clearInterval(subscriptionTimer);
     try {
       await guard.shutdown();
     } catch (error) {

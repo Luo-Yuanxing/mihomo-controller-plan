@@ -7,7 +7,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { PROXY_GROUP_NAME, renderConfig } from './config/template.js';
 import type { AppContext } from './context.js';
-import { proxyGroups } from './core/api.js';
+import { CoreApiError, DELAY_TEST_URL, proxyGroups } from './core/api.js';
 import { parseFailedConnections } from './logs/failed-connections.js';
 import { RuleValidationError, renderRuleProvider } from './rules/render.js';
 import { countSubscriptionProxies } from './sub/download.js';
@@ -80,10 +80,8 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     const previous = ctx.settings;
     const settings = await ctx.saveSettings(parsed.data);
     ctx.subscription.url = settings.subscription.url;
-    ctx.subscription.interval = settings.subscription.interval;
     ctx.subscription.useProxy = settings.subscription.useProxy;
     ctx.subscription.userAgent = settings.subscription.userAgent;
-    ctx.syncSubscriptionTimer();
     await ctx.writeConfig();
 
     const needsRestart =
@@ -110,7 +108,6 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get('/api/subscription', () => ({
     config: {
       url: ctx.settings.subscription.url,
-      interval: ctx.settings.subscription.interval,
       useProxy: ctx.settings.subscription.useProxy,
       userAgent: ctx.settings.subscription.userAgent,
       proxyGroup: ctx.settings.subscription.proxyGroup,
@@ -123,7 +120,6 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.put('/api/subscription', async (request, reply) => {
     const schema = z.object({
       url: z.string().optional(),
-      interval: z.number().int().positive().optional(),
       useProxy: z.boolean().optional(),
       userAgent: z.string().min(1).optional(),
       proxyGroup: z.string().optional(),
@@ -134,17 +130,14 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     const current = ctx.settings.subscription;
     const next = {
       url: parsed.data.url ?? current.url,
-      interval: parsed.data.interval ?? current.interval,
       useProxy: parsed.data.useProxy ?? current.useProxy,
       userAgent: parsed.data.userAgent ?? current.userAgent,
       proxyGroup: parsed.data.proxyGroup ?? current.proxyGroup,
     };
     await ctx.saveSettings({ ...ctx.settings, subscription: next });
     ctx.subscription.url = next.url;
-    ctx.subscription.interval = next.interval;
     ctx.subscription.useProxy = next.useProxy;
     ctx.subscription.userAgent = next.userAgent;
-    ctx.syncSubscriptionTimer();
     await ctx.writeConfig();
     return { config: next };
   });
@@ -158,14 +151,12 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     };
     await ctx.saveSettings({ ...ctx.settings, subscription: next });
     ctx.subscription.url = '';
-    ctx.syncSubscriptionTimer();
 
     try {
       fs.rmSync(ctx.paths.subscription, { force: true });
     } catch (error) {
       await ctx.saveSettings({ ...ctx.settings, subscription: previous });
       ctx.subscription.url = previous.url;
-      ctx.syncSubscriptionTimer();
       throw error;
     }
 
@@ -362,6 +353,19 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
       await ctx.api.selectProxy(group, parsed.data.name);
       return { group, now: parsed.data.name, all };
     } catch (error) {
+      return reply.status(502).send({ error: errorText(error) });
+    }
+  });
+
+  /** 测代理组里每个节点的时延；测不通的节点不会出现在 delays 里。 */
+  app.get('/api/proxies/:group/delay', async (request, reply) => {
+    const { group } = request.params as { group: string };
+    try {
+      return { group, url: DELAY_TEST_URL, delays: await ctx.api.groupDelay(group) };
+    } catch (error) {
+      if (error instanceof CoreApiError && error.status === 404) {
+        return reply.status(404).send({ error: `代理组不存在：${group}` });
+      }
       return reply.status(502).send({ error: errorText(error) });
     }
   });

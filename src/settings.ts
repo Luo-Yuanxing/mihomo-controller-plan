@@ -10,7 +10,6 @@ import { writeFileAtomic } from './util/atomic.js';
 export const settingsSchema = z.object({
   subscription: z.object({
     url: z.string(),
-    interval: z.number().int().positive(),
     useProxy: z.boolean(),
     userAgent: z.string().min(1),
     /** PROXY 策略指代订阅里的哪个组；空串 = 订阅全部节点。 */
@@ -34,7 +33,6 @@ export type Settings = z.infer<typeof settingsSchema>;
 export const DEFAULT_SETTINGS: Settings = {
   subscription: {
     url: '',
-    interval: 86_400,
     useProxy: false,
     userAgent: 'clash-verge/v3',
     proxyGroup: '',

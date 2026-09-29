@@ -1,7 +1,6 @@
 {
   "subscription": {
     "url": "",
-    "interval": 86400,
     "useProxy": false,
     "userAgent": "clash-verge/v3",
     "proxyGroup": ""
