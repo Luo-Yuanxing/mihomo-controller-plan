@@ -347,7 +347,7 @@ const invokedDirectly =
   process.argv[1] !== undefined &&
   import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 
-if (invokedDirectly || process.env['MCP_STANDALONE'] === '1') {
+if (invokedDirectly) {
   const running = await startServer({
     appDir: process.cwd(),
     port: Number(process.env['MCP_PORT'] ?? 8787),
