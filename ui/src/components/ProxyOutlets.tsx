@@ -105,7 +105,7 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
             )}
           {subGroupsQuery.data?.groups.map((item) => (
             <option key={item.name} value={item.name}>
-              {item.name}（{item.type} · {item.members} 个成员）
+              {item.name}
             </option>
           ))}
         </select>
