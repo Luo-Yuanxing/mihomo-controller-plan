@@ -35,7 +35,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
 };
 
 export function uiConfigPath(dataDir: string): string {
-  return path.join(dataDir, 'ui-config.json');
+  return path.join(dataDir, 'config.json');
 }
 
 /**
@@ -44,7 +44,7 @@ export function uiConfigPath(dataDir: string): string {
  */
 export function ensureUiConfigFile(appDir: string, dataDir: string, log?: Logger): string {
   const fallback = uiConfigPath(dataDir);
-  for (const target of [path.join(appDir, 'ui-config.json'), fallback]) {
+  for (const target of [path.join(appDir, 'config.json'), fallback]) {
     try {
       if (!fs.existsSync(target)) {
         fs.mkdirSync(path.dirname(target), { recursive: true });

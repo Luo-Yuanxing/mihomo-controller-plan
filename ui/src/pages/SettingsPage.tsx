@@ -208,7 +208,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="flex flex-col gap-2 rounded border border-slate-300 bg-white p-3">
-        <h2 className="text-base font-semibold">界面常量（ui-config.json）</h2>
+        <h2 className="text-base font-semibold">界面常量（config.json）</h2>
         <p className="text-xs text-slate-500">
           系统值（存库）：规则类型 {uiConfigQuery.data?.config.ruleTypes.join(' / ') ?? '—'}
           ；目标策略{' '}

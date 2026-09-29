@@ -53,7 +53,7 @@ describe('ensureUiConfigFile', () => {
 
     const file = ensureUiConfigFile(appDir, dataDir);
 
-    expect(file).toBe(path.join(appDir, 'ui-config.json'));
+    expect(file).toBe(path.join(appDir, 'config.json'));
     expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual(DEFAULT_UI_CONFIG);
   });
 
@@ -61,7 +61,7 @@ describe('ensureUiConfigFile', () => {
     const appDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-app-'));
     const dataDir = mkdtempSync(path.join(os.tmpdir(), 'mcp-data-'));
     const existing = { ...DEFAULT_UI_CONFIG, ruleTypes: ['DOMAIN'] };
-    writeFileSync(path.join(appDir, 'ui-config.json'), JSON.stringify(existing), 'utf8');
+    writeFileSync(path.join(appDir, 'config.json'), JSON.stringify(existing), 'utf8');
 
     expect(readUiConfigFile(ensureUiConfigFile(appDir, dataDir)).ruleTypes).toEqual(['DOMAIN']);
   });

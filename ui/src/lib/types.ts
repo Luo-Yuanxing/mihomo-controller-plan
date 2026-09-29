@@ -3,7 +3,7 @@
  * 后端改了字段，这里要同步改。
  */
 /**
- * 界面可改的简单常量，来源 data/ui-config.json（GET /api/ui-config）。
+ * 界面可改的简单常量，来源配置文件（默认 app 目录下 config.json，GET /api/ui-config）。
  * 下面的默认值只在后端不可用时兜底，改选项请改 JSON 再点"重载常量"。
  */
 export interface UiConfig {
