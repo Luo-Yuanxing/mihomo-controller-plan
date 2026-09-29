@@ -6,6 +6,12 @@ import type { NoticeKind } from '../lib/useNotices';
 
 const SELECTOR_TYPES = new Set(['Selector', 'select']);
 
+/** 时延配色：≤200 ms 绿、>200 ms 黄、没测通红。 */
+function delayColor(ms: number | undefined): string {
+  if (ms === undefined) return 'text-rose-600';
+  return ms <= 200 ? 'text-emerald-600' : 'text-amber-600';
+}
+
 export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: string) => void }) {
   const queryClient = useQueryClient();
   const groupsQuery = useQuery({
@@ -121,35 +127,39 @@ export default function ProxyOutlets({ push }: { push: (kind: NoticeKind, text: 
       </div>
 
       {group !== undefined && (
-        <div className="flex flex-wrap gap-1">
-          {group.all.map((name) => {
-            const active = name === value;
-            const ms = delays?.[name];
-            const selectable = SELECTOR_TYPES.has(group.type);
-            return (
-              <button
-                key={name}
-                type="button"
-                disabled={!selectable || select.isPending}
-                onClick={() => {
-                  setNode(name);
-                  select.mutate(name);
-                }}
-                className={`rounded border px-2 py-1 text-xs ${
-                  active
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-slate-300 bg-white hover:bg-slate-50'
-                } ${selectable ? '' : 'cursor-default'}`}
-              >
-                {name}
-                {delays !== null && (
-                  <span className={ms === undefined ? 'ml-1 text-rose-400' : 'ml-1 opacity-70'}>
-                    {ms === undefined ? '超时' : `${String(ms)} ms`}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="flex items-start gap-2">
+          <span className="w-28 shrink-0" />
+          <div className="grid flex-1 grid-cols-4 gap-1">
+            {group.all.map((name) => {
+              const active = name === value;
+              const ms = delays?.[name];
+              const selectable = SELECTOR_TYPES.has(group.type);
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  title={name}
+                  disabled={!selectable || select.isPending}
+                  onClick={() => {
+                    setNode(name);
+                    select.mutate(name);
+                  }}
+                  className={`flex w-full items-center justify-between gap-1 rounded border px-2 py-1 text-xs ${
+                    active
+                      ? 'border-slate-900 bg-slate-100 font-semibold'
+                      : 'border-slate-300 bg-white hover:bg-slate-50'
+                  } ${selectable ? '' : 'cursor-default'}`}
+                >
+                  <span className="truncate">{name}</span>
+                  {delays !== null && (
+                    <span className={`shrink-0 ${delayColor(ms)}`}>
+                      {ms === undefined ? '超时' : `${String(ms)} ms`}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </section>
