@@ -178,6 +178,22 @@ export default function RulesPage() {
         <h2 className="text-base font-semibold">
           规则（共 {rows.length} 条{filtering ? `，匹配 ${visibleRows.length} 条` : ''}）
         </h2>
+      </div>
+
+      <NoticeStack
+        notices={[
+          ...notices.items,
+          ...(rulesQuery.isError
+            ? [{ id: -1, kind: 'error' as const, text: String(rulesQuery.error) }]
+            : []),
+        ]}
+        onDismiss={notices.dismiss}
+      />
+
+      <ProxyOutlets push={notices.push} />
+
+      {/* 动作按钮放在代理出口与规则表之间：先看出口，再改规则，最后一起热更新 */}
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => {
@@ -200,23 +216,15 @@ export default function RulesPage() {
         >
           {saveMutation.isPending ? '保存中…' : '保存并热更新'}
         </button>
+        <span className="text-xs text-slate-500">
+          改动先留在页面上，点"保存并热更新"才写库并通知内核重载。
+        </span>
       </div>
 
-      <NoticeStack
-        notices={[
-          ...notices.items,
-          ...(rulesQuery.isError
-            ? [{ id: -1, kind: 'error' as const, text: String(rulesQuery.error) }]
-            : []),
-        ]}
-        onDismiss={notices.dismiss}
-      />
-
-      <ProxyOutlets push={notices.push} />
-
-      <div className="overflow-auto rounded border border-slate-300 bg-white">
+      {/* 固定 8 行视口：表头两行（约 72 px）+ 8 × 40 px 数据行 ≈ 24.5 rem，超出在容器内滚动 */}
+      <div className="max-h-[24.5rem] overflow-auto rounded border border-slate-300 bg-white">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+          <thead className="sticky top-0 z-10 bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="px-2 py-2">
                 <button
@@ -319,7 +327,7 @@ export default function RulesPage() {
           </thead>
           <tbody>
             {visibleRows.map(({ row, index }) => (
-              <tr key={row.key} className="border-t border-slate-200">
+              <tr key={row.key} className="h-10 border-t border-slate-200">
                 <td className="px-2 py-1">
                   <input
                     type="checkbox"
