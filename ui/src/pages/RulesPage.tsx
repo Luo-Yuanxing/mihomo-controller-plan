@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { compareByDomain } from '../lib/ruleOrder';
 import { useT } from '../lib/useI18n';
 import type { Rule, RuleInput, UiConfig } from '../lib/types';
 import { useUiConfig } from '../lib/uiConfig';
@@ -77,6 +78,8 @@ export default function RulesPage() {
   const [removed, setRemoved] = useState<number[]>([]);
   const [orderDirty, setOrderDirty] = useState(false);
   const [filters, setFilters] = useState<RuleFilters>(EMPTY_FILTERS);
+  /** 编辑命中顺序：关（默认）按域名层级排序展示，开则回到库中顺序并放开上下移动。 */
+  const [editOrder, setEditOrder] = useState(false);
   const notices = useNotices();
 
   useEffect(() => {
@@ -173,6 +176,10 @@ export default function RulesPage() {
   const policyChoices = Array.from(
     new Set([...uiConfig.policies.map((option) => option.value), ...rows.map((row) => row.policy)]),
   );
+  // 默认按域名层级排序展示（稳定排序，同键保持库中相对顺序）；打开编辑开关才回到命中顺序。
+  const displayRows = editOrder
+    ? visibleRows
+    : [...visibleRows].sort((a, b) => compareByDomain(a.row.value, b.row.value));
 
   return (
     <div className="flex flex-col gap-3">
@@ -220,6 +227,18 @@ export default function RulesPage() {
         >
           {saveMutation.isPending ? t('common.saving') : t('rules.save')}
         </button>
+        <label
+          className="ml-auto flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-600"
+          title={t('rules.editOrderTitle')}
+        >
+          <input
+            type="checkbox"
+            aria-label={t('rules.editOrder')}
+            checked={editOrder}
+            onChange={(event) => setEditOrder(event.target.checked)}
+          />
+          {t('rules.editOrder')}
+        </label>
       </div>
 
       {/* 固定 8 行视口：表头两行（约 72 px）+ 8 × 40 px 数据行 ≈ 24.5 rem，超出在容器内滚动 */}
@@ -327,7 +346,7 @@ export default function RulesPage() {
             </tr>
           </thead>
           <tbody>
-            {visibleRows.map(({ row, index }) => (
+            {displayRows.map(({ row, index }) => (
               <tr key={row.key} className="h-10 border-t border-slate-200">
                 <td className="px-2 py-1">
                   <input
@@ -337,20 +356,24 @@ export default function RulesPage() {
                   />
                 </td>
                 <td className="px-2 py-1 whitespace-nowrap">
-                  <button
-                    type="button"
-                    className="px-1 text-slate-500 hover:text-slate-900"
-                    onClick={() => move(index, -1)}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className="px-1 text-slate-500 hover:text-slate-900"
-                    onClick={() => move(index, 1)}
-                  >
-                    ↓
-                  </button>
+                  {editOrder && (
+                    <>
+                      <button
+                        type="button"
+                        className="px-1 text-slate-500 hover:text-slate-900"
+                        onClick={() => move(index, -1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="px-1 text-slate-500 hover:text-slate-900"
+                        onClick={() => move(index, 1)}
+                      >
+                        ↓
+                      </button>
+                    </>
+                  )}
                   {row.id === null && (
                     <span className="ml-1 text-xs text-emerald-600">{t('rules.newBadge')}</span>
                   )}

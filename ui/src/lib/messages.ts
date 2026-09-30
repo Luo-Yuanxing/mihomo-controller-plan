@@ -64,6 +64,9 @@ export const ZH = {
   'rules.headingFiltered': '规则（共 {count} 条，匹配 {matched} 条）',
   'rules.add': '新增规则',
   'rules.save': '保存规则',
+  'rules.editOrder': '编辑命中顺序',
+  'rules.editOrderTitle':
+    '关闭（默认）时按域名层级排序显示：1 级域名定顶层顺序，2 级域名定下一层，以此类推；打开后按内核实际命中顺序（库中顺序）显示，可上下移动规则',
   'rules.saved': '已热更新 {provider}：{change}，耗时 {ms} ms',
   'rules.savedRewritten': '文件已重写',
   'rules.savedUnchanged': '内容无变化，未触发 PUT',
@@ -303,6 +306,9 @@ export const EN: Record<MessageKey, string> = {
   'rules.headingFiltered': 'Rules ({count}, {matched} matching)',
   'rules.add': 'Add rule',
   'rules.save': 'Save rules',
+  'rules.editOrder': 'Edit match order',
+  'rules.editOrderTitle':
+    'Off (default): rows are sorted by domain hierarchy — the 1st-level domain sets the top order, the 2nd-level the next, and so on. On: rows follow the kernel match order (stored order) and up/down buttons appear.',
   'rules.saved': 'Hot reloaded {provider}: {change}, took {ms} ms',
   'rules.savedRewritten': 'file rewritten',
   'rules.savedUnchanged': 'no change, PUT skipped',
