@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check:
+    # 界面与打包都只面向 Windows，代理守护逻辑只跑在 Windows 上
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # better-sqlite3 是原生模块，按当前 Node 重新编译一次更稳
+      - run: npm rebuild better-sqlite3
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      - run: npm test
