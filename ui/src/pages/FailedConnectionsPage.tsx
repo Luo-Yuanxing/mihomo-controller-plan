@@ -19,6 +19,18 @@ function displayTime(value: string): string {
     : new Date(timestamp).toLocaleString(locale(), { hour12: false });
 }
 
+/**
+ * DOMAIN-SUFFIX 的规则值强制截取末尾两级域名：otheve.beacon.qq.com → qq.com。
+ * 内核日志里的失败目标常带随机/多级子域，按完整域名建规则会漏掉同域的其它子域。
+ * IP 目标没有域名层级，原样保留；不足两级（如 localhost）也原样保留。
+ */
+export function domainSuffixValue(host: string): string {
+  const value = host.trim().toLowerCase().replace(/\.$/, '');
+  if (value === '' || value.includes(':') || /^\d+(?:\.\d+){3}$/.test(value)) return value;
+  const parts = value.split('.');
+  return parts.length <= 2 ? value : parts.slice(-2).join('.');
+}
+
 export default function FailedConnectionsPage() {
   const t = useT();
   const queryClient = useQueryClient();
@@ -48,6 +60,7 @@ export default function FailedConnectionsPage() {
   const [hostQuery, setHostQuery] = useState('');
   const [ruleType, setRuleType] = useState(uiConfig.defaults.ruleType);
   const [policy, setPolicy] = useState(uiConfig.defaults.policy);
+  const isDomainSuffix = ruleType.trim().toUpperCase() === 'DOMAIN-SUFFIX';
   const notices = useNotices();
 
   const connections = failedQuery.data?.connections ?? [];
@@ -116,10 +129,18 @@ export default function FailedConnectionsPage() {
 
   const addRules = useMutation({
     mutationFn: async () => {
-      const rules: RuleInput[] = selectedRows.map((connection) => ({
+      // DOMAIN-SUFFIX 强制收敛到末尾两级域名：多条失败目标很可能同域，去重后只建一条。
+      const values = [
+        ...new Set(
+          selectedRows.map((connection) =>
+            isDomainSuffix ? domainSuffixValue(connection.host) : connection.host,
+          ),
+        ),
+      ].filter((value) => value !== '');
+      const rules: RuleInput[] = values.map((value) => ({
         enabled: true,
         type: ruleType,
-        value: connection.host,
+        value,
         policy,
         noResolve: true,
       }));
@@ -212,6 +233,7 @@ export default function FailedConnectionsPage() {
           {t('failed.ruleType')}
           <select
             className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
+            title={isDomainSuffix ? t('failed.suffixTruncated') : undefined}
             value={ruleType}
             onChange={(event) => setRuleType(event.target.value)}
           >
@@ -221,6 +243,9 @@ export default function FailedConnectionsPage() {
               </option>
             ))}
           </select>
+          {isDomainSuffix && (
+            <span className="text-xs text-slate-400">{t('failed.suffixTruncated')}</span>
+          )}
         </label>
         <label className="flex items-center gap-1 text-sm text-slate-500">
           {t('failed.policy')}

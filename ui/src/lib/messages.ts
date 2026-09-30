@@ -96,6 +96,7 @@ export const ZH = {
   'failed.filterHost': '筛选主机',
   'failed.filterHostPlaceholder': '例如 com',
   'failed.ruleType': '规则类型',
+  'failed.suffixTruncated': 'DOMAIN-SUFFIX 只取末尾两级域名（otheve.beacon.qq.com → qq.com）',
   'failed.policy': '目标策略',
   'failed.selectAll': '全选',
   'failed.deselectAll': '取消全选',
@@ -333,6 +334,8 @@ export const EN: Record<MessageKey, string> = {
   'failed.filterHost': 'Filter hosts',
   'failed.filterHostPlaceholder': 'e.g. com',
   'failed.ruleType': 'Rule type',
+  'failed.suffixTruncated':
+    'DOMAIN-SUFFIX keeps only the last two domain levels (otheve.beacon.qq.com → qq.com)',
   'failed.policy': 'Target policy',
   'failed.selectAll': 'Select all',
   'failed.deselectAll': 'Deselect all',
