@@ -257,10 +257,12 @@ describe.skipIf(!canLoadFastify)('PUT /api/settings', () => {
   it('只改端口不重建代理组，只提示需要重启', async () => {
     const { restarts, context } = extra();
     const app = buildApp(fakeApi(), { ...context, settings: withProxyGroup('Proxy') });
+    // core 只改端口，binaryPath 仍用真实存在的可执行文件，否则会先被路径校验拦下
+    const base = withProxyGroup('Proxy');
     const response = await app.inject({
       method: 'PUT',
       url: '/api/settings',
-      payload: { ...withProxyGroup('Proxy'), core: { ...DEFAULT_SETTINGS.core, mixedPort: 7891 } },
+      payload: { ...base, core: { ...base.core, mixedPort: 7891 } },
     });
 
     expect(response.statusCode).toBe(200);
