@@ -231,9 +231,7 @@ export const ZH = {
   'settings.initializing': '初始化中…',
   'settings.initializeTitle': '把初始化标记落成 false，内容不动',
   'settings.initialized': '已初始化：之后启动直接按 config.json 生效，不再加载引导',
-  'settings.applyButton': '保存界面常量',
-  'settings.applyTitle': '把上面显示的界面常量写回 config.json',
-  'settings.uiConfigSaved': '界面常量已保存到 config.json',
+  'settings.autoDownloadFailed': '设置已保存，但订阅自动下载失败：{error}',
   'settings.uiConfigUnavailable': '界面常量还没读出来',
   'settings.shareNote':
     '字符串里只有界面常量、自定义规则、内核路径与系统代理期望值；订阅与内核 secret 不外传。',
@@ -476,9 +474,7 @@ export const EN: Record<MessageKey, string> = {
   'settings.initializing': 'Initializing…',
   'settings.initializeTitle': 'Set the initialized flag to false, content untouched',
   'settings.initialized': 'Initialized: the next start uses config.json directly, no setup flow',
-  'settings.applyButton': 'Save UI constants',
-  'settings.applyTitle': 'Write the UI constants shown above back to config.json',
-  'settings.uiConfigSaved': 'UI constants saved to config.json',
+  'settings.autoDownloadFailed': 'Settings saved, but the subscription download failed: {error}',
   'settings.uiConfigUnavailable': 'UI constants are not loaded yet',
   'settings.shareNote':
     'The string carries only UI constants, custom rules, the kernel path and the desired system proxy; the subscription and the kernel secret never leave this machine.',

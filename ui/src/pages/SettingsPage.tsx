@@ -51,6 +51,9 @@ export default function SettingsPage() {
     mutationFn: (settings: Settings) => api.saveSettings(settings),
     onSuccess: async (result) => {
       notices.push('ok', result.needsRestart ? t('settings.savedNeedsRestart') : t('common.saved'));
+      if (result.subscription.error !== null) {
+        notices.push('error', t('settings.autoDownloadFailed', { error: result.subscription.error }));
+      }
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       await queryClient.invalidateQueries({ queryKey: ['status'] });
     },
@@ -92,19 +95,6 @@ export default function SettingsPage() {
     mutationFn: () => api.initializeUiConfig(),
     onSuccess: async () => {
       notices.push('ok', t('settings.initialized'));
-      await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
-    },
-    onError: (error: Error) => notices.push('error', error.message),
-  });
-
-  const applyUiConfig = useMutation({
-    mutationFn: () => {
-      const config = uiConfigQuery.data?.config;
-      if (config === undefined) throw new Error(t('settings.uiConfigUnavailable'));
-      return api.applyUiConfig(config);
-    },
-    onSuccess: async () => {
-      notices.push('ok', t('settings.uiConfigSaved'));
       await queryClient.invalidateQueries({ queryKey: ['ui-config'] });
     },
     onError: (error: Error) => notices.push('error', error.message),
@@ -299,18 +289,6 @@ export default function SettingsPage() {
             {initializeConfig.isPending
               ? t('settings.initializing')
               : t('settings.initializeButton')}
-          </button>
-          <button
-            type="button"
-            className="rounded border border-slate-300 bg-white px-3 py-1 text-sm hover:bg-slate-50 disabled:opacity-50"
-            disabled={applyUiConfig.isPending || uiConfigQuery.data === undefined}
-            title={t('settings.applyTitle')}
-            onClick={() => {
-              notices.clear();
-              applyUiConfig.mutate();
-            }}
-          >
-            {applyUiConfig.isPending ? t('common.saving') : t('settings.applyButton')}
           </button>
         </div>
         <p className="text-xs text-slate-400">{t('settings.shareNote')}</p>

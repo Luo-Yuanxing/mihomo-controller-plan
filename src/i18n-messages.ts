@@ -116,6 +116,7 @@ export const ZH = {
   'routes.recover.proxyPointed': '内核已就绪，系统代理已指向内核',
   'routes.recover.proxyDisabled': '内核不可用，已关闭系统代理以免整机断网',
   'routes.settingsRestartFailed': '设置已保存，但内核重启失败：{error}',
+  'routes.subscriptionAutoDownloadFailed': '订阅自动下载失败：{error}',
   'routes.shareBinaryMissing': '分享串里的内核路径在本机不存在（{path}），已保留本机当前路径',
   'routes.proxyGroupMissing': '代理组不存在：{group}',
   'routes.nodeNotInGroup': '节点不在代理组 {group} 中：{name}',
@@ -222,6 +223,7 @@ export const EN: Record<MessageKey, string> = {
   'routes.recover.proxyPointed': 'the kernel is ready, the system proxy now points to it',
   'routes.recover.proxyDisabled': 'the kernel is unavailable, the system proxy was disabled',
   'routes.settingsRestartFailed': 'Settings saved, but the kernel failed to restart: {error}',
+  'routes.subscriptionAutoDownloadFailed': 'Automatic subscription download failed: {error}',
   'routes.shareBinaryMissing':
     'The kernel path from the pasted string does not exist here ({path}); the local path was kept',
   'routes.proxyGroupMissing': 'Proxy group not found: {group}',

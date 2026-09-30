@@ -206,8 +206,10 @@ describe.skipIf(!canLoadFastify)('PUT /api/settings', () => {
 
   const extra = () => {
     const restarts: string[] = [];
+    const refreshes: string[] = [];
     return {
       restarts,
+      refreshes,
       context: {
         subscription: {
           url: '',
@@ -220,6 +222,10 @@ describe.skipIf(!canLoadFastify)('PUT /api/settings', () => {
         },
         saveSettings: async (next: unknown) => next,
         writeConfig: async () => undefined,
+        refreshSubscription: async () => {
+          refreshes.push('refresh');
+          return { url: '', useProxy: false, userAgent: '', refreshing: false };
+        },
         kernel: {
           status: () => ({ state: 'running' }),
           restart: async () => {
@@ -280,6 +286,37 @@ describe.skipIf(!canLoadFastify)('PUT /api/settings', () => {
     expect(response.statusCode).toBe(400);
     expect(response.json<{ error: string }>().error).toContain('不存在或不可读');
     expect(restarts).toHaveLength(0);
+    await app.close();
+  });
+
+  it('订阅 URL 换成新的非空值就自动下一份', async () => {
+    const { refreshes, context } = extra();
+    const app = buildApp(fakeApi(), { ...context, settings: withProxyGroup('Proxy') });
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: {
+        ...withProxyGroup('Proxy'),
+        subscription: { ...DEFAULT_SETTINGS.subscription, url: 'https://example.com/sub' },
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<{ subscription: { error: string | null } }>().subscription.error).toBeNull();    expect(refreshes).toHaveLength(1);
+    await app.close();
+  });
+
+  it('订阅 URL 没变就不重复下载', async () => {
+    const { refreshes, context } = extra();
+    const app = buildApp(fakeApi(), { ...context, settings: withProxyGroup('Proxy') });
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/settings',
+      payload: withProxyGroup('Proxy'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(refreshes).toHaveLength(0);
     await app.close();
   });
 });

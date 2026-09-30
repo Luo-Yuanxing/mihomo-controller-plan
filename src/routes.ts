@@ -259,9 +259,13 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
    * 保存设置并做完副作用：路径校验 → 落盘 → 通知内核/守护 → 重写 config.yaml，
    * 换了 PROXY 指代就重建代理组。PUT /api/settings 与"按配置文件加载"共用。
    */
-  const applySettings = async (
-    next: Settings,
-  ): Promise<{ settings: Settings; needsRestart: boolean; groupsRebuilt: boolean }> => {
+  const applySettings = async (next: Settings): Promise<{
+    settings: Settings;
+    needsRestart: boolean;
+    groupsRebuilt: boolean;
+    /** 订阅 URL 这次有变化时才会自动下一份；失败原因回给界面，不再抛错。 */
+    subscriptionError?: string;
+  }> => {
     // 内核路径和界面常量配置文件一样：解析成绝对路径并落盘，路径不存在直接拒绝
     const binaryPath = resolveBinaryPath(ctx.appDir, next.core.binaryPath);
 
@@ -275,10 +279,25 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
     if (previous.core.mixedPort !== settings.core.mixedPort) {
       await ctx.guard.setServer(`127.0.0.1:${settings.core.mixedPort}`);
     }
+    const previousUrl = ctx.subscription.url;
     ctx.subscription.url = settings.subscription.url;
     ctx.subscription.useProxy = settings.subscription.useProxy;
     ctx.subscription.userAgent = settings.subscription.userAgent;
     await ctx.writeConfig();
+
+    /**
+     * 订阅 URL 换成新的非空值就顺手下一份：用户不必再去状态页点一次刷新。
+     * 下载失败只回报原因，设置本身已经落盘（订阅文件保留旧的）。
+     */
+    let subscriptionError: string | undefined;
+    if (settings.subscription.url !== '' && settings.subscription.url !== previousUrl) {
+      try {
+        await ctx.refreshSubscription();
+      } catch (error) {
+        subscriptionError = errorText(error);
+        ctx.log.warn({ err: subscriptionError }, '保存设置后自动下载订阅失败');
+      }
+    }
 
     const needsRestart =
       previous.core.mixedPort !== settings.core.mixedPort ||
@@ -297,18 +316,30 @@ export function registerRoutes(app: FastifyInstance, ctx: AppContext): void {
             502,
           );
         }
-        return { settings, needsRestart, groupsRebuilt: true };
+        return {
+          settings,
+          needsRestart,
+          groupsRebuilt: true,
+          ...(subscriptionError === undefined ? {} : { subscriptionError }),
+        };
       }
     }
 
-    return { settings, needsRestart, groupsRebuilt: false };
+    return {
+      settings,
+      needsRestart,
+      groupsRebuilt: false,
+      ...(subscriptionError === undefined ? {} : { subscriptionError }),
+    };
   };
 
   app.put('/api/settings', async (request, reply) => {
     const parsed = settingsSchema.safeParse(request.body);
     if (!parsed.success) return invalid(reply, parsed.error);
     try {
-      return await applySettings(parsed.data);
+      const result = await applySettings(parsed.data);
+      // 自动下载的结果一并回给界面：成功是 null，失败是原因（设置已保存）
+      return { ...result, subscription: { error: result.subscriptionError ?? null } };
     } catch (error) {
       const status = error instanceof SettingsApplyError ? error.status : 400;
       return reply.status(status).send({ error: errorText(error) });

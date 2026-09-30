@@ -110,14 +110,17 @@ export const api = {
   importUiConfig: (payload: string) =>
     post<UiConfigImportResult>('/api/ui-config/import', { payload }),
 
+  /** 保存设置；订阅 URL 换成新的非空值时后端会顺手下一份订阅，失败原因在 subscription.error 里。 */
   saveSettings: (settings: Settings) =>
-    request<{ settings: Settings; needsRestart: boolean; groupsRebuilt: boolean }>(
-      '/api/settings',
-      {
-        method: 'PUT',
-        body: JSON.stringify(settings),
-      },
-    ),
+    request<{
+      settings: Settings;
+      needsRestart: boolean;
+      groupsRebuilt: boolean;
+      subscription: { error: string | null };
+    }>('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
 
   deleteSubscription: () =>
     request<{ deleted: boolean; config: SubscriptionConfig; kernel: CoreStatus }>(
