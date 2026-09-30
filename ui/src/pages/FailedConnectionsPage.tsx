@@ -233,7 +233,6 @@ export default function FailedConnectionsPage() {
           {t('failed.ruleType')}
           <select
             className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-900"
-            title={isDomainSuffix ? t('failed.suffixTruncated') : undefined}
             value={ruleType}
             onChange={(event) => setRuleType(event.target.value)}
           >
@@ -243,9 +242,6 @@ export default function FailedConnectionsPage() {
               </option>
             ))}
           </select>
-          {isDomainSuffix && (
-            <span className="text-xs text-slate-400">{t('failed.suffixTruncated')}</span>
-          )}
         </label>
         <label className="flex items-center gap-1 text-sm text-slate-500">
           {t('failed.policy')}
