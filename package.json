@@ -1,7 +1,7 @@
 {
   "name": "mihomo-controller-plan",
   "productName": "代理控制面板",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "mihomo 代理控制面板：规则热更新 + 内核托管 + 系统代理守护",
   "author": "Luo Yuanxing",
