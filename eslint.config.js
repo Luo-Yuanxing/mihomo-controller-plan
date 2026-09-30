@@ -17,6 +17,13 @@ export default defineConfig(
     },
   },
   {
+    // .cjs 在 type: module 的包里只能用 require：这是格式要求，不是风格问题
+    files: ['**/*.cjs'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',
