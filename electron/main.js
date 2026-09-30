@@ -2,11 +2,12 @@
  * Electron 壳：主进程即后台常驻程序。
  * 计划 §4.1 进程模型、§4.4 单实例、FR-12 托盘常驻与退出保护、§8 托盘菜单三项。
  */
-import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, session } from 'electron';
+import { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, session, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DEFAULT_LANGUAGE, isLanguage, t } from './messages.mjs';
 import { offlineAction } from './offline-actions.mjs';
+import { ensureDesktopShortcut } from './shortcut.mjs';
 
 /** 开发期由 Vite dev server 提供界面，打包后加载内置后端（同一进程）。 */
 const devServerUrl = process.env['MCP_DEV_SERVER_URL'] ?? '';
@@ -301,6 +302,9 @@ async function bootstrap() {
     // 托盘起不来不影响代理工作，只少了交互入口
     runningServer?.context.log.warn({ err: String(error) }, '托盘创建失败');
   }
+
+  // 首次运行补桌面快捷方式；版本目录换了也在这里自愈（失败只记日志）
+  ensureDesktopShortcut({ shell, app, log: runningServer?.context.log });
 
   await loadInitialLanguage();
 }
